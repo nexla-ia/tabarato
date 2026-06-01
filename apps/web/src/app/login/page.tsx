@@ -2,6 +2,7 @@
 import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import styles from './page.module.css'
@@ -31,7 +32,9 @@ export default function LoginPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.logo}>🛒 Tá Barato</div>
+        <div className={styles.logoWrap}>
+          <Image src="/logo.png" alt="Tá Barato" width={120} height={120} style={{ objectFit: 'contain' }} priority />
+        </div>
         <h1 className={styles.title}>Entrar na conta</h1>
         <p className={styles.sub}>Acesse sua conta para fazer pedidos</p>
 

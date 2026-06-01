@@ -1,7 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { ShoppingBag, Bell, LogOut, User, ShoppingCart } from 'lucide-react'
+import { ShoppingBag, LogOut, ShoppingCart } from 'lucide-react'
+import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
 import { useCartStore } from '@/stores/cart'
 import styles from './Navbar.module.css'
@@ -21,7 +22,7 @@ export function Navbar() {
     <header className={styles.nav}>
       <div className={`container ${styles.inner}`}>
         <Link href="/" className={styles.logo}>
-          🛒 <span>Tá Barato</span>
+          <Image src="/logo-wide.png" alt="Tá Barato" height={40} width={160} style={{ objectFit: 'contain', height: 40, width: 'auto' }} priority />
         </Link>
 
         <div className={styles.actions}>
