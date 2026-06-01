@@ -1,6 +1,6 @@
 import type { AuthUser, Courier, Stats, Store, User } from './types'
 
-const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
+const BASE: string = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) || '/api'
 
 function getToken() {
   return localStorage.getItem('admin_token')
