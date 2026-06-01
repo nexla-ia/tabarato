@@ -2,11 +2,13 @@
 import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { api, setToken } from '@/lib/api'
+import { api } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 import styles from '../login/page.module.css'
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { login } = useAuth()
   const [name, setName]         = useState('')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -19,8 +21,7 @@ export default function RegisterPage() {
     setError(''); setLoading(true)
     try {
       const { data } = await api.post('/auth/register', { name, email, password, phone: phone || undefined })
-      setToken(data.accessToken)
-      localStorage.setItem('tb_user', JSON.stringify(data.user))
+      login(data.accessToken, data.user)
       router.push('/')
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Erro ao criar conta')

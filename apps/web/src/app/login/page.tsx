@@ -2,11 +2,13 @@
 import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { api, setToken } from '@/lib/api'
+import { api } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 import styles from './page.module.css'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { login } = useAuth()
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
@@ -17,8 +19,7 @@ export default function LoginPage() {
     setError(''); setLoading(true)
     try {
       const { data } = await api.post('/auth/login', { email, password })
-      setToken(data.accessToken)
-      localStorage.setItem('tb_user', JSON.stringify(data.user))
+      login(data.accessToken, data.user)
       router.push('/')
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Credenciais inválidas')

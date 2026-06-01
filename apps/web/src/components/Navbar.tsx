@@ -1,40 +1,50 @@
 'use client'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { ShoppingBag, Bell, LogOut, User } from 'lucide-react'
-import { clearToken } from '@/lib/api'
+import { useRouter, usePathname } from 'next/navigation'
+import { ShoppingBag, Bell, LogOut, User, ShoppingCart } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
+import { useCartStore } from '@/stores/cart'
 import styles from './Navbar.module.css'
 
-export function Navbar({ user }: { user?: { name: string } | null }) {
+export function Navbar() {
   const router = useRouter()
+  const pathname = usePathname()
+  const { user, logout } = useAuth()
+  const cartCount = useCartStore(s => s.items.reduce((a, i) => a + i.quantity, 0))
 
   function handleLogout() {
-    clearToken()
-    router.push('/login')
+    logout()
+    router.push('/')
   }
 
   return (
     <header className={styles.nav}>
       <div className={`container ${styles.inner}`}>
         <Link href="/" className={styles.logo}>
-          <span className={styles.logoEmoji}>🛒</span>
-          <span>Tá Barato</span>
+          🛒 <span>Tá Barato</span>
         </Link>
 
         <div className={styles.actions}>
+          {/* Cart */}
+          <Link href="/cart" className={`${styles.iconBtn} ${pathname === '/cart' ? styles.iconBtnActive : ''}`} title="Carrinho">
+            <div style={{ position: 'relative' }}>
+              <ShoppingCart size={20} />
+              {cartCount > 0 && (
+                <span className={styles.cartBadge}>{cartCount > 9 ? '9+' : cartCount}</span>
+              )}
+            </div>
+          </Link>
+
           {user ? (
             <>
-              <Link href="/orders" className={styles.iconBtn} title="Meus pedidos">
+              <Link href="/orders" className={`${styles.iconBtn} ${pathname.startsWith('/orders') ? styles.iconBtnActive : ''}`} title="Meus pedidos">
                 <ShoppingBag size={20} />
               </Link>
-              <Link href="/notifications" className={styles.iconBtn} title="Notificações">
-                <Bell size={20} />
-              </Link>
-              <Link href="/profile" className={styles.iconBtn} title="Perfil">
-                <User size={20} />
+              <Link href="/profile" className={`${styles.iconBtn} ${pathname === '/profile' ? styles.iconBtnActive : ''}`} title="Perfil">
+                <div className={styles.avatarCircle}>{user.name?.[0]?.toUpperCase()}</div>
               </Link>
               <button className={styles.iconBtn} onClick={handleLogout} title="Sair">
-                <LogOut size={20} />
+                <LogOut size={18} />
               </button>
             </>
           ) : (
