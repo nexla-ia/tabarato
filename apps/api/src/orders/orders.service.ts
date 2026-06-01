@@ -1,10 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { OrderStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { CouponsService } from '../coupons/coupons.service'
 import { PushService } from '../common/push.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { PaymentsService } from '../payments/payments.service'
+import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
 import { CreateOrderDto } from './dto/create-order.dto'
 
 // Vilhena-RO runs at UTC-4 (no DST)
@@ -53,6 +54,7 @@ export class OrdersService {
     private push: PushService,
     private notifications: NotificationsService,
     private payments: PaymentsService,
+    @Optional() private matching: DeliveryMatchingService,
   ) {}
 
   async create(userId: string, dto: CreateOrderDto) {
@@ -309,16 +311,13 @@ export class OrdersService {
       include: { user: { select: { pushToken: true } } },
     })
 
-    // Auto-create delivery when order is ready — couriers will pick it up
+    // Auto-create delivery when order is ready and start auto-match
     if (status === 'READY') {
       const existing = await this.prisma.delivery.findUnique({ where: { orderId } })
       if (!existing) {
-        const distanceKm = haversineKm(
-          store.lat, store.lng,
-          order.address.lat, order.address.lng,
-        )
-        const courierFee = calcCourierFee(distanceKm)
-        await this.prisma.delivery.create({
+        const distanceKm = haversineKm(store.lat, store.lng, order.address.lat, order.address.lng)
+        const courierFee  = calcCourierFee(distanceKm)
+        const delivery    = await this.prisma.delivery.create({
           data: {
             orderId,
             distanceKm: Math.round(distanceKm * 10) / 10,
@@ -326,6 +325,8 @@ export class OrdersService {
             status: 'SEARCHING_COURIER',
           },
         })
+        // Start auto-match: 1km → 2km → 3km, 30s per radius
+        this.matching?.startMatching(delivery.id, store.lat, store.lng).catch(() => {})
       }
     }
 

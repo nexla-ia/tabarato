@@ -1,0 +1,48 @@
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.05);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+}
+
+.logo {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 20px; font-weight: 800; color: var(--orange);
+  letter-spacing: -0.4px;
+}
+
+.logoEmoji { font-size: 22px; }
+
+.actions { display: flex; align-items: center; gap: 8px; }
+
+.iconBtn {
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 10px;
+  color: var(--muted); background: var(--bg);
+  transition: background 0.15s, color 0.15s;
+}
+.iconBtn:hover { background: var(--orange-light); color: var(--orange); }
+
+.loginBtn {
+  padding: 8px 16px; border-radius: 10px;
+  font-weight: 700; font-size: 14px;
+  color: var(--orange); background: var(--orange-light);
+  transition: background 0.15s;
+}
+.loginBtn:hover { background: #FFE4CC; }
+
+.signupBtn {
+  padding: 8px 16px; border-radius: 10px;
+  font-weight: 700; font-size: 14px;
+  color: #fff; background: var(--orange);
+  box-shadow: 0 3px 10px rgba(255,102,0,0.3);
+  transition: background 0.15s;
+}
+.signupBtn:hover { background: var(--orange-dark); }

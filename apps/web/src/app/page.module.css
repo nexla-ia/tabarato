@@ -1,0 +1,26 @@
+.hero {
+  background: linear-gradient(135deg, var(--orange) 0%, #CC4400 100%);
+  padding: 56px 0 48px;
+  margin-bottom: 36px;
+}
+
+.heroTitle {
+  font-size: clamp(28px, 5vw, 48px);
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -1px;
+  margin-bottom: 10px;
+}
+
+.heroSub {
+  font-size: 17px;
+  color: rgba(255,255,255,0.8);
+  max-width: 500px;
+}
+
+.loading {
+  padding: 60px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 15px;
+}

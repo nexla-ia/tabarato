@@ -1,9 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { DeliveryStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
 import { WalletService } from '../wallet/wallet.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import { DeliveryMatchingService } from './delivery-matching.service'
+import { DeliveryGateway } from './delivery.gateway'
 import { CreateCourierDto } from './dto/create-courier.dto'
 import { UpdateLocationDto } from './dto/update-location.dto'
 
@@ -14,6 +16,8 @@ export class CouriersService {
     private push: PushService,
     private wallet: WalletService,
     private notifications: NotificationsService,
+    @Optional() private matching: DeliveryMatchingService,
+    @Optional() private gateway: DeliveryGateway,
   ) {}
 
   async register(userId: string, dto: CreateCourierDto) {
@@ -38,11 +42,27 @@ export class CouriersService {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier profile not found')
 
-    return this.prisma.courier.update({
+    const updated = await this.prisma.courier.update({
       where: { id: courier.id },
       data: { currentLat: dto.lat, currentLng: dto.lng },
       select: { id: true, currentLat: true, currentLng: true, updatedAt: true },
     })
+
+    // Broadcast live position to consumers watching this courier's active delivery
+    if (this.gateway) {
+      const activeDelivery = await this.prisma.delivery.findFirst({
+        where: {
+          courierId: courier.id,
+          status: { notIn: ['SEARCHING_COURIER', 'DELIVERED', 'FAILED'] },
+        },
+        select: { orderId: true },
+      })
+      if (activeDelivery) {
+        this.gateway.broadcastPosition(activeDelivery.orderId, dto.lat, dto.lng)
+      }
+    }
+
+    return updated
   }
 
   async toggleOnline(userId: string) {
@@ -108,10 +128,15 @@ export class CouriersService {
     })
     if (!delivery) throw new NotFoundException('Delivery not available')
 
-    return this.prisma.delivery.update({
+    const updated = await this.prisma.delivery.update({
       where: { id: deliveryId },
       data: { courierId: courier.id, status: 'COURIER_HEADING_TO_STORE' },
     })
+
+    // Cancel auto-match timer — delivery is taken
+    this.matching?.cancelMatching(deliveryId)
+
+    return updated
   }
 
   async findWallet(userId: string) {
