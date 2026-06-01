@@ -89,9 +89,8 @@ export function Orders() {
 
   useEffect(() => {
     setLoading(true)
-    const q = filter !== 'ALL' ? `?status=${filter}` : ''
-    api.get(`/admin/orders${q}`)
-      .then(r => setOrders(r.data))
+    api.orders(filter !== 'ALL' ? filter : undefined)
+      .then((data: any[]) => setOrders(data))
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [filter])

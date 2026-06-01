@@ -1,6 +1,6 @@
 import type { AuthUser, Courier, Stats, Store, User } from './types'
 
-const BASE = '/api'
+const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
 
 function getToken() {
   return localStorage.getItem('admin_token')
@@ -57,4 +57,7 @@ export const api = {
     }),
 
   users: () => request<User[]>('/admin/users'),
+
+  orders: (status?: string) =>
+    request<any[]>(`/admin/orders${status ? `?status=${status}` : ''}`),
 }
