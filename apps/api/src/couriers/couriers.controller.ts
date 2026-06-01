@@ -77,6 +77,13 @@ export class CouriersController {
 
   @UseGuards(RolesGuard)
   @Roles('COURIER')
+  @Post('me/wallet/withdraw')
+  requestWithdrawal(@CurrentUser() user: any, @Body() body: { amount: number }) {
+    return this.couriersService.requestWithdrawal(user.sub, body.amount)
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('COURIER')
   @Patch('me/deliveries/:id/advance')
   advanceDelivery(@CurrentUser() user: any, @Param('id') id: string, @Body() body: { photoUrl?: string }) {
     return this.couriersService.advanceDelivery(user.sub, id, body.photoUrl)

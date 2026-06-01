@@ -184,7 +184,34 @@ export class OrdersService {
     if (dto.paymentMethod === 'PIX') {
       this.payments.createPixPayment(
         payment.id, total, order.id, payer?.email ?? 'cliente@tabarato.com.br',
-      ).catch(() => {}) // don't block order if MP is temporarily down
+      ).catch(() => {})
+    }
+
+    // Card payment — synchronous, update order status immediately
+    if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && dto.cardToken) {
+      try {
+        const result = await this.payments.createCardPayment(
+          payment.id, total, order.id,
+          dto.cardToken,
+          dto.installments ?? 1,
+          payer?.email ?? 'cliente@tabarato.com.br',
+          dto.payerCpf,
+        )
+        if (result.status === 'PAID') {
+          await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } })
+          if (store.user?.pushToken) {
+            this.push.send(store.user.pushToken, '✅ Pedido pago!', `Pedido #${order.id.slice(0, 8)} pago com cartão.`, { orderId: order.id })
+          }
+          this.notifications.create(store.userId, 'ORDER_UPDATE', '✅ Pedido pago!', `Pedido #${order.id.slice(0, 8)} · R$ ${total.toFixed(2)}`, { orderId: order.id }).catch(() => {})
+        } else if (result.status === 'FAILED') {
+          await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } })
+          await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } })
+          throw new BadRequestException(`Pagamento recusado. Motivo: ${result.statusDetail ?? 'cartão não autorizado'}. Verifique os dados e tente novamente.`)
+        }
+      } catch (err: any) {
+        if (err?.status === 400) throw err
+        throw new BadRequestException('Não foi possível processar o pagamento com cartão. Tente outro método.')
+      }
     }
 
     if (store.user?.pushToken) {

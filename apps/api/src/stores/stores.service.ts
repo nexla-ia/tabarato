@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { WalletService } from '../wallet/wallet.service'
 import { CreateStoreDto } from './dto/create-store.dto'
 import { UpdateStoreDto } from './dto/update-store.dto'
 
@@ -36,7 +37,7 @@ function computeIsOpen(openingHours: any): boolean | null {
 
 @Injectable()
 export class StoresService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private wallet: WalletService) {}
 
   private async syncIsOpen(storeId: string, openingHours: any, currentIsOpen: boolean): Promise<void> {
     const shouldBeOpen = computeIsOpen(openingHours)
@@ -185,5 +186,18 @@ export class StoresService {
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
     })
+  }
+
+  async findWallet(userId: string) {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new NotFoundException('Store not found')
+    return this.wallet.findByOwner(store.id, 'STORE')
+  }
+
+  async requestWithdrawal(userId: string, amount: number) {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new NotFoundException('Store not found')
+    await this.wallet.debit(store.id, 'STORE', amount, 'Saque solicitado', `saque-${Date.now()}`)
+    return { message: 'Saque solicitado com sucesso. Será processado em até 24h via PIX.' }
   }
 }

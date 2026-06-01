@@ -138,6 +138,13 @@ export class CouriersService {
     })
   }
 
+  async requestWithdrawal(userId: string, amount: number) {
+    const courier = await this.prisma.courier.findUnique({ where: { userId } })
+    if (!courier) throw new NotFoundException('Courier not found')
+    await this.wallet.debit(courier.id, 'COURIER', amount, 'Saque solicitado', `saque-${Date.now()}`)
+    return { message: 'Saque solicitado com sucesso. Será processado em até 24h via PIX.' }
+  }
+
   async returnDelivery(userId: string, deliveryId: string) {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier not found')
@@ -189,12 +196,20 @@ export class CouriersService {
 
     if (nextStatus === 'DELIVERED') {
       await this.prisma.order.update({ where: { id: delivery.orderId }, data: { status: 'DELIVERED' } })
-      await this.wallet.credit(
-        courier.id, 'COURIER',
-        delivery.courierFee,
-        `Entrega #${delivery.orderId.slice(0, 8)}`,
-        delivery.id,
-      )
+
+      // Credit courier wallet
+      await this.wallet.credit(courier.id, 'COURIER', delivery.courierFee, `Entrega #${delivery.orderId.slice(0, 8)}`, delivery.id)
+
+      // Credit store wallet: subtotal minus 10% platform fee
+      const fullOrder = await this.prisma.order.findUnique({
+        where: { id: delivery.orderId },
+        select: { subtotal: true, storeId: true },
+      })
+      if (fullOrder) {
+        const platformFee  = Math.round(fullOrder.subtotal * 0.10 * 100) / 100
+        const storeAmount  = Math.round((fullOrder.subtotal - platformFee) * 100) / 100
+        await this.wallet.credit(fullOrder.storeId, 'STORE', storeAmount, `Pedido #${delivery.orderId.slice(0, 8)}`, delivery.orderId)
+      }
     }
 
     const pushMessages: Partial<Record<DeliveryStatus, { title: string; body: string }>> = {

@@ -64,6 +64,57 @@ export class PaymentsService {
     }
   }
 
+  // ── Cartão de crédito/débito ──────────────────────────────────────────────────
+
+  async createCardPayment(
+    paymentId: string,
+    amount: number,
+    orderId: string,
+    cardToken: string,
+    installments: number,
+    payerEmail: string,
+    payerCpf?: string,
+  ) {
+    try {
+      const webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
+        ?? `${this.config.get<string>('API_URL') ?? ''}/api/webhooks/mercadopago`
+
+      const response = await this.mp.create({
+        body: {
+          transaction_amount: amount,
+          token: cardToken,
+          description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
+          installments,
+          payer: {
+            email: payerEmail,
+            ...(payerCpf
+              ? { identification: { type: 'CPF', number: payerCpf.replace(/\D/g, '') } }
+              : {}),
+          },
+          notification_url: webhookUrl,
+          external_reference: orderId,
+        } as any,
+      })
+
+      const mpStatus  = response.status // approved | rejected | pending | in_process
+      const gatewayId = String(response.id)
+
+      let status: 'PAID' | 'FAILED' | 'PENDING' = 'PENDING'
+      if (mpStatus === 'approved') status = 'PAID'
+      else if (mpStatus === 'rejected' || mpStatus === 'cancelled') status = 'FAILED'
+
+      await this.prisma.payment.update({
+        where: { id: paymentId },
+        data: { gatewayId, status, paidAt: status === 'PAID' ? new Date() : undefined },
+      })
+
+      return { gatewayId, status, mpStatus, statusDetail: (response as any).status_detail }
+    } catch (err) {
+      this.logger.error('MP Card payment failed', err)
+      throw err
+    }
+  }
+
   // ── Webhook ───────────────────────────────────────────────────────────────────
 
   async handleWebhook(body: any) {

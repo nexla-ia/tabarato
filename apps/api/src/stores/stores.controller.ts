@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, ParseFloatPipe, BadRequestException } from '@nestjs/common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -61,6 +61,21 @@ export class StoresController {
   @Post()
   create(@CurrentUser() user: any, @Body() dto: CreateStoreDto) {
     return this.storesService.create(user.sub, dto)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Get('my/wallet')
+  getWallet(@CurrentUser() user: any) {
+    return this.storesService.findWallet(user.sub)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Post('my/wallet/withdraw')
+  requestWithdrawal(@CurrentUser() user: any, @Body() body: { amount: number }) {
+    if (!body.amount || body.amount <= 0) throw new BadRequestException('Valor inválido para saque.')
+    return this.storesService.requestWithdrawal(user.sub, body.amount)
   }
 
   @Get(':id')

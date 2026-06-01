@@ -1,4 +1,4 @@
-import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator'
+import { IsArray, IsEnum, IsNumber, IsOptional, IsPositive, IsString, Min, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { PaymentMethod } from '@prisma/client'
 
@@ -41,4 +41,18 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   couponCode?: string
+
+  // Card payment fields (required when paymentMethod is CREDIT_CARD or DEBIT_CARD)
+  @IsString()
+  @IsOptional()
+  cardToken?: string
+
+  @IsNumber()
+  @IsPositive()
+  @IsOptional()
+  installments?: number
+
+  @IsString()
+  @IsOptional()
+  payerCpf?: string
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { WalletOwnerType } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 
@@ -23,6 +23,20 @@ export class WalletService {
       }),
       this.prisma.transaction.create({
         data: { walletId: wallet.id, amount, type: 'CREDIT', description, referenceId },
+      }),
+    ])
+  }
+
+  async debit(ownerId: string, ownerType: WalletOwnerType, amount: number, description: string, referenceId?: string) {
+    const wallet = await this.getOrCreate(ownerId, ownerType)
+    if (wallet.balance < amount) throw new BadRequestException('Saldo insuficiente para o saque solicitado.')
+    await this.prisma.$transaction([
+      this.prisma.wallet.update({
+        where: { id: wallet.id },
+        data: { balance: { decrement: amount } },
+      }),
+      this.prisma.transaction.create({
+        data: { walletId: wallet.id, amount, type: 'DEBIT', description, referenceId },
       }),
     ])
   }
