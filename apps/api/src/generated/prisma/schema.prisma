@@ -1,0 +1,411 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  CONSUMER
+  STORE_OWNER
+  COURIER
+  ADMIN
+}
+
+enum StoreStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  PICKED_UP
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  WALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum DeliveryStatus {
+  SEARCHING_COURIER
+  COURIER_ASSIGNED
+  COURIER_HEADING_TO_STORE
+  COURIER_AT_STORE
+  PICKED_UP
+  HEADING_TO_CLIENT
+  DELIVERED
+  FAILED
+}
+
+enum CourierStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum WalletOwnerType {
+  STORE
+  COURIER
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum NotificationType {
+  ORDER_UPDATE
+  DELIVERY_UPDATE
+  PAYMENT
+  PROMOTION
+  SYSTEM
+}
+
+// ─── USUÁRIOS ─────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(CONSUMER)
+  avatarUrl    String?  @map("avatar_url")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  addresses     Address[]
+  orders        Order[]
+  reviews       Review[]
+  notifications Notification[] @relation("RecipientNotifications")
+  store         Store?
+  courier       Courier?
+
+  @@map("users")
+}
+
+model Address {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  label      String
+  street     String
+  number     String
+  complement String?
+  district   String
+  city       String
+  state      String
+  zipCode    String   @map("zip_code")
+  lat        Float
+  lng        Float
+  isDefault  Boolean  @default(false) @map("is_default")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("addresses")
+}
+
+// ─── LOJAS ───────────────────────────────────────────────────────────────────
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  icon      String?
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  products Product[]
+  stores   Store[]   @relation("StoresToCategories")
+
+  @@map("categories")
+}
+
+model Store {
+  id               String      @id @default(uuid())
+  userId           String      @unique @map("user_id")
+  cnpj             String      @unique
+  name             String
+  description      String?
+  logoUrl          String?     @map("logo_url")
+  phone            String?
+  status           StoreStatus @default(PENDING)
+  prepTimeMin      Int         @default(30) @map("prep_time_min")
+  deliveryRadiusKm Float       @default(5.0) @map("delivery_radius_km")
+  lat              Float
+  lng              Float
+  address          String
+  pixKey           String?     @map("pix_key")
+  openingHours     Json?       @map("opening_hours")
+  isOpen           Boolean     @default(false) @map("is_open")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  user       User       @relation(fields: [userId], references: [id])
+  products   Product[]
+  orders     Order[]
+  categories Category[] @relation("StoresToCategories")
+
+  @@map("stores")
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  storeId       String   @map("store_id")
+  categoryId    String   @map("category_id")
+  name          String
+  description   String?
+  imageUrl      String?  @map("image_url")
+  hasVariations Boolean  @default(false) @map("has_variations")
+  basePrice     Float?   @map("base_price")
+  stock         Int?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  store      Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category   Category           @relation(fields: [categoryId], references: [id])
+  variations ProductVariation[]
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+model ProductVariation {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  sku       String?
+  name      String
+  size      String?
+  color     String?
+  price     Float
+  stock     Int      @default(0)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@map("product_variations")
+}
+
+// ─── PEDIDOS ─────────────────────────────────────────────────────────────────
+
+model Order {
+  id          String      @id @default(uuid())
+  userId      String      @map("user_id")
+  storeId     String      @map("store_id")
+  addressId   String      @map("address_id")
+  paymentId   String?     @map("payment_id")
+  subtotal    Float
+  deliveryFee Float       @map("delivery_fee")
+  total       Float
+  status      OrderStatus @default(PENDING)
+  notes       String?
+  refusalNote String?     @map("refusal_note")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  user     User        @relation(fields: [userId], references: [id])
+  store    Store       @relation(fields: [storeId], references: [id])
+  address  Address     @relation(fields: [addressId], references: [id])
+  payment  Payment?    @relation(fields: [paymentId], references: [id])
+  items    OrderItem[]
+  delivery Delivery?
+  review   Review?
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(uuid())
+  orderId     String  @map("order_id")
+  productId   String  @map("product_id")
+  variationId String? @map("variation_id")
+  quantity    Int
+  unitPrice   Float   @map("unit_price")
+  notes       String?
+
+  order     Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product           @relation(fields: [productId], references: [id])
+  variation ProductVariation? @relation(fields: [variationId], references: [id])
+
+  @@map("order_items")
+}
+
+model Payment {
+  id           String        @id @default(uuid())
+  method       PaymentMethod
+  gatewayId    String?       @map("gateway_id")
+  status       PaymentStatus @default(PENDING)
+  amount       Float
+  pixCode      String?       @map("pix_code")
+  pixExpiresAt DateTime?     @map("pix_expires_at")
+  paidAt       DateTime?     @map("paid_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  orders Order[]
+
+  @@map("payments")
+}
+
+// ─── LOGÍSTICA ────────────────────────────────────────────────────────────────
+
+model Courier {
+  id           String        @id @default(uuid())
+  userId       String        @unique @map("user_id")
+  cpf          String        @unique
+  cnh          String        @unique
+  vehiclePlate String        @map("vehicle_plate")
+  vehicleType  String        @default("moto") @map("vehicle_type")
+  photoUrl     String?       @map("photo_url")
+  status       CourierStatus @default(PENDING)
+  isOnline     Boolean       @default(false) @map("is_online")
+  currentLat   Float?        @map("current_lat")
+  currentLng   Float?        @map("current_lng")
+  rating       Float         @default(5.0)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  user       User       @relation(fields: [userId], references: [id])
+  deliveries Delivery[]
+
+  @@map("couriers")
+}
+
+model Delivery {
+  id          String         @id @default(uuid())
+  orderId     String         @unique @map("order_id")
+  courierId   String         @map("courier_id")
+  distanceKm  Float          @map("distance_km")
+  courierFee  Float          @map("courier_fee")
+  status      DeliveryStatus @default(SEARCHING_COURIER)
+  photoUrl    String?        @map("photo_url")
+  pickedUpAt  DateTime?      @map("picked_up_at")
+  deliveredAt DateTime?      @map("delivered_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  courier Courier @relation(fields: [courierId], references: [id])
+
+  @@map("deliveries")
+}
+
+// ─── FINANCEIRO ───────────────────────────────────────────────────────────────
+
+model Wallet {
+  id        String          @id @default(uuid())
+  ownerId   String          @map("owner_id")
+  ownerType WalletOwnerType @map("owner_type")
+  balance   Float           @default(0)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  transactions Transaction[]
+
+  @@unique([ownerId, ownerType])
+  @@map("wallets")
+}
+
+model Transaction {
+  id          String          @id @default(uuid())
+  walletId    String          @map("wallet_id")
+  amount      Float
+  type        TransactionType
+  description String?
+  referenceId String?         @map("reference_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@map("transactions")
+}
+
+// ─── ENGAJAMENTO ─────────────────────────────────────────────────────────────
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  orderId   String   @unique @map("order_id")
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id])
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("reviews")
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  recipientId String           @map("recipient_id")
+  type        NotificationType
+  title       String
+  body        String?
+  data        Json?
+  isRead      Boolean          @default(false) @map("is_read")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  recipient User @relation("RecipientNotifications", fields: [recipientId], references: [id])
+
+  @@map("notifications")
+}
+
+// ─── PROMOÇÕES ────────────────────────────────────────────────────────────────
+
+model Coupon {
+  id              String    @id @default(uuid())
+  code            String    @unique
+  description     String?
+  discountPercent Float?    @map("discount_percent")
+  discountFixed   Float?    @map("discount_fixed")
+  minOrderValue   Float?    @map("min_order_value")
+  maxUses         Int?      @map("max_uses")
+  usedCount       Int       @default(0) @map("used_count")
+  expiresAt       DateTime? @map("expires_at")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  uses CouponUse[]
+
+  @@map("coupons")
+}
+
+model CouponUse {
+  id       String   @id @default(uuid())
+  couponId String   @map("coupon_id")
+  userId   String   @map("user_id")
+  orderId  String   @map("order_id")
+  usedAt   DateTime @default(now()) @map("used_at")
+
+  coupon Coupon @relation(fields: [couponId], references: [id])
+
+  @@unique([couponId, userId])
+  @@map("coupon_uses")
+}

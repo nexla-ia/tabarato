@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@tabarato/types": ["./packages/types/src/index.ts"],
+      "@tabarato/utils": ["./packages/utils/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules"]
+}
