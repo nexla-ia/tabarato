@@ -19,15 +19,13 @@ export class WebhooksController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post('mercadopago')
-  handleMp(
+  async handleMp(
     @Body() body: any,
     @Headers('x-signature') xSignature: string,
     @Headers('x-request-id') xRequestId: string,
     @Req() req: RawBodyRequest<any>,
   ) {
-    // Validate MP webhook signature before processing
-    // handleWebhook will verify using the MERCADO_PAGO_WEBHOOK_SECRET env var
-    this.paymentsService.handleWebhook(body, xSignature, xRequestId, req.rawBody)
+    await this.paymentsService.handleWebhook(body, xSignature, xRequestId, req.rawBody)
     return { ok: true }
   }
 }

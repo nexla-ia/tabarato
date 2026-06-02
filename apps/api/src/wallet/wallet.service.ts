@@ -60,6 +60,6 @@ export class WalletService {
       orderBy: { createdAt: 'desc' },
       take: 30,
     })
-    return { balance: wallet.balance, transactions }
+    return { balance: Number(wallet.balance), transactions }
   }
 }

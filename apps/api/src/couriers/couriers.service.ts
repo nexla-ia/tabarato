@@ -225,7 +225,7 @@ export class CouriersService {
       if (photoUrl) updateData.photoUrl = photoUrl
     }
 
-    const updated = await this.prisma.delivery.update({ where: { id: deliveryId }, data: updateData })
+    let updated: Awaited<ReturnType<typeof this.prisma.delivery.update>>
 
     if (nextStatus === 'DELIVERED') {
       // Fetch full order data needed for wallet credits
@@ -234,56 +234,46 @@ export class CouriersService {
         select: { subtotal: true, storeId: true },
       })
 
-      if (fullOrder) {
-        const platformFee = Math.round(Number(fullOrder.subtotal) * 0.10 * 100) / 100
-        const storeAmount = Math.round((Number(fullOrder.subtotal) - platformFee) * 100) / 100
-        const courierFee  = Number(delivery.courierFee)
+      if (!fullOrder) throw new NotFoundException('Order not found')
 
-        // Everything in one atomic transaction: status updates + both wallet credits
-        await this.prisma.$transaction(async (tx) => {
-          await tx.order.update({ where: { id: delivery.orderId }, data: { status: 'DELIVERED' } })
+      const platformFee = Math.round(Number(fullOrder.subtotal) * 0.10 * 100) / 100
+      const storeAmount = Math.round((Number(fullOrder.subtotal) - platformFee) * 100) / 100
+      const courierFee  = Number(delivery.courierFee)
 
-          // Courier wallet — get/create then credit
-          const courierWallet = await tx.wallet.upsert({
-            where: { ownerId_ownerType: { ownerId: courier.id, ownerType: 'COURIER' } },
-            update: {},
-            create: { ownerId: courier.id, ownerType: 'COURIER', balance: 0 },
-          })
-          await tx.wallet.update({
-            where: { id: courierWallet.id },
-            data: { balance: { increment: courierFee } },
-          })
-          await tx.transaction.create({
-            data: {
-              walletId: courierWallet.id,
-              amount: courierFee,
-              type: 'CREDIT',
-              description: `Entrega #${delivery.orderId.slice(0, 8)}`,
-              referenceId: delivery.id,
-            },
-          })
+      // Delivery update + order status + both wallet credits — all in one atomic transaction
+      updated = await this.prisma.$transaction(async (tx) => {
+        const d = await tx.delivery.update({ where: { id: deliveryId }, data: updateData })
+        await tx.order.update({ where: { id: delivery.orderId }, data: { status: 'DELIVERED' } })
 
-          // Store wallet — get/create then credit
-          const storeWallet = await tx.wallet.upsert({
-            where: { ownerId_ownerType: { ownerId: fullOrder.storeId, ownerType: 'STORE' } },
-            update: {},
-            create: { ownerId: fullOrder.storeId, ownerType: 'STORE', balance: 0 },
-          })
-          await tx.wallet.update({
-            where: { id: storeWallet.id },
-            data: { balance: { increment: storeAmount } },
-          })
-          await tx.transaction.create({
-            data: {
-              walletId: storeWallet.id,
-              amount: storeAmount,
-              type: 'CREDIT',
-              description: `Pedido #${delivery.orderId.slice(0, 8)}`,
-              referenceId: delivery.orderId,
-            },
-          })
+        // Courier wallet — get/create then credit
+        const courierWallet = await tx.wallet.upsert({
+          where: { ownerId_ownerType: { ownerId: courier.id, ownerType: 'COURIER' } },
+          update: {},
+          create: { ownerId: courier.id, ownerType: 'COURIER', balance: 0 },
         })
-      }
+        await tx.wallet.update({ where: { id: courierWallet.id }, data: { balance: { increment: courierFee } } })
+        await tx.transaction.create({
+          data: { walletId: courierWallet.id, amount: courierFee, type: 'CREDIT',
+            description: `Entrega #${delivery.orderId.slice(0, 8)}`, referenceId: delivery.id },
+        })
+
+        // Store wallet — get/create then credit
+        const storeWallet = await tx.wallet.upsert({
+          where: { ownerId_ownerType: { ownerId: fullOrder.storeId, ownerType: 'STORE' } },
+          update: {},
+          create: { ownerId: fullOrder.storeId, ownerType: 'STORE', balance: 0 },
+        })
+        await tx.wallet.update({ where: { id: storeWallet.id }, data: { balance: { increment: storeAmount } } })
+        await tx.transaction.create({
+          data: { walletId: storeWallet.id, amount: storeAmount, type: 'CREDIT',
+            description: `Pedido #${delivery.orderId.slice(0, 8)}`, referenceId: delivery.orderId },
+        })
+
+        return d
+      })
+    } else {
+      // For non-terminal transitions just update the delivery
+      updated = await this.prisma.delivery.update({ where: { id: deliveryId }, data: updateData })
     }
 
     const pushMessages: Partial<Record<DeliveryStatus, { title: string; body: string }>> = {

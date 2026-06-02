@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
+import { useAuth } from '@/hooks/useAuth'
 import styles from './StoreClient.module.css'
 
 interface Product {
@@ -22,28 +23,27 @@ function fmtBRL(v: number) { return `R$ ${v.toFixed(2).replace('.', ',')}` }
 
 export function StoreClient({ store, products }: { store: Store; products: Product[] }) {
   const { items, addItem, total, storeId } = useCartStore()
+  const { user } = useAuth()
   const [confirmClear, setConfirmClear] = useState<(() => void) | null>(null)
   const cartCount = items.reduce((a, i) => a + i.quantity, 0)
 
   function handleAdd(product: Product, variation?: { id: string; name: string; price: number }) {
     const price = variation?.price ?? product.basePrice ?? 0
+    const cartItem = {
+      productId: product.id, variationId: variation?.id, name: product.name,
+      price, quantity: 1, imageUrl: product.imageUrl ?? undefined, variationName: variation?.name,
+    }
 
     if (storeId && storeId !== store.id) {
       setConfirmClear(() => () => {
         useCartStore.getState().clear()
-        addItem(store.id, store.name, {
-          productId: product.id, variationId: variation?.id, name: product.name,
-          price, quantity: 1, imageUrl: product.imageUrl ?? undefined, variationName: variation?.name,
-        })
+        addItem(store.id, store.name, cartItem, user?.id)
         setConfirmClear(null)
       })
       return
     }
 
-    addItem(store.id, store.name, {
-      productId: product.id, variationId: variation?.id, name: product.name,
-      price, quantity: 1, imageUrl: product.imageUrl ?? undefined, variationName: variation?.name,
-    })
+    addItem(store.id, store.name, cartItem, user?.id)
   }
 
   return (
