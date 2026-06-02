@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { OrderStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { CouponsService } from '../coupons/coupons.service'
@@ -8,7 +8,6 @@ import { PaymentsService } from '../payments/payments.service'
 import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
 import { CreateOrderDto } from './dto/create-order.dto'
 
-// Vilhena-RO runs at UTC-4 (no DST)
 function isStoreOpenNow(openingHours: any): boolean | null {
   if (!openingHours || !Array.isArray(openingHours)) return null
   const localMs  = Date.now() - 4 * 60 * 60 * 1000
@@ -33,7 +32,7 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
 
 function calcCourierFee(distanceKm: number): number {
   const BASE = 10
-  const RATE = 2 // R$/km
+  const RATE = 2
   return Math.round((BASE + distanceKm * RATE) * 100) / 100
 }
 
@@ -48,6 +47,8 @@ const STATUS_PUSH: Partial<Record<OrderStatus, { title: string; body: string }>>
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name)
+
   constructor(
     private prisma: PrismaService,
     private coupons: CouponsService,
@@ -67,7 +68,6 @@ export class OrdersService {
     ])
     if (!store) throw new BadRequestException('Loja não encontrada')
 
-    // Check real-time opening hours first; fall back to the isOpen flag
     const openNow = isStoreOpenNow(store.openingHours)
     const closed  = openNow !== null ? !openNow : !store.isOpen
     if (closed) throw new BadRequestException('Esta loja está fechada no momento. Tente novamente mais tarde.')
@@ -85,7 +85,7 @@ export class OrdersService {
       unitPrice: number
       notes?: string
     }[] = []
-    const stockDecrements: { id: string; by: number }[] = []
+    const stockDecrements: { id: string; type: 'variation' | 'product'; by: number }[] = []
 
     for (const item of dto.items) {
       const product = await this.prisma.product.findUnique({
@@ -96,12 +96,11 @@ export class OrdersService {
         throw new BadRequestException(`Product ${item.productId} not available`)
       }
 
-      // Stock check
       if (product.stock !== null && product.stock < item.quantity) {
         throw new BadRequestException(`Produto "${product.name}" tem apenas ${product.stock} unidade(s) disponível(is).`)
       }
 
-      let unitPrice = product.basePrice ?? 0
+      let unitPrice = Number(product.basePrice ?? 0)
 
       if (item.variationId) {
         const variation = product.variations.find((v) => v.id === item.variationId)
@@ -109,10 +108,10 @@ export class OrdersService {
         if (variation.stock < item.quantity) {
           throw new BadRequestException(`Variação "${variation.name}" tem apenas ${variation.stock} unidade(s) disponível(is).`)
         }
-        unitPrice = variation.price
-        stockDecrements.push({ id: variation.id, by: item.quantity })
+        unitPrice = Number(variation.price)
+        stockDecrements.push({ id: variation.id, type: 'variation', by: item.quantity })
       } else {
-        if (product.stock !== null) stockDecrements.push({ id: product.id, by: item.quantity })
+        if (product.stock !== null) stockDecrements.push({ id: product.id, type: 'product', by: item.quantity })
       }
 
       subtotal += unitPrice * item.quantity
@@ -128,7 +127,6 @@ export class OrdersService {
     const distanceKm = haversineKm(store.lat, store.lng, address.lat, address.lng)
     const deliveryFee = calcCourierFee(distanceKm)
 
-    // Apply coupon if provided
     let discount = 0
     let couponId: string | undefined
     if (dto.couponCode) {
@@ -139,57 +137,68 @@ export class OrdersService {
 
     const total = subtotal + deliveryFee - discount
 
-    const payment = await this.prisma.payment.create({
-      data: { method: dto.paymentMethod, amount: total, status: 'PENDING' },
+    // Create payment + order in a single transaction to avoid orphaned records
+    const { payment, order } = await this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.create({
+        data: { method: dto.paymentMethod, amount: total, status: 'PENDING' },
+      })
+
+      const order = await tx.order.create({
+        data: {
+          userId,
+          storeId: dto.storeId,
+          addressId: dto.addressId,
+          paymentId: payment.id,
+          couponId,
+          subtotal,
+          deliveryFee,
+          discount,
+          total,
+          notes: dto.notes,
+          items: { create: orderItems },
+        },
+        include: {
+          items: { include: { product: true, variation: true } },
+          payment: true,
+          address: true,
+          store: { select: { id: true, name: true, logoUrl: true } },
+        },
+      })
+
+      // Coupon use + counter increment in the same transaction — prevents double-use
+      if (couponId) {
+        await tx.couponUse.create({ data: { couponId, userId, orderId: order.id } })
+        await tx.coupon.update({ where: { id: couponId }, data: { usedCount: { increment: 1 } } })
+      }
+
+      return { payment, order }
     })
 
-    const order = await this.prisma.order.create({
-      data: {
-        userId,
-        storeId: dto.storeId,
-        addressId: dto.addressId,
-        paymentId: payment.id,
-        couponId,
-        subtotal,
-        deliveryFee,
-        discount,
-        total,
-        notes: dto.notes,
-        items: { create: orderItems },
-      },
-      include: {
-        items: { include: { product: true, variation: true } },
-        payment: true,
-        address: true,
-        store: { select: { id: true, name: true, logoUrl: true } },
-      },
-    })
-
-    if (couponId) {
-      await this.prisma.$transaction([
-        this.prisma.couponUse.create({ data: { couponId, userId, orderId: order.id } }),
-        this.prisma.coupon.update({ where: { id: couponId }, data: { usedCount: { increment: 1 } } }),
-      ])
-    }
-
-    // Decrement stock
+    // Decrement stock (best-effort; stock is advisory not a hard constraint here)
     await Promise.all(
-      stockDecrements.map(({ id, by }) =>
-        this.prisma.productVariation.updateMany({ where: { id }, data: { stock: { decrement: by } } })
-          .catch(() =>
-            this.prisma.product.updateMany({ where: { id }, data: { stock: { decrement: by } } }),
-          ),
-      ),
+      stockDecrements.map(({ id, type, by }) => {
+        if (type === 'variation') {
+          return this.prisma.productVariation.updateMany({ where: { id }, data: { stock: { decrement: by } } })
+            .catch((err) => this.logger.warn(`Stock decrement failed for variation ${id}`, err))
+        }
+        return this.prisma.product.updateMany({ where: { id }, data: { stock: { decrement: by } } })
+          .catch((err) => this.logger.warn(`Stock decrement failed for product ${id}`, err))
+      }),
     )
 
-    // Create MP payment for PIX — fire-and-forget (order already saved)
+    // PIX — await so the QR code is available when the response returns
     if (dto.paymentMethod === 'PIX') {
-      this.payments.createPixPayment(
-        payment.id, total, order.id, payer?.email ?? 'cliente@tabarato.com.br',
-      ).catch(() => {})
+      try {
+        await this.payments.createPixPayment(
+          payment.id, total, order.id, payer?.email ?? 'cliente@tabarato.com.br',
+        )
+      } catch (err) {
+        this.logger.error('PIX payment creation failed after order was saved', err)
+        throw new BadRequestException('Não foi possível gerar o QR Code PIX. Tente outro método de pagamento.')
+      }
     }
 
-    // Card payment — synchronous, update order status immediately
+    // Card payment — synchronous
     if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && dto.cardToken) {
       try {
         const result = await this.payments.createCardPayment(
@@ -204,7 +213,8 @@ export class OrdersService {
           if (store.user?.pushToken) {
             this.push.send(store.user.pushToken, '✅ Pedido pago!', `Pedido #${order.id.slice(0, 8)} pago com cartão.`, { orderId: order.id })
           }
-          this.notifications.create(store.userId, 'ORDER_UPDATE', '✅ Pedido pago!', `Pedido #${order.id.slice(0, 8)} · R$ ${total.toFixed(2)}`, { orderId: order.id }).catch(() => {})
+          this.notifications.create(store.userId, 'ORDER_UPDATE', '✅ Pedido pago!', `Pedido #${order.id.slice(0, 8)} · R$ ${total.toFixed(2)}`, { orderId: order.id })
+            .catch((err) => this.logger.warn('Store notification failed', err))
         } else if (result.status === 'FAILED') {
           await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } })
           await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } })
@@ -225,14 +235,13 @@ export class OrdersService {
       )
     }
 
-    // In-app notification for store owner
     this.notifications.create(
       store.userId,
       'ORDER_UPDATE',
       '🛒 Novo pedido!',
       `Pedido #${order.id.slice(0, 8)} · R$ ${total.toFixed(2)}`,
       { orderId: order.id },
-    ).catch(() => {})
+    ).catch((err) => this.logger.warn('Store notification failed', err))
 
     return order
   }
@@ -311,7 +320,6 @@ export class OrdersService {
       include: { user: { select: { pushToken: true } } },
     })
 
-    // Auto-create delivery when order is ready and start auto-match
     if (status === 'READY') {
       const existing = await this.prisma.delivery.findUnique({ where: { orderId } })
       if (!existing) {
@@ -325,8 +333,9 @@ export class OrdersService {
             status: 'SEARCHING_COURIER',
           },
         })
-        // Start auto-match: 1km → 2km → 3km, 30s per radius
-        this.matching?.startMatching(delivery.id, store.lat, store.lng).catch(() => {})
+        this.matching?.startMatching(delivery.id, store.lat, store.lng).catch((err) => {
+          this.logger.warn('Auto-match start failed', err)
+        })
       }
     }
 
@@ -335,7 +344,8 @@ export class OrdersService {
       this.push.send(updated.user.pushToken, pushMsg.title, pushMsg.body, { orderId })
     }
     if (pushMsg) {
-      this.notifications.create(order.userId, 'ORDER_UPDATE', pushMsg.title, pushMsg.body, { orderId }).catch(() => {})
+      this.notifications.create(order.userId, 'ORDER_UPDATE', pushMsg.title, pushMsg.body, { orderId })
+        .catch((err) => this.logger.warn('Notification failed', err))
     }
 
     return updated
@@ -360,7 +370,8 @@ export class OrdersService {
     if (pushMsg && order.user?.pushToken) {
       this.push.send(order.user.pushToken, pushMsg.title, pushMsg.body, { orderId })
     }
-    this.notifications.create(userId, 'ORDER_UPDATE', '❌ Pedido cancelado', 'Seu pedido foi cancelado.', { orderId }).catch(() => {})
+    this.notifications.create(userId, 'ORDER_UPDATE', '❌ Pedido cancelado', 'Seu pedido foi cancelado.', { orderId })
+      .catch((err) => this.logger.warn('Notification failed', err))
 
     return updated
   }

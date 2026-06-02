@@ -15,7 +15,8 @@ interface CartState {
   storeId: string | null
   storeName: string | null
   items: CartItem[]
-  addItem: (storeId: string, storeName: string, item: CartItem) => void
+  userId: string | null
+  addItem: (storeId: string, storeName: string, item: CartItem, userId?: string) => void
   removeItem: (productId: string, variationId?: string) => void
   updateQty: (productId: string, variationId: string | undefined, qty: number) => void
   clear: () => void
@@ -28,12 +29,13 @@ export const useCartStore = create<CartState>()(
       storeId: null,
       storeName: null,
       items: [],
+      userId: null,
 
-      addItem(storeId, storeName, item) {
+      addItem(storeId, storeName, item, userId) {
         const state = get()
         // Different store — ask user (handled in UI), clear and add
         if (state.storeId && state.storeId !== storeId) {
-          set({ storeId, storeName, items: [{ ...item, quantity: item.quantity }] })
+          set({ storeId, storeName, userId: userId ?? null, items: [{ ...item, quantity: item.quantity }] })
           return
         }
         const existing = state.items.find(
@@ -71,7 +73,7 @@ export const useCartStore = create<CartState>()(
         })
       },
 
-      clear: () => set({ storeId: null, storeName: null, items: [] }),
+      clear: () => set({ storeId: null, storeName: null, items: [], userId: null }),
 
       total: () => get().items.reduce((acc, i) => acc + i.price * i.quantity, 0),
     }),

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
 
@@ -15,10 +15,13 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
 interface MatchState {
   offeredTo: Set<string>
   timeout: ReturnType<typeof setTimeout> | null
+  storeLat: number
+  storeLng: number
+  currentRadius: number
 }
 
 @Injectable()
-export class DeliveryMatchingService {
+export class DeliveryMatchingService implements OnModuleInit {
   private readonly logger = new Logger(DeliveryMatchingService.name)
   private readonly state = new Map<string, MatchState>()
 
@@ -27,9 +30,29 @@ export class DeliveryMatchingService {
     private push: PushService,
   ) {}
 
+  // On startup, resume matching for any deliveries stuck in SEARCHING_COURIER
+  async onModuleInit() {
+    try {
+      const stuck = await this.prisma.delivery.findMany({
+        where: { status: 'SEARCHING_COURIER', courierId: null },
+        include: { order: { include: { store: { select: { lat: true, lng: true } } } } },
+      })
+      if (stuck.length > 0) {
+        this.logger.log(`[Match] Resuming matching for ${stuck.length} stuck deliveries`)
+        for (const d of stuck) {
+          if (!this.state.has(d.id)) {
+            await this.startMatching(d.id, d.order.store.lat, d.order.store.lng)
+          }
+        }
+      }
+    } catch (err) {
+      this.logger.warn('[Match] Failed to resume stuck deliveries on startup', err)
+    }
+  }
+
   async startMatching(deliveryId: string, storeLat: number, storeLng: number) {
     this.logger.log(`[Match] Starting for delivery ${deliveryId.slice(0, 8)}`)
-    this.state.set(deliveryId, { offeredTo: new Set(), timeout: null })
+    this.state.set(deliveryId, { offeredTo: new Set(), timeout: null, storeLat, storeLng, currentRadius: 1 })
     await this.tryRadius(deliveryId, storeLat, storeLng, 1)
   }
 
@@ -51,7 +74,8 @@ export class DeliveryMatchingService {
     const entry = this.state.get(deliveryId)
     if (!entry) return
 
-    // Find online approved couriers with GPS, not already offered
+    entry.currentRadius = radiusKm
+
     const couriers = await this.prisma.courier.findMany({
       where: {
         status: 'APPROVED',
@@ -63,7 +87,6 @@ export class DeliveryMatchingService {
       include: { user: { select: { pushToken: true, name: true } } },
     })
 
-    // Filter by radius, sort by proximity
     const nearby = couriers
       .filter(c => haversineKm(storeLat, storeLng, c.currentLat!, c.currentLng!) <= radiusKm)
       .sort((a, b) =>
@@ -80,7 +103,7 @@ export class DeliveryMatchingService {
         this.push.send(
           closest.user.pushToken,
           '🛵 Nova entrega disponível!',
-          `R$ ${delivery.courierFee.toFixed(2)} · ${delivery.distanceKm.toFixed(1)} km — aceite em 30s`,
+          `R$ ${Number(delivery.courierFee).toFixed(2)} · ${Number(delivery.distanceKm).toFixed(1)} km — aceite em 30s`,
           { deliveryId, type: 'NEW_DELIVERY' },
         )
       }
@@ -94,7 +117,6 @@ export class DeliveryMatchingService {
     const timeout = setTimeout(async () => {
       if (!this.state.has(deliveryId)) return
 
-      // Check again if delivery was accepted during the 30s
       const current = await this.prisma.delivery.findUnique({ where: { id: deliveryId } })
       if (!current || current.courierId || current.status !== 'SEARCHING_COURIER') {
         this.cancelMatching(deliveryId)

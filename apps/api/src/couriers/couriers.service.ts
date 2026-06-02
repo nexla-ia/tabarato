@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { DeliveryStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
@@ -11,6 +11,8 @@ import { UpdateLocationDto } from './dto/update-location.dto'
 
 @Injectable()
 export class CouriersService {
+  private readonly logger = new Logger(CouriersService.name)
+
   constructor(
     private prisma: PrismaService,
     private push: PushService,
@@ -123,20 +125,20 @@ export class CouriersService {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier not found')
 
-    const delivery = await this.prisma.delivery.findFirst({
+    // Atomic update: only succeeds if delivery is still unassigned (prevents TOCTOU race)
+    const result = await this.prisma.delivery.updateMany({
       where: { id: deliveryId, courierId: null, status: 'SEARCHING_COURIER' },
-    })
-    if (!delivery) throw new NotFoundException('Delivery not available')
-
-    const updated = await this.prisma.delivery.update({
-      where: { id: deliveryId },
       data: { courierId: courier.id, status: 'COURIER_HEADING_TO_STORE' },
     })
+
+    if (result.count === 0) {
+      throw new ConflictException('Esta entrega já foi aceita por outro entregador.')
+    }
 
     // Cancel auto-match timer — delivery is taken
     this.matching?.cancelMatching(deliveryId)
 
-    return updated
+    return this.prisma.delivery.findUnique({ where: { id: deliveryId } })
   }
 
   async findWallet(userId: string) {
@@ -166,7 +168,7 @@ export class CouriersService {
   async requestWithdrawal(userId: string, amount: number) {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier not found')
-    await this.wallet.debit(courier.id, 'COURIER', amount, 'Saque solicitado', `saque-${Date.now()}`)
+    await this.wallet.debit(courier.id, 'COURIER', amount, 'Saque solicitado', `saque-${crypto.randomUUID()}`)
     return { message: 'Saque solicitado com sucesso. Será processado em até 24h via PIX.' }
   }
 
@@ -196,7 +198,13 @@ export class CouriersService {
 
     const delivery = await this.prisma.delivery.findFirst({
       where: { id: deliveryId, courierId: courier.id },
-      include: { order: { include: { user: { select: { pushToken: true } } } } },
+      include: {
+        order: {
+          include: {
+            user: { select: { id: true, pushToken: true } },
+          },
+        },
+      },
     })
     if (!delivery) throw new NotFoundException('Delivery not found')
 
@@ -220,20 +228,61 @@ export class CouriersService {
     const updated = await this.prisma.delivery.update({ where: { id: deliveryId }, data: updateData })
 
     if (nextStatus === 'DELIVERED') {
-      await this.prisma.order.update({ where: { id: delivery.orderId }, data: { status: 'DELIVERED' } })
-
-      // Credit courier wallet
-      await this.wallet.credit(courier.id, 'COURIER', delivery.courierFee, `Entrega #${delivery.orderId.slice(0, 8)}`, delivery.id)
-
-      // Credit store wallet: subtotal minus 10% platform fee
+      // Fetch full order data needed for wallet credits
       const fullOrder = await this.prisma.order.findUnique({
         where: { id: delivery.orderId },
         select: { subtotal: true, storeId: true },
       })
+
       if (fullOrder) {
-        const platformFee  = Math.round(fullOrder.subtotal * 0.10 * 100) / 100
-        const storeAmount  = Math.round((fullOrder.subtotal - platformFee) * 100) / 100
-        await this.wallet.credit(fullOrder.storeId, 'STORE', storeAmount, `Pedido #${delivery.orderId.slice(0, 8)}`, delivery.orderId)
+        const platformFee = Math.round(Number(fullOrder.subtotal) * 0.10 * 100) / 100
+        const storeAmount = Math.round((Number(fullOrder.subtotal) - platformFee) * 100) / 100
+        const courierFee  = Number(delivery.courierFee)
+
+        // Everything in one atomic transaction: status updates + both wallet credits
+        await this.prisma.$transaction(async (tx) => {
+          await tx.order.update({ where: { id: delivery.orderId }, data: { status: 'DELIVERED' } })
+
+          // Courier wallet — get/create then credit
+          const courierWallet = await tx.wallet.upsert({
+            where: { ownerId_ownerType: { ownerId: courier.id, ownerType: 'COURIER' } },
+            update: {},
+            create: { ownerId: courier.id, ownerType: 'COURIER', balance: 0 },
+          })
+          await tx.wallet.update({
+            where: { id: courierWallet.id },
+            data: { balance: { increment: courierFee } },
+          })
+          await tx.transaction.create({
+            data: {
+              walletId: courierWallet.id,
+              amount: courierFee,
+              type: 'CREDIT',
+              description: `Entrega #${delivery.orderId.slice(0, 8)}`,
+              referenceId: delivery.id,
+            },
+          })
+
+          // Store wallet — get/create then credit
+          const storeWallet = await tx.wallet.upsert({
+            where: { ownerId_ownerType: { ownerId: fullOrder.storeId, ownerType: 'STORE' } },
+            update: {},
+            create: { ownerId: fullOrder.storeId, ownerType: 'STORE', balance: 0 },
+          })
+          await tx.wallet.update({
+            where: { id: storeWallet.id },
+            data: { balance: { increment: storeAmount } },
+          })
+          await tx.transaction.create({
+            data: {
+              walletId: storeWallet.id,
+              amount: storeAmount,
+              type: 'CREDIT',
+              description: `Pedido #${delivery.orderId.slice(0, 8)}`,
+              referenceId: delivery.orderId,
+            },
+          })
+        })
       }
     }
 
@@ -248,7 +297,9 @@ export class CouriersService {
       this.push.send(pushToken, msg.title, msg.body, { orderId: delivery.orderId })
     }
     if (msg) {
-      this.notifications.create(delivery.order.userId, 'DELIVERY_UPDATE', msg.title, msg.body, { orderId: delivery.orderId }).catch(() => {})
+      this.notifications.create(delivery.order.user.id, 'DELIVERY_UPDATE', msg.title, msg.body, { orderId: delivery.orderId }).catch((err) => {
+        this.logger.warn('Failed to create delivery notification', err)
+      })
     }
 
     return updated

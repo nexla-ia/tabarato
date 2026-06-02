@@ -4,10 +4,11 @@ import { useRouter } from 'next/navigation'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useCartStore } from '@/stores/cart'
+import { validateCardForm } from '@/lib/cardValidation'
 import Image from 'next/image'
 import styles from './page.module.css'
 
-const MP_PUBLIC_KEY = 'APP_USR-7286d9e5-0638-48bc-81c3-0408a661d48c'
+const MP_PUBLIC_KEY = process.env.NEXT_PUBLIC_MP_PUBLIC_KEY ?? ''
 
 function fmtBRL(v: number) { return `R$ ${v.toFixed(2).replace('.', ',')}` }
 function fmtCpf(v: string) { return v.replace(/\D/g,'').slice(0,11).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4') }
@@ -90,11 +91,10 @@ export default function CheckoutPage() {
     if (!storeId) { setError('Carrinho vazio'); return }
 
     if (isCard) {
-      if (!cardNumber || cardNumber.replace(/\s/g,'').length < 13) { setError('Número do cartão inválido'); return }
       if (!cardHolder.trim()) { setError('Nome no cartão obrigatório'); return }
-      if (!cardExpiry || cardExpiry.length < 5) { setError('Validade inválida'); return }
-      if (!cardCvv || cardCvv.length < 3) { setError('CVV inválido'); return }
-      if (!cardCpf || cardCpf.replace(/\D/g,'').length < 11) { setError('CPF obrigatório'); return }
+      const cardErrors = validateCardForm({ cardNumber, expiry: cardExpiry, cvv: cardCvv, cpf: cardCpf })
+      const firstError = cardErrors.cardNumber ?? cardErrors.expiry ?? cardErrors.cvv ?? cardErrors.cpf
+      if (firstError) { setError(firstError); return }
     }
 
     setLoading(true); setError('')

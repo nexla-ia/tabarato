@@ -7,7 +7,7 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── ENUMS ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ ENUMS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 enum UserRole {
   CONSUMER
@@ -83,7 +83,7 @@ enum NotificationType {
   SYSTEM
 }
 
-// ─── USUÁRIOS ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ USUÃRIOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model User {
   id           String   @id @default(uuid())
@@ -100,11 +100,11 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  addresses     Address[]
-  orders        Order[]
+  addresses      Address[]
+  orders         Order[]
   reviews        Review[]
   courierReviews CourierReview[]
-  notifications  Notification[] @relation("RecipientNotifications")
+  notifications  Notification[]  @relation("RecipientNotifications")
   couponUses     CouponUse[]
   store          Store?
   courier        Courier?
@@ -134,7 +134,7 @@ model Address {
   @@map("addresses")
 }
 
-// ─── LOJAS ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ LOJAS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Category {
   id        String   @id @default(uuid())
@@ -189,7 +189,7 @@ model Product {
   description   String?
   imageUrl      String?  @map("image_url")
   hasVariations Boolean  @default(false) @map("has_variations")
-  basePrice     Float?   @map("base_price")
+  basePrice     Decimal? @map("base_price")
   stock         Int?
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")
@@ -200,6 +200,7 @@ model Product {
   variations ProductVariation[]
   orderItems OrderItem[]
 
+  @@index([storeId])
   @@map("products")
 }
 
@@ -210,7 +211,7 @@ model ProductVariation {
   name      String
   size      String?
   color     String?
-  price     Float
+  price     Decimal
   stock     Int      @default(0)
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
@@ -221,7 +222,7 @@ model ProductVariation {
   @@map("product_variations")
 }
 
-// ─── PEDIDOS ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ PEDIDOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Order {
   id          String      @id @default(uuid())
@@ -229,10 +230,10 @@ model Order {
   storeId     String      @map("store_id")
   addressId   String      @map("address_id")
   paymentId   String?     @map("payment_id")
-  subtotal    Float
-  deliveryFee Float       @map("delivery_fee")
-  discount    Float       @default(0)
-  total       Float
+  subtotal    Decimal
+  deliveryFee Decimal     @map("delivery_fee")
+  discount    Decimal     @default(0)
+  total       Decimal
   couponId    String?     @map("coupon_id")
   status      OrderStatus @default(PENDING)
   notes       String?
@@ -240,17 +241,21 @@ model Order {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
-  user      User        @relation(fields: [userId], references: [id])
-  store     Store       @relation(fields: [storeId], references: [id])
-  address   Address     @relation(fields: [addressId], references: [id])
-  payment   Payment?    @relation(fields: [paymentId], references: [id])
-  coupon    Coupon?     @relation(fields: [couponId], references: [id])
-  items          OrderItem[]
-  delivery       Delivery?
-  review         Review?
-  courierReview  CourierReview?
-  couponUse      CouponUse?
+  user          User           @relation(fields: [userId], references: [id])
+  store         Store          @relation(fields: [storeId], references: [id])
+  address       Address        @relation(fields: [addressId], references: [id])
+  payment       Payment?       @relation(fields: [paymentId], references: [id])
+  coupon        Coupon?        @relation(fields: [couponId], references: [id])
+  items         OrderItem[]
+  delivery      Delivery?
+  review        Review?
+  courierReview CourierReview?
+  couponUse     CouponUse?
 
+  @@index([userId])
+  @@index([storeId])
+  @@index([status])
+  @@index([status, createdAt])
   @@map("orders")
 }
 
@@ -260,42 +265,47 @@ model OrderItem {
   productId   String  @map("product_id")
   variationId String? @map("variation_id")
   quantity    Int
-  unitPrice   Float   @map("unit_price")
+  unitPrice   Decimal @map("unit_price")
   notes       String?
 
   order     Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product   Product           @relation(fields: [productId], references: [id])
   variation ProductVariation? @relation(fields: [variationId], references: [id])
 
+  @@index([orderId])
   @@map("order_items")
 }
 
 model Payment {
-  id           String        @id @default(uuid())
-  method       PaymentMethod
-  gatewayId    String?       @map("gateway_id")
-  status       PaymentStatus @default(PENDING)
-  amount       Float
-  pixCode      String?       @map("pix_code")
-  pixQrBase64  String?       @map("pix_qr_base64")
-  pixExpiresAt DateTime?     @map("pix_expires_at")
-  paidAt       DateTime?     @map("paid_at")
-  createdAt    DateTime      @default(now()) @map("created_at")
+  id             String        @id @default(uuid())
+  method         PaymentMethod
+  gatewayId      String?       @map("gateway_id")
+  idempotencyKey String?       @unique @map("idempotency_key")
+  status         PaymentStatus @default(PENDING)
+  amount         Decimal
+  pixCode        String?       @map("pix_code")
+  pixQrBase64    String?       @map("pix_qr_base64")
+  pixExpiresAt   DateTime?     @map("pix_expires_at")
+  paidAt         DateTime?     @map("paid_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
   orders Order[]
 
+  @@index([gatewayId])
+  @@index([status])
   @@map("payments")
 }
 
-// ─── LOGÍSTICA ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ LOGÃSTICA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Courier {
-  id           String        @id @default(uuid())
-  userId       String        @unique @map("user_id")
-  cpf          String        @unique
-  cnh          String        @unique
-  vehiclePlate String        @map("vehicle_plate")
-  vehicleType  String        @default("moto") @map("vehicle_type")
+  id                 String        @id @default(uuid())
+  userId             String        @unique @map("user_id")
+  cpf                String        @unique
+  cnh                String        @unique
+  vehiclePlate       String        @map("vehicle_plate")
+  vehicleType        String        @default("moto") @map("vehicle_type")
   photoUrl           String?       @map("photo_url")
   cnhPhotoUrl        String?       @map("cnh_photo_url")
   identityPhotoUrl   String?       @map("identity_photo_url")
@@ -304,12 +314,12 @@ model Courier {
   identityStatus     String?       @map("identity_status")
   vehicleDocStatus   String?       @map("vehicle_doc_status")
   status             CourierStatus @default(PENDING)
-  isOnline     Boolean       @default(false) @map("is_online")
-  currentLat   Float?        @map("current_lat")
-  currentLng   Float?        @map("current_lng")
-  rating       Float         @default(5.0)
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
+  isOnline           Boolean       @default(false) @map("is_online")
+  currentLat         Float?        @map("current_lat")
+  currentLng         Float?        @map("current_lng")
+  rating             Float         @default(5.0)
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
 
   user           User            @relation(fields: [userId], references: [id])
   deliveries     Delivery[]
@@ -322,8 +332,8 @@ model Delivery {
   id          String         @id @default(uuid())
   orderId     String         @unique @map("order_id")
   courierId   String?        @map("courier_id")
-  distanceKm  Float          @map("distance_km")
-  courierFee  Float          @map("courier_fee")
+  distanceKm  Decimal        @map("distance_km")
+  courierFee  Decimal        @map("courier_fee")
   status      DeliveryStatus @default(SEARCHING_COURIER)
   photoUrl    String?        @map("photo_url")
   pickedUpAt  DateTime?      @map("picked_up_at")
@@ -334,16 +344,18 @@ model Delivery {
   order   Order    @relation(fields: [orderId], references: [id])
   courier Courier? @relation(fields: [courierId], references: [id])
 
+  @@index([courierId])
+  @@index([status])
   @@map("deliveries")
 }
 
-// ─── FINANCEIRO ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ FINANCEIRO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Wallet {
   id        String          @id @default(uuid())
   ownerId   String          @map("owner_id")
   ownerType WalletOwnerType @map("owner_type")
-  balance   Float           @default(0)
+  balance   Decimal         @default(0)
   createdAt DateTime        @default(now()) @map("created_at")
   updatedAt DateTime        @updatedAt @map("updated_at")
 
@@ -356,7 +368,7 @@ model Wallet {
 model Transaction {
   id          String          @id @default(uuid())
   walletId    String          @map("wallet_id")
-  amount      Float
+  amount      Decimal
   type        TransactionType
   description String?
   referenceId String?         @map("reference_id")
@@ -364,10 +376,11 @@ model Transaction {
 
   wallet Wallet @relation(fields: [walletId], references: [id])
 
+  @@index([walletId])
   @@map("transactions")
 }
 
-// ─── ENGAJAMENTO ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ ENGAJAMENTO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Review {
   id        String   @id @default(uuid())
@@ -383,6 +396,7 @@ model Review {
   store Store @relation(fields: [storeId], references: [id])
   order Order @relation(fields: [orderId], references: [id])
 
+  @@index([storeId, createdAt])
   @@map("reviews")
 }
 
@@ -399,6 +413,7 @@ model CourierReview {
   courier Courier @relation(fields: [courierId], references: [id])
   order   Order   @relation(fields: [orderId], references: [id])
 
+  @@index([courierId])
   @@map("courier_reviews")
 }
 
@@ -414,19 +429,21 @@ model Notification {
 
   recipient User @relation("RecipientNotifications", fields: [recipientId], references: [id])
 
+  @@index([recipientId, isRead])
+  @@index([recipientId, createdAt])
   @@map("notifications")
 }
 
-// ─── PROMOÇÕES ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ PROMOÃ‡Ã•ES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Coupon {
   id              String    @id @default(uuid())
   storeId         String?   @map("store_id")
   code            String    @unique
   description     String?
-  discountPercent Float?    @map("discount_percent")
-  discountFixed   Float?    @map("discount_fixed")
-  minOrderValue   Float?    @map("min_order_value")
+  discountPercent Decimal?  @map("discount_percent")
+  discountFixed   Decimal?  @map("discount_fixed")
+  minOrderValue   Decimal?  @map("min_order_value")
   maxUses         Int?      @map("max_uses")
   usedCount       Int       @default(0) @map("used_count")
   expiresAt       DateTime? @map("expires_at")
@@ -437,6 +454,7 @@ model Coupon {
   uses   CouponUse[]
   orders Order[]
 
+  @@index([expiresAt])
   @@map("coupons")
 }
 
