@@ -307,9 +307,10 @@ model Order {
   discount    Decimal     @default(0)
   total       Decimal
   couponId    String?     @map("coupon_id")
-  status      OrderStatus @default(PENDING)
-  notes       String?
-  refusalNote String?     @map("refusal_note")
+  status       OrderStatus @default(PENDING)
+  scheduledFor DateTime?  @map("scheduled_for")
+  notes        String?
+  refusalNote  String?    @map("refusal_note")
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 

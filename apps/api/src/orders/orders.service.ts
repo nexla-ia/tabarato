@@ -189,6 +189,7 @@ export class OrdersService {
           discount,
           total,
           notes: dto.notes,
+          scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : undefined,
           items: { create: orderItems },
         },
         include: {

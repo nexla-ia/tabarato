@@ -55,4 +55,8 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   payerCpf?: string
+
+  @IsString()
+  @IsOptional()
+  scheduledFor?: string // ISO date string
 }
