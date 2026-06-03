@@ -80,15 +80,16 @@ export class OrdersService {
     const closed  = openNow !== null ? !openNow : !store.isOpen
     if (closed) throw new BadRequestException('Esta loja está fechada no momento. Tente novamente mais tarde.')
 
-    // Check concurrent orders limit
-    if ((store as any).maxConcurrentOrders) {
+    // Check concurrent orders limit (null = unlimited; 0 treated as unlimited)
+    const maxConcurrent = (store as any).maxConcurrentOrders
+    if (maxConcurrent != null && maxConcurrent > 0) {
       const activeCount = await this.prisma.order.count({
         where: {
           storeId: store.id,
           status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] },
         },
       })
-      if (activeCount >= (store as any).maxConcurrentOrders) {
+      if (activeCount >= maxConcurrent) {
         throw new BadRequestException('A loja está com capacidade máxima no momento. Tente novamente em breve.')
       }
     }
@@ -97,6 +98,9 @@ export class OrdersService {
       where: { id: dto.addressId, userId },
     })
     if (!address) throw new NotFoundException('Address not found')
+
+    // Calculate distance once — reused for per-product limit validation and delivery fee
+    const distToAddress = haversineKm(store.lat, store.lng, address.lat, address.lng)
 
     let subtotal = 0
     const orderItems: {
@@ -121,14 +125,12 @@ export class OrdersService {
         throw new BadRequestException(`Produto "${product.name}" tem apenas ${product.stock} unidade(s) disponível(is).`)
       }
 
-      // Validate delivery distance limit per product
-      if ((product as any).maxDeliveryKm) {
-        const dist = haversineKm(store.lat, store.lng, address.lat, address.lng)
-        if (dist > (product as any).maxDeliveryKm) {
-          throw new BadRequestException(
-            `"${product.name}" não pode ser entregue a ${dist.toFixed(1)} km — limite deste produto é ${(product as any).maxDeliveryKm} km.`
-          )
-        }
+      // Validate delivery distance limit per product (uses pre-calculated distance)
+      const productMaxKm = (product as any).maxDeliveryKm
+      if (productMaxKm != null && productMaxKm > 0 && distToAddress > productMaxKm) {
+        throw new BadRequestException(
+          `"${product.name}" não pode ser entregue a ${distToAddress.toFixed(1)} km — limite deste produto é ${productMaxKm} km.`
+        )
       }
 
       let unitPrice = Number(product.basePrice ?? 0)
@@ -156,7 +158,7 @@ export class OrdersService {
       })
     }
 
-    const distanceKm = haversineKm(store.lat, store.lng, address.lat, address.lng)
+    const distanceKm = distToAddress // already calculated above
     const deliveryFee = calcCourierFee(distanceKm)
 
     let discount = 0
@@ -360,7 +362,7 @@ export class OrdersService {
     // Audit log
     this.prisma.orderStatusHistory.create({
       data: { orderId, status, changedBy: userId, note: refusalNote },
-    }).catch(() => {})
+    }).catch((err) => this.logger.warn('Audit log failed', err))
 
     if (status === 'READY') {
       const existing = await this.prisma.delivery.findUnique({ where: { orderId } })
@@ -417,7 +419,7 @@ export class OrdersService {
 
     this.prisma.orderStatusHistory.create({
       data: { orderId, status: 'CANCELLED', changedBy: userId },
-    }).catch(() => {})
+    }).catch((err) => this.logger.warn('Audit log failed', err))
 
     return updated
   }
@@ -429,13 +431,24 @@ export class OrdersService {
 
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, storeId: store.id },
-      include: { user: { select: { id: true, pushToken: true } } },
+      include: {
+        user: { select: { id: true, pushToken: true } },
+        delivery: { select: { status: true } },
+      },
     })
     if (!order) throw new NotFoundException('Order not found')
 
     const cancellable = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY']
     if (!cancellable.includes(order.status)) {
       throw new BadRequestException('Não é possível cancelar um pedido já coletado ou entregue.')
+    }
+
+    // Guard: if courier already picked up the package, cannot cancel
+    const deliveryAlreadyPickedUp = ['PICKED_UP', 'HEADING_TO_CLIENT', 'DELIVERED'].includes(
+      (order as any).delivery?.status ?? ''
+    )
+    if (deliveryAlreadyPickedUp) {
+      throw new BadRequestException('Não é possível cancelar: o entregador já coletou o pedido.')
     }
 
     const updated = await this.prisma.order.update({
@@ -447,11 +460,11 @@ export class OrdersService {
       this.push.send(order.user.pushToken, '❌ Pedido cancelado', note ?? 'A loja cancelou seu pedido.', { orderId })
     }
     this.notifications.create(order.user.id, 'ORDER_UPDATE', '❌ Pedido cancelado pela loja',
-      note ?? 'A loja cancelou seu pedido.', { orderId }).catch(() => {})
+      note ?? 'A loja cancelou seu pedido.', { orderId }).catch((err) => this.logger.warn('Audit log failed', err))
 
     this.prisma.orderStatusHistory.create({
       data: { orderId, status: 'CANCELLED', changedBy: userId, note },
-    }).catch(() => {})
+    }).catch((err) => this.logger.warn('Audit log failed', err))
 
     return updated
   }
