@@ -105,7 +105,8 @@ export class OrdersService {
       if (item.variationId) {
         const variation = product.variations.find((v) => v.id === item.variationId)
         if (!variation || !variation.isActive) throw new BadRequestException('Variation not available')
-        if (variation.stock < item.quantity) {
+        // stock === null means unlimited; only check when it's a defined number
+        if (variation.stock !== null && variation.stock < item.quantity) {
           throw new BadRequestException(`Variação "${variation.name}" tem apenas ${variation.stock} unidade(s) disponível(is).`)
         }
         unitPrice = Number(variation.price)

@@ -94,13 +94,20 @@ export class StoresService {
         .map((s) => this.syncIsOpen(s.id, s.openingHours, s.isOpen))
     )
 
-    // Re-fetch with updated isOpen
+    // Re-fetch with updated isOpen — preserve ALL original filters (categoryId + search)
     const hasHours = stores.some((s) => s.openingHours)
     let result = hasHours
       ? await this.prisma.store.findMany({
           where: {
             status: 'APPROVED',
             ...(categoryId && { categories: { some: { id: categoryId } } }),
+            ...(search && {
+              OR: [
+                { name: { contains: search, mode: 'insensitive' } },
+                { description: { contains: search, mode: 'insensitive' } },
+                { products: { some: { name: { contains: search, mode: 'insensitive' }, isActive: true } } },
+              ],
+            }),
           },
           include: { categories: { select: { id: true, name: true, icon: true } } },
           orderBy: { name: 'asc' },
