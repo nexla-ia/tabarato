@@ -215,4 +215,24 @@ export class ProductsService {
     })
     return { updated: productIds.length, isActive: active }
   }
+
+  async bulkUpdate(userId: string, productIds: string[], data: {
+    basePrice?: number
+    stock?: number
+    isActive?: boolean
+  }) {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new ForbiddenException()
+
+    const updateData: Record<string, any> = {}
+    if (data.basePrice !== undefined) updateData.basePrice = data.basePrice
+    if (data.stock !== undefined) updateData.stock = data.stock
+    if (data.isActive !== undefined) updateData.isActive = data.isActive
+
+    const result = await this.prisma.product.updateMany({
+      where: { id: { in: productIds }, storeId: store.id },
+      data: updateData,
+    })
+    return { updated: result.count }
+  }
 }

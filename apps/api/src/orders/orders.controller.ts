@@ -34,6 +34,11 @@ export class OrdersController {
     return this.ordersService.findById(id, user.sub, user.role)
   }
 
+  @Get(':id/history')
+  getHistory(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.ordersService.getStatusHistory(id, user.sub, user.role)
+  }
+
   @UseGuards(RolesGuard)
   @Roles('STORE_OWNER')
   @Patch(':id/status')
@@ -48,5 +53,13 @@ export class OrdersController {
   @Patch(':id/cancel')
   cancel(@CurrentUser() user: any, @Param('id') id: string) {
     return this.ordersService.cancel(user.sub, id)
+  }
+
+  // Store owner can cancel up to READY (before pickup)
+  @UseGuards(RolesGuard)
+  @Roles('STORE_OWNER')
+  @Patch(':id/cancel-store')
+  cancelByStore(@CurrentUser() user: any, @Param('id') id: string, @Body() body: { note?: string }) {
+    return this.ordersService.cancelByStore(user.sub, id, body.note)
   }
 }

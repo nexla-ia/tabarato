@@ -95,6 +95,22 @@ export class StoresController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('STORE_OWNER')
+  @Get('my/analytics')
+  getAnalytics(@CurrentUser() user: any) {
+    return this.storesService.getAnalytics(user.sub)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Get('my/transactions/:txId/receipt')
+  async getReceipt(@CurrentUser() user: any, @Param('txId') txId: string, @Res() res: Response) {
+    const text = await this.storesService.getTransactionReceipt(user.sub, txId)
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    res.send(text)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
   @Get('my/orders/export')
   async exportOrders(@CurrentUser() user: any, @Res() res: Response) {
     const csv = await this.storesService.exportOrdersCsv(user.sub)

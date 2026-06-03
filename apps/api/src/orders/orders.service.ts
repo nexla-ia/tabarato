@@ -8,11 +8,19 @@ import { PaymentsService } from '../payments/payments.service'
 import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
 import { CreateOrderDto } from './dto/create-order.dto'
 
-function isStoreOpenNow(openingHours: any): boolean | null {
+function isStoreOpenNow(openingHours: any, scheduleExceptions?: any): boolean | null {
+  const localMs = Date.now() - 4 * 60 * 60 * 1000
+  const local   = new Date(localMs)
+  const today   = local.toISOString().slice(0, 10) // YYYY-MM-DD
+
+  // Check holiday/exception overrides first
+  if (Array.isArray(scheduleExceptions)) {
+    const ex = scheduleExceptions.find((e: any) => e.date === today)
+    if (ex) return !ex.closed
+  }
+
   if (!openingHours || !Array.isArray(openingHours)) return null
-  const localMs  = Date.now() - 4 * 60 * 60 * 1000
-  const local    = new Date(localMs)
-  const day      = openingHours[local.getUTCDay()]
+  const day = openingHours[local.getUTCDay()]
   if (!day?.open) return false
   const now  = local.getUTCHours() * 60 + local.getUTCMinutes()
   const [fh, fm] = (day.from as string).split(':').map(Number)
@@ -68,9 +76,22 @@ export class OrdersService {
     ])
     if (!store) throw new BadRequestException('Loja não encontrada')
 
-    const openNow = isStoreOpenNow(store.openingHours)
+    const openNow = isStoreOpenNow(store.openingHours, (store as any).scheduleExceptions)
     const closed  = openNow !== null ? !openNow : !store.isOpen
     if (closed) throw new BadRequestException('Esta loja está fechada no momento. Tente novamente mais tarde.')
+
+    // Check concurrent orders limit
+    if ((store as any).maxConcurrentOrders) {
+      const activeCount = await this.prisma.order.count({
+        where: {
+          storeId: store.id,
+          status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] },
+        },
+      })
+      if (activeCount >= (store as any).maxConcurrentOrders) {
+        throw new BadRequestException('A loja está com capacidade máxima no momento. Tente novamente em breve.')
+      }
+    }
 
     const address = await this.prisma.address.findFirst({
       where: { id: dto.addressId, userId },
@@ -98,6 +119,16 @@ export class OrdersService {
 
       if (product.stock !== null && product.stock < item.quantity) {
         throw new BadRequestException(`Produto "${product.name}" tem apenas ${product.stock} unidade(s) disponível(is).`)
+      }
+
+      // Validate delivery distance limit per product
+      if ((product as any).maxDeliveryKm) {
+        const dist = haversineKm(store.lat, store.lng, address.lat, address.lng)
+        if (dist > (product as any).maxDeliveryKm) {
+          throw new BadRequestException(
+            `"${product.name}" não pode ser entregue a ${dist.toFixed(1)} km — limite deste produto é ${(product as any).maxDeliveryKm} km.`
+          )
+        }
       }
 
       let unitPrice = Number(product.basePrice ?? 0)
@@ -164,6 +195,11 @@ export class OrdersService {
           address: true,
           store: { select: { id: true, name: true, logoUrl: true } },
         },
+      })
+
+      // Log initial status in audit trail
+      await tx.orderStatusHistory.create({
+        data: { orderId: order.id, status: 'PENDING', changedBy: userId, note: 'Pedido criado' },
       })
 
       // Coupon use + counter increment in the same transaction — prevents double-use
@@ -321,6 +357,11 @@ export class OrdersService {
       include: { user: { select: { pushToken: true } } },
     })
 
+    // Audit log
+    this.prisma.orderStatusHistory.create({
+      data: { orderId, status, changedBy: userId, note: refusalNote },
+    }).catch(() => {})
+
     if (status === 'READY') {
       const existing = await this.prisma.delivery.findUnique({ where: { orderId } })
       if (!existing) {
@@ -374,6 +415,58 @@ export class OrdersService {
     this.notifications.create(userId, 'ORDER_UPDATE', '❌ Pedido cancelado', 'Seu pedido foi cancelado.', { orderId })
       .catch((err) => this.logger.warn('Notification failed', err))
 
+    this.prisma.orderStatusHistory.create({
+      data: { orderId, status: 'CANCELLED', changedBy: userId },
+    }).catch(() => {})
+
     return updated
+  }
+
+  // Store owner can cancel even READY/PREPARING orders (before pickup)
+  async cancelByStore(userId: string, orderId: string, note?: string) {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new ForbiddenException()
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, storeId: store.id },
+      include: { user: { select: { id: true, pushToken: true } } },
+    })
+    if (!order) throw new NotFoundException('Order not found')
+
+    const cancellable = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY']
+    if (!cancellable.includes(order.status)) {
+      throw new BadRequestException('Não é possível cancelar um pedido já coletado ou entregue.')
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'CANCELLED', refusalNote: note },
+    })
+
+    if (order.user?.pushToken) {
+      this.push.send(order.user.pushToken, '❌ Pedido cancelado', note ?? 'A loja cancelou seu pedido.', { orderId })
+    }
+    this.notifications.create(order.user.id, 'ORDER_UPDATE', '❌ Pedido cancelado pela loja',
+      note ?? 'A loja cancelou seu pedido.', { orderId }).catch(() => {})
+
+    this.prisma.orderStatusHistory.create({
+      data: { orderId, status: 'CANCELLED', changedBy: userId, note },
+    }).catch(() => {})
+
+    return updated
+  }
+
+  async getStatusHistory(orderId: string, userId: string, userRole: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) throw new NotFoundException('Order not found')
+
+    const isOwner = order.userId === userId
+    const isElevated = ['STORE_OWNER', 'ADMIN', 'COURIER'].includes(userRole)
+    if (!isOwner && !isElevated) throw new ForbiddenException()
+
+    return this.prisma.orderStatusHistory.findMany({
+      where: { orderId },
+      orderBy: { createdAt: 'asc' },
+    })
   }
 }

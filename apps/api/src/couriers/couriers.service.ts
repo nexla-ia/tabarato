@@ -202,6 +202,7 @@ export class CouriersService {
         order: {
           include: {
             user: { select: { id: true, pushToken: true } },
+            store: { include: { user: { select: { id: true, pushToken: true } } } },
           },
         },
       },
@@ -290,6 +291,26 @@ export class CouriersService {
       this.notifications.create(delivery.order.user.id, 'DELIVERY_UPDATE', msg.title, msg.body, { orderId: delivery.orderId }).catch((err) => {
         this.logger.warn('Failed to create delivery notification', err)
       })
+    }
+
+    // Notify store owner when courier picks up the order
+    if (nextStatus === 'PICKED_UP') {
+      const storeUser = (delivery.order as any).store?.user
+      if (storeUser?.pushToken) {
+        this.push.send(
+          storeUser.pushToken,
+          '🛵 Pedido coletado!',
+          `Entregador ${courier.id.slice(0, 8)} coletou o pedido #${delivery.orderId.slice(-6).toUpperCase()}.`,
+          { orderId: delivery.orderId },
+        )
+      }
+      if (storeUser?.id) {
+        this.notifications.create(storeUser.id, 'DELIVERY_UPDATE',
+          '🛵 Pedido coletado!',
+          `O entregador saiu com o pedido #${delivery.orderId.slice(-6).toUpperCase()}.`,
+          { orderId: delivery.orderId },
+        ).catch(() => {})
+      }
     }
 
     return updated

@@ -126,4 +126,15 @@ export class ProductsController {
   ) {
     return this.productsService.bulkToggle(user.sub, body.productIds, body.active)
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Patch('bulk/update')
+  bulkUpdate(
+    @CurrentUser() user: any,
+    @Body() body: { productIds: string[]; basePrice?: number; stock?: number; isActive?: boolean },
+  ) {
+    const { productIds, ...data } = body
+    return this.productsService.bulkUpdate(user.sub, productIds, data)
+  }
 }

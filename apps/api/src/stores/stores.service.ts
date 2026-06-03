@@ -252,6 +252,98 @@ export class StoresService {
     return { reviews, total, page, pages: Math.ceil(total / limit), avgRating: agg._avg.rating ?? null }
   }
 
+  async getAnalytics(userId: string) {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new NotFoundException('Store not found')
+
+    const now = new Date()
+    const days7Ago = new Date(now.getTime() - 7 * 86_400_000)
+
+    const [orders, products] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { storeId: store.id, createdAt: { gte: days7Ago } },
+        select: { total: true, subtotal: true, status: true, createdAt: true, items: { select: { productId: true, quantity: true, product: { select: { name: true } } } } },
+      }),
+      this.prisma.product.count({ where: { storeId: store.id, isActive: true } }),
+    ])
+
+    const delivered = orders.filter(o => o.status === 'DELIVERED')
+    const cancelled = orders.filter(o => o.status === 'CANCELLED')
+    const totalRevenue = delivered.reduce((s, o) => s + Number(o.subtotal) * 0.9, 0)
+    const avgTicket = delivered.length > 0 ? totalRevenue / delivered.length : 0
+    const cancellationRate = orders.length > 0 ? (cancelled.length / orders.length) * 100 : 0
+
+    // Sales by day (last 7 days)
+    const salesByDay: Record<string, { date: string; revenue: number; count: number }> = {}
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 86_400_000)
+      const key = d.toISOString().slice(0, 10)
+      salesByDay[key] = { date: key, revenue: 0, count: 0 }
+    }
+    for (const o of delivered) {
+      const key = new Date(o.createdAt).toISOString().slice(0, 10)
+      if (salesByDay[key]) {
+        salesByDay[key].revenue += Number(o.subtotal) * 0.9
+        salesByDay[key].count++
+      }
+    }
+
+    // Top products by quantity sold
+    const productSales: Record<string, { name: string; qty: number }> = {}
+    for (const o of delivered) {
+      for (const item of o.items) {
+        if (!productSales[item.productId]) {
+          productSales[item.productId] = { name: item.product.name, qty: 0 }
+        }
+        productSales[item.productId].qty += item.quantity
+      }
+    }
+    const topProducts = Object.values(productSales)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5)
+
+    return {
+      totalOrders: orders.length,
+      deliveredOrders: delivered.length,
+      cancelledOrders: cancelled.length,
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      avgTicket: Math.round(avgTicket * 100) / 100,
+      cancellationRate: Math.round(cancellationRate * 10) / 10,
+      activeProducts: products,
+      salesByDay: Object.values(salesByDay),
+      topProducts,
+    }
+  }
+
+  async getTransactionReceipt(userId: string, transactionId: string): Promise<string> {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new NotFoundException('Store not found')
+
+    const tx = await this.prisma.transaction.findFirst({
+      where: { id: transactionId, wallet: { ownerId: store.id, ownerType: 'STORE' } },
+      include: { wallet: true },
+    })
+    if (!tx) throw new NotFoundException('Transação não encontrada')
+
+    const date = new Date(tx.createdAt).toLocaleString('pt-BR')
+    const lines = [
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '    COMPROVANTE DE TRANSAÇÃO',
+      '    Tá Barato — Plataforma',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      `ID:          ${tx.id.slice(-12).toUpperCase()}`,
+      `Data:        ${date}`,
+      `Tipo:        ${tx.type === 'CREDIT' ? 'Crédito' : 'Débito'}`,
+      `Valor:       R$ ${Number(tx.amount).toFixed(2)}`,
+      `Descrição:   ${tx.description ?? '—'}`,
+      `Referência:  ${tx.referenceId ?? '—'}`,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      `Loja:        ${store.name}`,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    ]
+    return lines.join('\n')
+  }
+
   async exportOrdersCsv(userId: string): Promise<string> {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
