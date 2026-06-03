@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, ParseFloatPipe, BadRequestException } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards, BadRequestException } from '@nestjs/common'
+import { Response } from 'express'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -51,6 +52,13 @@ export class StoresController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('STORE_OWNER')
+  @Patch('my/toggle-pause')
+  togglePause(@CurrentUser() user: any) {
+    return this.storesService.togglePause(user.sub)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
   @Post('my/categories/:categoryId')
   addCategory(@CurrentUser() user: any, @Param('categoryId') categoryId: string) {
     return this.storesService.addCategory(user.sub, categoryId)
@@ -76,6 +84,23 @@ export class StoresController {
   requestWithdrawal(@CurrentUser() user: any, @Body() body: { amount: number }) {
     if (!body.amount || body.amount <= 0) throw new BadRequestException('Valor inválido para saque.')
     return this.storesService.requestWithdrawal(user.sub, body.amount)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Get('my/reviews')
+  getMyReviews(@CurrentUser() user: any, @Query('page') page?: string) {
+    return this.storesService.findMyReviews(user.sub, page ? parseInt(page) : 1)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Get('my/orders/export')
+  async exportOrders(@CurrentUser() user: any, @Res() res: Response) {
+    const csv = await this.storesService.exportOrdersCsv(user.sub)
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', 'attachment; filename="pedidos.csv"')
+    res.send('﻿' + csv) // BOM for Excel compatibility
   }
 
   @Get(':id')

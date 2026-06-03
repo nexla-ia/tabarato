@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { WalletService } from '../wallet/wallet.service'
 import { CreateStoreDto } from './dto/create-store.dto'
@@ -16,6 +16,13 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
 }
 
 // Vilhena-RO is UTC-4 (no DST)
+function parseMinutes(time: string): number | null {
+  if (!time || typeof time !== 'string') return null
+  const [h, m] = time.split(':').map(Number)
+  if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null
+  return h * 60 + m
+}
+
 function computeIsOpen(openingHours: any): boolean | null {
   if (!openingHours || !Array.isArray(openingHours)) return null
 
@@ -29,14 +36,16 @@ function computeIsOpen(openingHours: any): boolean | null {
   const day: DaySchedule = openingHours[dayOfWeek]
   if (!day || !day.open) return false
 
-  const [fh, fm] = day.from.split(':').map(Number)
-  const [th, tm] = day.to.split(':').map(Number)
+  const fromMin = parseMinutes(day.from)
+  const toMin   = parseMinutes(day.to)
+  if (fromMin === null || toMin === null) return null // invalid schedule — don't auto-close
 
-  return currentMinutes >= fh * 60 + fm && currentMinutes <= th * 60 + tm
+  return currentMinutes >= fromMin && currentMinutes <= toMin
 }
 
 @Injectable()
 export class StoresService {
+  private readonly logger = new Logger(StoresService.name)
   constructor(private prisma: PrismaService, private wallet: WalletService) {}
 
   private async syncIsOpen(storeId: string, openingHours: any, currentIsOpen: boolean): Promise<void> {
@@ -197,7 +206,74 @@ export class StoresService {
   async requestWithdrawal(userId: string, amount: number) {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
-    await this.wallet.debit(store.id, 'STORE', amount, 'Saque solicitado', `saque-${Date.now()}`)
+    await this.wallet.debit(store.id, 'STORE', amount, 'Saque solicitado', `saque-${crypto.randomUUID()}`)
     return { message: 'Saque solicitado com sucesso. Será processado em até 24h via PIX.' }
+  }
+
+  async togglePause(userId: string) {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new NotFoundException('Store not found')
+    // isPaused stored in openingHours json as a meta flag to avoid schema change
+    const meta = (store as any).pausedUntil
+    if (meta) {
+      // Unpause: clear flag, restore isOpen based on schedule
+      await this.prisma.store.update({ where: { id: store.id }, data: { isOpen: computeIsOpen(store.openingHours) ?? store.isOpen } })
+      return { isPaused: false }
+    }
+    // Pause: close the store temporarily
+    await this.prisma.store.update({ where: { id: store.id }, data: { isOpen: false } })
+    return { isPaused: true }
+  }
+
+  async findMyReviews(userId: string, page = 1) {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new NotFoundException('Store not found')
+
+    const limit = 20
+    const skip  = (page - 1) * limit
+    const [reviews, total, agg] = await Promise.all([
+      this.prisma.review.findMany({
+        where: { storeId: store.id },
+        include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip, take: limit,
+      }),
+      this.prisma.review.count({ where: { storeId: store.id } }),
+      this.prisma.review.aggregate({ where: { storeId: store.id }, _avg: { rating: true } }),
+    ])
+
+    return { reviews, total, page, pages: Math.ceil(total / limit), avgRating: agg._avg.rating ?? null }
+  }
+
+  async exportOrdersCsv(userId: string): Promise<string> {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new NotFoundException('Store not found')
+
+    const orders = await this.prisma.order.findMany({
+      where: { storeId: store.id },
+      include: {
+        user: { select: { name: true, phone: true } },
+        items: { include: { product: { select: { name: true } } } },
+        payment: { select: { method: true, status: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+    })
+
+    const rows = [
+      'ID,Data,Cliente,Telefone,Status,Itens,Subtotal,Taxa Entrega,Desconto,Total,Pagamento,Status Pag.',
+      ...orders.map(o => {
+        const items = o.items.map(i => `${i.product.name}(x${i.quantity})`).join('|')
+        const date  = new Date(o.createdAt).toLocaleString('pt-BR')
+        return [
+          o.id.slice(-8), date, o.user?.name ?? '', o.user?.phone ?? '',
+          o.status, items,
+          Number(o.subtotal).toFixed(2), Number(o.deliveryFee).toFixed(2),
+          Number(o.discount).toFixed(2), Number(o.total).toFixed(2),
+          o.payment?.method ?? '', o.payment?.status ?? '',
+        ].join(',')
+      }),
+    ]
+    return rows.join('\n')
   }
 }

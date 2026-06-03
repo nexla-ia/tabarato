@@ -178,4 +178,41 @@ export class ProductsService {
 
     return { deleted: true }
   }
+
+  async duplicate(userId: string, productId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      include: { store: true, variations: true },
+    })
+    if (!product) throw new NotFoundException('Product not found')
+    if (product.store.userId !== userId) throw new ForbiddenException('Not your product')
+
+    const { id: _id, createdAt: _c, updatedAt: _u, store: _s, variations, ...data } = product as any
+    const newProduct = await this.prisma.product.create({
+      data: { ...data, name: `${product.name} (cópia)`, isActive: false },
+      include: { category: true },
+    })
+
+    if (variations.length > 0) {
+      await this.prisma.productVariation.createMany({
+        data: variations.map(({ id: _vid, createdAt: _vc, productId: _pid, ...v }: any) => ({
+          ...v, productId: newProduct.id,
+        })),
+      })
+      await this.prisma.product.update({ where: { id: newProduct.id }, data: { hasVariations: true } })
+    }
+
+    return { ...newProduct, hasVariations: variations.length > 0 }
+  }
+
+  async bulkToggle(userId: string, productIds: string[], active: boolean) {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new ForbiddenException()
+
+    await this.prisma.product.updateMany({
+      where: { id: { in: productIds }, storeId: store.id },
+      data: { isActive: active },
+    })
+    return { updated: productIds.length, isActive: active }
+  }
 }

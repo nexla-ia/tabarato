@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, Query } from '@nestjs/common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -108,5 +108,22 @@ export class ProductsController {
     @Body() dto: CreateVariationDto,
   ) {
     return this.productsService.addVariation(user.sub, id, dto)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Post(':id/duplicate')
+  duplicate(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.productsService.duplicate(user.sub, id)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Patch('bulk/toggle')
+  bulkToggle(
+    @CurrentUser() user: any,
+    @Body() body: { productIds: string[]; active: boolean },
+  ) {
+    return this.productsService.bulkToggle(user.sub, body.productIds, body.active)
   }
 }
