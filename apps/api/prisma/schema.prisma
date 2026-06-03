@@ -108,6 +108,7 @@ model User {
   couponUses     CouponUse[]
   store          Store?
   courier        Courier?
+  favorites      Favorite[]
 
   @@map("users")
 }
@@ -179,8 +180,23 @@ model Store {
   categories Category[] @relation("StoresToCategories")
   reviews    Review[]
   coupons    Coupon[]
+  favorites  Favorite[]
 
   @@map("stores")
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  storeId   String   @map("store_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storeId])
+  @@index([userId])
+  @@map("favorites")
 }
 
 model Product {
