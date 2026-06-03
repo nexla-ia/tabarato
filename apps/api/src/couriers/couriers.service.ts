@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
 import { WalletService } from '../wallet/wallet.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import { LoyaltyService } from '../loyalty/loyalty.service'
 import { DeliveryMatchingService } from './delivery-matching.service'
 import { DeliveryGateway } from './delivery.gateway'
 import { CreateCourierDto } from './dto/create-courier.dto'
@@ -18,6 +19,7 @@ export class CouriersService {
     private push: PushService,
     private wallet: WalletService,
     private notifications: NotificationsService,
+    private loyalty: LoyaltyService,
     @Optional() private matching: DeliveryMatchingService,
     @Optional() private gateway: DeliveryGateway,
   ) {}
@@ -272,6 +274,15 @@ export class CouriersService {
 
         return d
       })
+
+      // Credit loyalty points to the consumer (fire-and-forget)
+      const order = await this.prisma.order.findUnique({
+        where: { id: delivery.orderId },
+        select: { userId: true, subtotal: true },
+      })
+      if (order) {
+        this.loyalty.earnPoints(order.userId, delivery.orderId, Number(order.subtotal)).catch(() => {})
+      }
     } else {
       // For non-terminal transitions just update the delivery
       updated = await this.prisma.delivery.update({ where: { id: deliveryId }, data: updateData })

@@ -16,6 +16,7 @@ import { WalletModule } from './wallet/wallet.module'
 import { CourierReviewsModule } from './courier-reviews/courier-reviews.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { PaymentsModule } from './payments/payments.module'
+import { LoyaltyModule } from './loyalty/loyalty.module'
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { PaymentsModule } from './payments/payments.module'
     CourierReviewsModule,
     NotificationsModule,
     PaymentsModule,
+    LoyaltyModule,
   ],
 })
 export class AppModule {}

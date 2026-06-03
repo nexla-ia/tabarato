@@ -97,18 +97,22 @@ model User {
   state        String?
   isActive     Boolean  @default(true) @map("is_active")
   pushToken    String?  @map("push_token")
+  referralCode String?  @unique @map("referral_code")
+  referredBy   String?  @map("referred_by")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  addresses      Address[]
-  orders         Order[]
-  reviews        Review[]
-  courierReviews CourierReview[]
-  notifications  Notification[]  @relation("RecipientNotifications")
-  couponUses     CouponUse[]
-  store          Store?
-  courier        Courier?
-  favorites      Favorite[]
+  addresses       Address[]
+  orders          Order[]
+  reviews         Review[]
+  courierReviews  CourierReview[]
+  notifications   Notification[]  @relation("RecipientNotifications")
+  couponUses      CouponUse[]
+  store           Store?
+  courier         Courier?
+  favorites       Favorite[]
+  loyaltyAccount  LoyaltyAccount?
+  chatMessages    ChatMessage[]
 
   @@map("users")
 }
@@ -184,6 +188,55 @@ model Store {
 
   @@map("stores")
 }
+
+// ─── FIDELIDADE ──────────────────────────────────────────────────────────────
+
+model LoyaltyAccount {
+  id             String   @id @default(uuid())
+  userId         String   @unique @map("user_id")
+  points         Int      @default(0)
+  lifetimePoints Int      @default(0) @map("lifetime_points")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions LoyaltyTransaction[]
+
+  @@map("loyalty_accounts")
+}
+
+model LoyaltyTransaction {
+  id          String   @id @default(uuid())
+  accountId   String   @map("account_id")
+  points      Int
+  type        String   // EARN | REDEEM | BONUS
+  description String?
+  orderId     String?  @map("order_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  account LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@map("loyalty_transactions")
+}
+
+// ─── CHAT ─────────────────────────────────────────────────────────────────────
+
+model ChatMessage {
+  id         String   @id @default(uuid())
+  orderId    String   @map("order_id")
+  senderId   String   @map("sender_id")
+  senderRole String   @map("sender_role")
+  content    String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sender User  @relation(fields: [senderId], references: [id])
+
+  @@index([orderId])
+  @@map("chat_messages")
+}
+
+// ─── FAVORITOS ────────────────────────────────────────────────────────────────
 
 model Favorite {
   id        String   @id @default(uuid())
@@ -271,6 +324,7 @@ model Order {
   courierReview CourierReview?
   couponUse     CouponUse?
   statusHistory OrderStatusHistory[]
+  chatMessages  ChatMessage[]
 
   @@index([userId])
   @@index([storeId])

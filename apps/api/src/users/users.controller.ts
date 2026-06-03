@@ -15,6 +15,15 @@ export class UsersController {
     return this.usersService.findById(user.sub)
   }
 
+  @Get('me/referral')
+  async getReferral(@CurrentUser() user: any) {
+    const u = await this.usersService.findById(user.sub)
+    return {
+      referralCode: (u as any).referralCode,
+      shareText: `Use meu código ${(u as any).referralCode} no Tá Barato e ganhe 50 pontos de boas-vindas! 🎁`,
+    }
+  }
+
   @Patch('me')
   updateMe(@CurrentUser() user: any, @Body() dto: UpdateUserDto) {
     return this.usersService.update(user.sub, dto)

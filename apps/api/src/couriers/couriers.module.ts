@@ -8,6 +8,7 @@ import { DeliveryGateway } from './delivery.gateway'
 import { PushService } from '../common/push.service'
 import { WalletModule } from '../wallet/wallet.module'
 import { NotificationsModule } from '../notifications/notifications.module'
+import { LoyaltyModule } from '../loyalty/loyalty.module'
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { NotificationsModule } from '../notifications/notifications.module'
     }),
     WalletModule,
     NotificationsModule,
+    LoyaltyModule,
   ],
   controllers: [CouriersController],
   providers: [CouriersService, PushService, DeliveryMatchingService, DeliveryGateway],
