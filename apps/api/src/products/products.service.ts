@@ -18,6 +18,41 @@ export class ProductsService {
     })
   }
 
+  async findPopular(limit = 12) {
+    // Aggregate order items to find most-ordered products
+    const topItems = await this.prisma.orderItem.groupBy({
+      by: ['productId'],
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: limit * 2, // fetch extra to account for inactive/unavailable
+    })
+
+    const productIds = topItems.map(t => t.productId)
+    const products = await this.prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        isActive: true,
+        store: { status: 'APPROVED' },
+      },
+      include: {
+        category: { select: { id: true, name: true } },
+        store: { select: { id: true, name: true, logoUrl: true, isOpen: true, prepTimeMin: true } },
+        variations: { where: { isActive: true }, select: { price: true }, take: 1, orderBy: { price: 'asc' } },
+      },
+      take: limit,
+    })
+
+    // Re-sort by original ranking from orderItem aggregation
+    const rankMap = new Map(topItems.map((t, i) => [t.productId, i]))
+    return products
+      .sort((a, b) => (rankMap.get(a.id) ?? 999) - (rankMap.get(b.id) ?? 999))
+      .map(p => ({
+        ...p,
+        totalOrdered: topItems.find(t => t.productId === p.id)?._sum.quantity ?? 0,
+        displayPrice: p.basePrice ?? p.variations[0]?.price ?? null,
+      }))
+  }
+
   async findByStore(storeId: string) {
     return this.prisma.product.findMany({
       where: { storeId, isActive: true },

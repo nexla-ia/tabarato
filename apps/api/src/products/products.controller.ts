@@ -11,6 +11,11 @@ import { CreateVariationDto } from './dto/create-variation.dto'
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
+  @Get('popular')
+  getPopular(@Query('limit') limit?: string) {
+    return this.productsService.findPopular(limit ? parseInt(limit) : 12)
+  }
+
   @Get('store/:storeId')
   findByStore(@Param('storeId') storeId: string) {
     return this.productsService.findByStore(storeId)
