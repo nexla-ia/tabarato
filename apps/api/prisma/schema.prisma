@@ -377,7 +377,7 @@ model Payment {
   pixExpiresAt   DateTime?     @map("pix_expires_at")
   paidAt         DateTime?     @map("paid_at")
   createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at")
 
   orders Order[]
 
