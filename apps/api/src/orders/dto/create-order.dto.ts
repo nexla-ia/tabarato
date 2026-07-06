@@ -59,4 +59,9 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   scheduledFor?: string // ISO date string
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  pointsToRedeem?: number // loyalty points to redeem (multiples of 100)
 }

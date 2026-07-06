@@ -169,6 +169,36 @@ export class OrdersService {
       couponId = result.coupon.id
     }
 
+    // ── Loyalty redemption (100 pts = R$10) ──────────────────────────────
+    // Validated here and applied atomically inside the transaction below.
+    let loyaltyRedeem = 0
+    let loyaltyAccountId: string | undefined
+    if (dto.pointsToRedeem && dto.pointsToRedeem > 0) {
+      const pts = Math.floor(dto.pointsToRedeem)
+      if (pts < 100 || pts % 100 !== 0) {
+        throw new BadRequestException('Resgate de pontos deve ser em múltiplos de 100 (mínimo 100).')
+      }
+      const account = await this.prisma.loyaltyAccount.findUnique({ where: { userId } })
+      if (!account || account.points < pts) {
+        throw new BadRequestException('Saldo de pontos insuficiente para o resgate.')
+      }
+      // Never let the loyalty discount exceed the remaining order value —
+      // cap the redeemed points to whole R$10 blocks that actually fit.
+      const maxExtra = subtotal + deliveryFee - discount
+      let loyaltyDiscount = (pts / 100) * 10
+      if (loyaltyDiscount > maxExtra) {
+        const usableBlocks = Math.floor(maxExtra / 10)
+        loyaltyRedeem = usableBlocks * 100
+        loyaltyDiscount = usableBlocks * 10
+      } else {
+        loyaltyRedeem = pts
+      }
+      if (loyaltyRedeem > 0) {
+        discount += loyaltyDiscount
+        loyaltyAccountId = account.id
+      }
+    }
+
     const total = subtotal + deliveryFee - discount
 
     // Create payment + order in a single transaction to avoid orphaned records
@@ -209,6 +239,24 @@ export class OrdersService {
       if (couponId) {
         await tx.couponUse.create({ data: { couponId, userId, orderId: order.id } })
         await tx.coupon.update({ where: { id: couponId }, data: { usedCount: { increment: 1 } } })
+      }
+
+      // Loyalty redemption — decrement points + ledger entry in the same transaction
+      if (loyaltyAccountId && loyaltyRedeem > 0) {
+        await tx.loyaltyAccount.update({
+          where: { id: loyaltyAccountId },
+          data: {
+            points: { decrement: loyaltyRedeem },
+            transactions: {
+              create: {
+                points: -loyaltyRedeem,
+                type: 'REDEEM',
+                description: `Resgate de ${loyaltyRedeem} pontos (R$ ${((loyaltyRedeem / 100) * 10).toFixed(2)} de desconto)`,
+                orderId: order.id,
+              },
+            },
+          },
+        })
       }
 
       return { payment, order }
