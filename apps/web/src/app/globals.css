@@ -2,28 +2,64 @@
 
 :root {
   --orange: #FF5500;
+  --orange-2: #FF7A00;
   --orange-dark: #CC3300;
   --orange-light: #FFF0EB;
   --text: #1A0A00;
   --muted: #7A5C4A;
+  --faint: #A8927F;
   --border: #F0E8E0;
   --bg: #FFFBF7;
+  --bg-warm: #FFF4EC;
   --card: #FFFFFF;
-  --green: #22C55E;
+  --green: #16A34A;
+  --green-bg: #DCFCE7;
   --red: #EF4444;
-  --radius: 14px;
+  --radius: 16px;
+  --shadow-sm: 0 1px 2px rgba(26,10,0,0.04), 0 2px 8px rgba(26,10,0,0.04);
+  --shadow-md: 0 6px 24px rgba(26,10,0,0.09);
+  --shadow-lg: 0 18px 50px rgba(204,51,0,0.16);
+  --sans: var(--font-dm-sans), system-ui, -apple-system, sans-serif;
+  --display: var(--font-display), var(--font-dm-sans), system-ui, sans-serif;
 }
 
+html { scroll-behavior: smooth; }
+
 body {
-  font-family: var(--font-dm-sans), 'DM Sans', system-ui, -apple-system, sans-serif;
+  font-family: var(--sans);
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a { color: inherit; text-decoration: none; }
-button { cursor: pointer; border: none; background: none; font: inherit; }
-input, textarea { font: inherit; }
+button { cursor: pointer; border: none; background: none; font: inherit; color: inherit; }
+input, textarea, select { font: inherit; }
 img { max-width: 100%; display: block; }
 
 .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+/* ── Scrollbars discretas em rails horizontais ── */
+.hideScroll { scrollbar-width: none; -ms-overflow-style: none; }
+.hideScroll::-webkit-scrollbar { display: none; }
+
+/* ── Animações de entrada ── */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+.reveal { animation: rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

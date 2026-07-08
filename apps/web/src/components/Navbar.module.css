@@ -1,61 +1,99 @@
 .nav {
-  position: sticky; top: 0; z-index: 100;
-  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(255, 251, 247, 0.85);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 2px 16px rgba(0,0,0,0.05);
 }
-
 .inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 60px;
+  height: 68px;
+  gap: 16px;
 }
 
-.logo {
-  display: flex; align-items: center;
-  height: 40px;
-}
+.left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.logo { display: flex; align-items: center; flex-shrink: 0; }
 
-.actions { display: flex; align-items: center; gap: 6px; }
+.location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.location:hover { border-color: var(--orange); box-shadow: var(--shadow-sm); }
+.location svg:first-child { color: var(--orange); }
+.locationText { white-space: nowrap; }
+.locationState { color: var(--muted); font-weight: 500; }
+.chev { color: var(--faint); }
+
+.actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
 .iconBtn {
+  position: relative;
+  width: 42px; height: 42px;
+  border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; border-radius: 10px;
-  color: var(--muted); background: transparent;
-  transition: background 0.15s, color 0.15s; position: relative;
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s;
 }
-.iconBtn:hover, .iconBtnActive { background: var(--orange-light); color: var(--orange); }
+.iconBtn:hover { background: var(--orange-light); color: var(--orange); }
+.iconBtnActive { background: var(--orange-light); color: var(--orange); }
 
 .cartBadge {
-  position: absolute; top: -6px; right: -6px;
+  position: absolute; top: 4px; right: 4px;
+  min-width: 17px; height: 17px; padding: 0 4px;
   background: var(--orange); color: #fff;
-  font-size: 9px; font-weight: 800;
-  width: 16px; height: 16px; border-radius: 8px;
+  border-radius: 999px; font-size: 10px; font-weight: 800;
   display: flex; align-items: center; justify-content: center;
-  border: 1.5px solid #fff;
+  border: 2px solid var(--bg);
 }
 
+.profile {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.profile:hover { border-color: var(--orange); box-shadow: var(--shadow-sm); }
 .avatarCircle {
-  width: 28px; height: 28px; border-radius: 14px;
-  background: var(--orange); color: #fff;
-  font-size: 13px; font-weight: 800;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+  color: #fff; font-weight: 800; font-size: 13px;
   display: flex; align-items: center; justify-content: center;
 }
+.profileName { font-size: 13.5px; font-weight: 700; }
 
 .loginBtn {
-  padding: 8px 16px; border-radius: 10px;
+  padding: 9px 18px; border-radius: 999px;
+  background: var(--orange-light); color: var(--orange);
   font-weight: 700; font-size: 14px;
-  color: var(--orange); background: var(--orange-light);
   transition: background 0.15s;
 }
-.loginBtn:hover { background: #FFE0CC; }
+.loginBtn:hover { background: #FFE3D6; }
 
 .signupBtn {
-  padding: 8px 16px; border-radius: 10px;
+  padding: 9px 20px; border-radius: 999px;
+  background: var(--orange); color: #fff;
   font-weight: 700; font-size: 14px;
-  color: #fff; background: var(--orange);
-  box-shadow: 0 3px 10px rgba(255,102,0,0.3);
-  transition: background 0.15s;
+  box-shadow: 0 4px 14px rgba(255,85,0,0.32);
+  transition: transform 0.12s, box-shadow 0.15s, background 0.15s;
 }
-.signupBtn:hover { background: var(--orange-dark); }
+.signupBtn:hover { background: var(--orange-dark); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(255,85,0,0.4); }
+
+@media (max-width: 640px) {
+  .location, .profileName { display: none; }
+  .inner { height: 60px; }
+}
