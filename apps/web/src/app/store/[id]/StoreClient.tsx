@@ -2,16 +2,17 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
 import styles from './StoreClient.module.css'
 
+interface Variation { id: string; name: string; price: number | string; stock?: number | null }
 interface Product {
   id: string; name: string; description?: string
-  imageUrl?: string; basePrice?: number; isActive: boolean
-  hasVariations: boolean
-  variations?: { id: string; name: string; price: number; stock: number }[]
+  imageUrl?: string; basePrice?: number | string; isActive: boolean
+  hasVariations?: boolean
+  variations?: Variation[]
 }
 
 interface Store {
@@ -19,7 +20,7 @@ interface Store {
   deliveryRadiusKm: number; prepTimeMin: number; isOpen: boolean
 }
 
-function fmtBRL(v: number) { return `R$ ${v.toFixed(2).replace('.', ',')}` }
+function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}` }
 
 export function StoreClient({ store, products }: { store: Store; products: Product[] }) {
   const { items, addItem, total, storeId } = useCartStore()
@@ -27,8 +28,8 @@ export function StoreClient({ store, products }: { store: Store; products: Produ
   const [confirmClear, setConfirmClear] = useState<(() => void) | null>(null)
   const cartCount = items.reduce((a, i) => a + i.quantity, 0)
 
-  function handleAdd(product: Product, variation?: { id: string; name: string; price: number }) {
-    const price = variation?.price ?? product.basePrice ?? 0
+  function handleAdd(product: Product, variation?: { id: string; name: string; price: number | string }) {
+    const price = Number(variation?.price ?? product.basePrice ?? 0)
     const cartItem = {
       productId: product.id, variationId: variation?.id, name: product.name,
       price, quantity: 1, imageUrl: product.imageUrl ?? undefined, variationName: variation?.name,
@@ -51,6 +52,7 @@ export function StoreClient({ store, products }: { store: Store; products: Produ
       {/* Store header */}
       <div className={styles.header}>
         <div className="container">
+          <Link href="/" className={styles.backLink}><ArrowLeft size={16} /> Voltar às lojas</Link>
           <div className={styles.headerInner}>
             <div className={styles.logoWrap}>
               {store.logoUrl
@@ -119,10 +121,10 @@ export function StoreClient({ store, products }: { store: Store; products: Produ
 
 function ProductCard({ product, onAdd }: {
   product: Product
-  onAdd: (p: Product, v?: { id: string; name: string; price: number }) => void
+  onAdd: (p: Product, v?: Variation) => void
 }) {
   const [selectedVar, setSelectedVar] = useState(product.variations?.[0])
-  const price = selectedVar?.price ?? product.basePrice ?? 0
+  const price = Number(selectedVar?.price ?? product.basePrice ?? 0)
   const items = useCartStore(s => s.items)
   const qty = items.filter(
     i => i.productId === product.id && i.variationId === selectedVar?.id
@@ -140,7 +142,7 @@ function ProductCard({ product, onAdd }: {
         <h3 className={styles.productName}>{product.name}</h3>
         {product.description && <p className={styles.productDesc}>{product.description}</p>}
 
-        {product.hasVariations && product.variations && product.variations.length > 0 && (
+        {product.variations && product.variations.length > 0 && (
           <div className={styles.varRow}>
             {product.variations.map(v => (
               <button

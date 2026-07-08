@@ -18,7 +18,7 @@ const STATUS_COLOR: Record<string, string> = {
 }
 const STEPS = ['PENDING','CONFIRMED','PREPARING','READY','DELIVERED']
 
-function fmtBRL(v: number) { return `R$ ${v.toFixed(2).replace('.', ',')}` }
+function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}` }
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()

@@ -4,26 +4,25 @@ import { notFound } from 'next/navigation'
 import { StoreClient } from './StoreClient'
 
 async function getStore(id: string) {
-  const res = await fetch(`${BASE}/stores/${id}`, { next: { revalidate: 60 } })
-  if (!res.ok) return null
-  return res.json()
-}
-
-async function getProducts(storeId: string) {
-  const res = await fetch(`${BASE}/products?storeId=${storeId}`, { next: { revalidate: 30 } })
-  if (!res.ok) return []
-  return res.json()
+  try {
+    const res = await fetch(`${BASE}/stores/${id}`, { next: { revalidate: 30 } })
+    if (!res.ok) return null
+    return res.json()
+  } catch { return null }
 }
 
 export default async function StorePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [store, products] = await Promise.all([getStore(id), getProducts(id)])
+  const store = await getStore(id)
   if (!store) notFound()
+
+  // A API já retorna os produtos embutidos em /stores/:id
+  const products = (store.products ?? []).filter((p: any) => p.isActive)
 
   return (
     <>
       <Navbar />
-      <StoreClient store={store} products={products.filter((p: any) => p.isActive)} />
+      <StoreClient store={store} products={products} />
     </>
   )
 }

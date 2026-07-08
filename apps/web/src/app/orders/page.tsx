@@ -16,7 +16,7 @@ const STATUS_COLOR: Record<string, string> = {
   READY: '#0891B2', PICKED_UP: '#059669', DELIVERED: '#16A34A', CANCELLED: '#DC2626',
 }
 
-function fmtBRL(v: number) { return `R$ ${v.toFixed(2).replace('.', ',')}` }
+function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}` }
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
 }
@@ -36,7 +36,7 @@ export default function OrdersPage() {
   useEffect(() => {
     if (!ready) return
     if (!user) { router.push('/login'); return }
-    api.get<Order[]>('/orders/me').then(r => setOrders(r.data)).catch(() => {}).finally(() => setLoading(false))
+    api.get<Order[]>('/orders').then(r => setOrders(r.data)).catch(() => {}).finally(() => setLoading(false))
   }, [user, ready])
 
   return (

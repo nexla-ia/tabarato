@@ -7,7 +7,7 @@ import { useCartStore } from '@/stores/cart'
 import { Navbar } from '@/components/Navbar'
 import styles from './page.module.css'
 
-function fmtBRL(v: number) { return `R$ ${v.toFixed(2).replace('.', ',')}` }
+function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}` }
 
 export default function CartPage() {
   const router = useRouter()
