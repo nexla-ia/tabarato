@@ -9,14 +9,20 @@ async function bootstrap() {
     rawBody: true,
   })
 
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : [
-        'https://admin-production-41b2.up.railway.app',
-        'https://api-production-b730d.up.railway.app',
-        // Next.js web (add after deploy)
-        /^http:\/\/localhost(:\d+)?$/,
-      ]
+  // Origins extras via env (ex.: domínio da plataforma web após o deploy).
+  // Aceita múltiplos separados por vírgula. São SOMADOS aos defaults abaixo
+  // (não substituem) — assim o admin continua funcionando ao adicionar a web.
+  const envOrigins = (process.env.ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean)
+
+  const allowedOrigins: (string | RegExp)[] = [
+    'https://admin-production-41b2.up.railway.app',
+    'https://api-production-b730d.up.railway.app',
+    /^http:\/\/localhost(:\d+)?$/,
+    ...envOrigins,
+  ]
 
   app.enableCors({
     origin: allowedOrigins,
