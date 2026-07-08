@@ -56,8 +56,10 @@ export class DeliveryGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   }
 
   @SubscribeMessage('order:watch')
-  handleWatch(@ConnectedSocket() client: Socket, @MessageBody() data: { orderId: string }) {
+  async handleWatch(@ConnectedSocket() client: Socket, @MessageBody() data: { orderId: string }) {
     if (!data?.orderId) return
+    const user = (client as any).user as { sub: string } | undefined
+    if (!user?.sub || !(await this.isParticipant(data.orderId, user.sub))) return
     client.join(`order:${data.orderId}`)
   }
 
@@ -68,11 +70,14 @@ export class DeliveryGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   }
 
   @SubscribeMessage('courier:location')
-  handleCourierLocation(
-    @ConnectedSocket() _client: Socket,
+  async handleCourierLocation(
+    @ConnectedSocket() client: Socket,
     @MessageBody() data: { orderId: string; lat: number; lng: number },
   ) {
     if (!data?.orderId) return
+    // Only the courier actually assigned to this order may broadcast its position.
+    const user = (client as any).user as { sub: string } | undefined
+    if (!user?.sub || !(await this.isAssignedCourier(data.orderId, user.sub))) return
     this.server.to(`order:${data.orderId}`).emit('courier:position', {
       lat: data.lat,
       lng: data.lng,
@@ -95,6 +100,7 @@ export class DeliveryGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
     const user = (client as any).user as { sub: string; role: string }
     if (!user?.sub) return
+    if (!(await this.isParticipant(data.orderId, user.sub))) return
 
     try {
       const msg = await this.prisma.chatMessage.create({
@@ -119,6 +125,8 @@ export class DeliveryGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     @MessageBody() data: { orderId: string },
   ) {
     if (!data?.orderId) return
+    const user = (client as any).user as { sub: string } | undefined
+    if (!user?.sub || !(await this.isParticipant(data.orderId, user.sub))) return
     try {
       const messages = await this.prisma.chatMessage.findMany({
         where: { orderId: data.orderId },
@@ -128,6 +136,33 @@ export class DeliveryGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       })
       client.emit('chat:history', messages)
     } catch {}
+  }
+
+  /** True if the user is the order's consumer, the store owner, or the assigned courier. */
+  private async isParticipant(orderId: string, userId: string): Promise<boolean> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        userId: true,
+        store: { select: { userId: true } },
+        delivery: { select: { courier: { select: { userId: true } } } },
+      },
+    })
+    if (!order) return false
+    return (
+      order.userId === userId ||
+      order.store?.userId === userId ||
+      order.delivery?.courier?.userId === userId
+    )
+  }
+
+  /** True only if the user is the courier currently assigned to this order. */
+  private async isAssignedCourier(orderId: string, userId: string): Promise<boolean> {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { orderId },
+      select: { courier: { select: { userId: true } } },
+    })
+    return delivery?.courier?.userId === userId
   }
 
   private extractToken(client: Socket): string | null {

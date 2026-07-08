@@ -76,9 +76,22 @@ export class OrdersService {
     ])
     if (!store) throw new BadRequestException('Loja não encontrada')
 
-    const openNow = isStoreOpenNow(store.openingHours, (store as any).scheduleExceptions)
-    const closed  = openNow !== null ? !openNow : !store.isOpen
-    if (closed) throw new BadRequestException('Esta loja está fechada no momento. Tente novamente mais tarde.')
+    // Validate the scheduled time (if any) — must be a valid future date
+    let scheduledDate: Date | undefined
+    if (dto.scheduledFor) {
+      scheduledDate = new Date(dto.scheduledFor)
+      if (isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now()) {
+        throw new BadRequestException('O horário de agendamento deve ser uma data futura válida.')
+      }
+    }
+
+    // The store must be open right now — unless the order is scheduled for later,
+    // in which case it's fine for the store to be closed at the moment of ordering.
+    if (!scheduledDate) {
+      const openNow = isStoreOpenNow(store.openingHours, (store as any).scheduleExceptions)
+      const closed  = openNow !== null ? !openNow : !store.isOpen
+      if (closed) throw new BadRequestException('Esta loja está fechada no momento. Tente novamente mais tarde.')
+    }
 
     // Check concurrent orders limit (null = unlimited; 0 treated as unlimited)
     const maxConcurrent = (store as any).maxConcurrentOrders
@@ -219,7 +232,7 @@ export class OrdersService {
           discount,
           total,
           notes: dto.notes,
-          scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : undefined,
+          scheduledFor: scheduledDate,
           items: { create: orderItems },
         },
         include: {

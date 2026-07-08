@@ -48,29 +48,6 @@ export class LoyaltyService {
     this.logger.log(`Loyalty: user ${userId.slice(0, 8)} earned ${points} pts for order ${orderId.slice(0, 8)}`)
   }
 
-  async redeemPoints(userId: string, pointsToRedeem: number): Promise<number> {
-    const account = await this.getOrCreate(userId)
-    if (account.points < pointsToRedeem) throw new Error('Saldo de pontos insuficiente')
-
-    const discount = (pointsToRedeem / 100) * REDEEM_RATE
-
-    await this.prisma.loyaltyAccount.update({
-      where: { id: account.id },
-      data: {
-        points: { decrement: pointsToRedeem },
-        transactions: {
-          create: {
-            points: -pointsToRedeem,
-            type: 'REDEEM',
-            description: `Resgate de ${pointsToRedeem} pontos (R$ ${discount.toFixed(2)} de desconto)`,
-          },
-        },
-      },
-    })
-
-    return discount
-  }
-
   async grantReferralBonus(referrerId: string, newUserId: string) {
     await Promise.all([
       this.grantBonus(referrerId, REFERRAL_BONUS, `Bônus de indicação — amigo cadastrado`),

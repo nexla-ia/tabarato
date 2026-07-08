@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, BadRequestException } from '@nestjs/common'
+import { Controller, Get, UseGuards } from '@nestjs/common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { LoyaltyService } from './loyalty.service'
@@ -13,12 +13,7 @@ export class LoyaltyController {
     return this.loyalty.getOrCreate(user.sub)
   }
 
-  @Post('redeem')
-  async redeem(@CurrentUser() user: any, @Body() body: { points: number }) {
-    if (!body.points || body.points < 100 || body.points % 100 !== 0) {
-      throw new BadRequestException('Mínimo de 100 pontos por resgate (múltiplos de 100).')
-    }
-    const discount = await this.loyalty.redeemPoints(user.sub, body.points)
-    return { discount, pointsUsed: body.points }
-  }
+  // Note: point redemption happens atomically at checkout (see OrdersService.create,
+  // field `pointsToRedeem`). A standalone redeem endpoint is intentionally omitted —
+  // it would debit points without tying the discount to an actual order.
 }
