@@ -21,10 +21,10 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (!ready) return
     if (!user) { router.replace('/login'); return }
-    if (user.role !== 'STORE') { router.replace('/'); return }
+    if (user.role !== 'STORE_OWNER') { router.replace('/'); return }
   }, [ready, user, router])
 
-  if (!ready || !user || user.role !== 'STORE') {
+  if (!ready || !user || user.role !== 'STORE_OWNER') {
     return <div className={styles.loading}>Carregando…</div>
   }
 

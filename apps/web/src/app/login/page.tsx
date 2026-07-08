@@ -22,7 +22,7 @@ export default function LoginPage() {
       const { data } = await api.post('/auth/login', { email, password })
       login(data.accessToken, data.user)
       // Route by role: store owners land on the lojista panel
-      router.push(data.user?.role === 'STORE' ? '/lojista' : '/')
+      router.push(data.user?.role === 'STORE_OWNER' ? '/lojista' : '/')
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Credenciais inválidas')
     } finally {
@@ -66,6 +66,10 @@ export default function LoginPage() {
         <p className={styles.footer}>
           Não tem conta?{' '}
           <Link href="/register" className={styles.link}>Criar conta grátis</Link>
+        </p>
+        <p className={styles.footer} style={{ marginTop: 4 }}>
+          É lojista?{' '}
+          <Link href="/cadastro-loja" className={styles.link}>Cadastre sua loja</Link>
         </p>
       </div>
     </div>
