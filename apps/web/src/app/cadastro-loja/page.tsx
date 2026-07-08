@@ -2,7 +2,7 @@
 import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Store, User, CreditCard, MapPin, Check, Loader2 } from 'lucide-react'
+import { Store, User, CreditCard, MapPin, Check, Loader2, ArrowLeft } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import styles from './page.module.css'
@@ -109,6 +109,7 @@ export default function CadastroLojaPage() {
 
       <div className={styles.formSide}>
         <form className={styles.form} onSubmit={handleSubmit}>
+          <Link href="/" className={styles.backLink}><ArrowLeft size={16} /> Voltar ao início</Link>
           <h2 className={styles.formTitle}>Cadastro de lojista</h2>
 
           <div className={styles.section}><User size={15} /> Seus dados</div>

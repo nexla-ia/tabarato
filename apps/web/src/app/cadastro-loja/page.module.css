@@ -27,6 +27,12 @@
 
 .formSide { flex: 1; display: flex; justify-content: center; padding: 40px 24px; }
 .form { width: 100%; max-width: 480px; }
+.backLink {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13.5px; font-weight: 600; color: var(--muted);
+  margin-bottom: 14px; transition: color 0.14s;
+}
+.backLink:hover { color: var(--orange); }
 .formTitle { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
 
 .section {
