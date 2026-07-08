@@ -76,15 +76,21 @@ export function StoreClient({ store, products }: { store: Store; products: Produ
       </div>
 
       {/* Products */}
-      <div className="container" style={{ padding: '32px 20px 120px' }}>
+      <div className="container" style={{ padding: '28px 20px 120px' }}>
         {products.length === 0 ? (
           <div className={styles.empty}>Nenhum produto disponível no momento.</div>
         ) : (
+          <>
+          <div className={styles.menuHead}>
+            <h2 className={styles.menuTitle}>Cardápio</h2>
+            <span className={styles.menuCount}>{products.length} {products.length === 1 ? 'item' : 'itens'}</span>
+          </div>
           <div className={styles.grid}>
             {products.map(p => (
               <ProductCard key={p.id} product={p} onAdd={handleAdd} />
             ))}
           </div>
+          </>
         )}
       </div>
 

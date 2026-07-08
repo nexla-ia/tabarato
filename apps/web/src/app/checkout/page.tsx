@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useCartStore } from '@/stores/cart'
+import { useAuth } from '@/hooks/useAuth'
 import { validateCardForm } from '@/lib/cardValidation'
 import Image from 'next/image'
 import styles from './page.module.css'
@@ -39,6 +40,12 @@ async function tokenizeCard(data: { cardNumber: string; cvv: string; expiryMonth
 export default function CheckoutPage() {
   const router = useRouter()
   const { items, storeId, total, clear } = useCartStore()
+  const { user, ready } = useAuth()
+
+  // Exige login pra finalizar o pedido
+  useEffect(() => {
+    if (ready && !user) router.push('/login')
+  }, [ready, user, router])
 
   const [addresses, setAddresses] = useState<Address[]>([])
   const [selectedAddr, setSelectedAddr] = useState('')

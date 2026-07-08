@@ -1,7 +1,7 @@
 .loading { padding: 60px; text-align: center; color: var(--muted); }
 .back { font-size: 14px; color: var(--muted); font-weight: 600; display: inline-flex; align-items: center; gap: 5px; margin-bottom: 16px; }
 .back:hover { color: var(--orange); }
-.title { font-size: 22px; font-weight: 900; color: var(--text); letter-spacing: -0.3px; margin-bottom: 12px; }
+.title { font-family: var(--display); font-size: 24px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; margin-bottom: 12px; }
 .statusBadge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 20px; }
 
 .progress { display: flex; align-items: center; margin-bottom: 24px; }
