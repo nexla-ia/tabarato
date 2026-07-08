@@ -2,18 +2,20 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Phone, Store as StoreIcon } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
 import styles from './StoreClient.module.css'
 
 interface Variation { id: string; name: string; price: number | string; stock?: number | null }
+interface Category { id: string; name: string; icon?: string | null }
 interface Product {
   id: string; name: string; description?: string
   imageUrl?: string; basePrice?: number | string; isActive: boolean
   stock?: number | null
   hasVariations?: boolean
   variations?: Variation[]
+  category?: Category | null
 }
 
 // estoque null = ilimitado; <= 0 = esgotado
@@ -22,12 +24,17 @@ function isOut(stock?: number | null) { return stock != null && stock <= 0 }
 interface Store {
   id: string; name: string; description?: string; logoUrl?: string
   deliveryRadiusKm: number; prepTimeMin: number; isOpen: boolean
+  address?: string | null; phone?: string | null
 }
 
 function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}` }
+function digits(s?: string | null) { return (s ?? '').replace(/\D/g, '') }
 
-export function StoreClient({ store, products }: { store: Store; products: Product[] }) {
+export function StoreClient({ store, products, rating, reviewCount }: {
+  store: Store; products: Product[]; rating?: number | null; reviewCount?: number
+}) {
   const { items, addItem, total, storeId } = useCartStore()
+  const [query, setQuery] = useState('')
   const { user } = useAuth()
   const [confirmClear, setConfirmClear] = useState<(() => void) | null>(null)
   const cartCount = items.reduce((a, i) => a + i.quantity, 0)
@@ -71,6 +78,12 @@ export function StoreClient({ store, products }: { store: Store; products: Produ
                 <span className={`${styles.statusChip} ${store.isOpen ? styles.open : styles.closed}`}>
                   {store.isOpen ? '● Aberto' : '● Fechado'}
                 </span>
+                {rating != null && rating > 0 && (
+                  <span className={styles.ratingMeta}>
+                    <Star size={13} fill="#F59E0B" color="#F59E0B" /> {Number(rating).toFixed(1)}
+                    {reviewCount ? <span className={styles.ratingCount}>({reviewCount})</span> : null}
+                  </span>
+                )}
                 <span className={styles.metaItem}><Clock size={13} /> {store.prepTimeMin} min</span>
                 <span className={styles.metaItem}><MapPin size={13} /> até {store.deliveryRadiusKm} km</span>
               </div>
@@ -79,21 +92,87 @@ export function StoreClient({ store, products }: { store: Store; products: Produ
         </div>
       </div>
 
-      {/* Products */}
-      <div className="container" style={{ padding: '28px 20px 120px' }}>
+      {/* Info + Products */}
+      <div className="container" style={{ padding: '24px 20px 120px' }}>
+        {/* Sobre a loja */}
+        {(store.address || store.phone) && (
+          <div className={styles.infoCard}>
+            <div className={styles.infoItem}>
+              <StoreIcon size={16} />
+              <div>
+                <div className={styles.infoLabel}>Loja</div>
+                <div className={styles.infoValue}>{store.isOpen ? 'Aberta agora' : 'Fechada'} · entrega até {store.deliveryRadiusKm} km · ~{store.prepTimeMin} min</div>
+              </div>
+            </div>
+            {store.address && (
+              <div className={styles.infoItem}>
+                <MapPin size={16} />
+                <div>
+                  <div className={styles.infoLabel}>Endereço</div>
+                  <div className={styles.infoValue}>{store.address}</div>
+                </div>
+              </div>
+            )}
+            {store.phone && (
+              <a className={styles.infoItem} href={`https://wa.me/55${digits(store.phone)}`} target="_blank" rel="noopener noreferrer">
+                <Phone size={16} />
+                <div>
+                  <div className={styles.infoLabel}>Contato</div>
+                  <div className={`${styles.infoValue} ${styles.infoLink}`}>{store.phone}</div>
+                </div>
+              </a>
+            )}
+          </div>
+        )}
+
         {products.length === 0 ? (
           <div className={styles.empty}>Nenhum produto disponível no momento.</div>
         ) : (
           <>
-          <div className={styles.menuHead}>
-            <h2 className={styles.menuTitle}>Cardápio</h2>
-            <span className={styles.menuCount}>{products.length} {products.length === 1 ? 'item' : 'itens'}</span>
-          </div>
-          <div className={styles.grid}>
-            {products.map(p => (
-              <ProductCard key={p.id} product={p} onAdd={handleAdd} />
-            ))}
-          </div>
+            <div className={styles.menuHead}>
+              <h2 className={styles.menuTitle}>Produtos</h2>
+              <span className={styles.menuCount}>{products.length} {products.length === 1 ? 'item' : 'itens'}</span>
+            </div>
+
+            <div className={styles.searchBar}>
+              <Search size={18} />
+              <input
+                className={styles.searchInput}
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder={`Buscar em ${store.name}…`}
+              />
+            </div>
+
+            {(() => {
+              const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+              const q = norm(query.trim())
+              const filtered = q
+                ? products.filter(p => norm(p.name).includes(q) || norm(p.description ?? '').includes(q))
+                : products
+
+              if (!filtered.length) {
+                return <div className={styles.empty}>Nenhum produto encontrado para “{query}”.</div>
+              }
+
+              // agrupa por categoria preservando ordem de aparição
+              const groups: { name: string; items: Product[] }[] = []
+              for (const p of filtered) {
+                const catName = p.category?.name ?? 'Outros'
+                let g = groups.find(x => x.name === catName)
+                if (!g) { g = { name: catName, items: [] }; groups.push(g) }
+                g.items.push(p)
+              }
+
+              return groups.map(g => (
+                <section key={g.name} className={styles.catSection}>
+                  <h3 className={styles.catTitle}>{g.name}</h3>
+                  <div className={styles.grid}>
+                    {g.items.map(p => <ProductCard key={p.id} product={p} onAdd={handleAdd} />)}
+                  </div>
+                </section>
+              ))
+            })()}
           </>
         )}
       </div>

@@ -11,9 +11,17 @@ async function getStore(id: string) {
   } catch { return null }
 }
 
+async function getReviews(id: string) {
+  try {
+    const res = await fetch(`${BASE}/reviews/store/${id}?limit=0`, { next: { revalidate: 120 } })
+    if (!res.ok) return { avgRating: null, total: 0 }
+    return res.json()
+  } catch { return { avgRating: null, total: 0 } }
+}
+
 export default async function StorePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const store = await getStore(id)
+  const [store, reviews] = await Promise.all([getStore(id), getReviews(id)])
   if (!store) notFound()
 
   // A API já retorna os produtos embutidos em /stores/:id
@@ -22,7 +30,12 @@ export default async function StorePage({ params }: { params: Promise<{ id: stri
   return (
     <>
       <Navbar />
-      <StoreClient store={store} products={products} />
+      <StoreClient
+        store={store}
+        products={products}
+        rating={reviews?.avgRating ?? null}
+        reviewCount={reviews?.total ?? 0}
+      />
     </>
   )
 }
