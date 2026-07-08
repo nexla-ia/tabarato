@@ -13,10 +13,10 @@ async function getStore(id: string) {
 
 async function getReviews(id: string) {
   try {
-    const res = await fetch(`${BASE}/reviews/store/${id}?limit=0`, { next: { revalidate: 120 } })
-    if (!res.ok) return { avgRating: null, total: 0 }
+    const res = await fetch(`${BASE}/reviews/store/${id}?limit=6`, { next: { revalidate: 120 } })
+    if (!res.ok) return { avgRating: null, total: 0, reviews: [] }
     return res.json()
-  } catch { return { avgRating: null, total: 0 } }
+  } catch { return { avgRating: null, total: 0, reviews: [] } }
 }
 
 export default async function StorePage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,6 +35,8 @@ export default async function StorePage({ params }: { params: Promise<{ id: stri
         products={products}
         rating={reviews?.avgRating ?? null}
         reviewCount={reviews?.total ?? 0}
+        reviews={reviews?.reviews ?? []}
+        photos={store.photos ?? []}
       />
     </>
   )

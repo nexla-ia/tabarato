@@ -26,12 +26,29 @@ interface Store {
   deliveryRadiusKm: number; prepTimeMin: number; isOpen: boolean
   address?: string | null; phone?: string | null
 }
+interface Review {
+  id: string; rating: number; comment?: string | null
+  photos?: string[]; createdAt: string; user?: { name?: string } | null
+}
 
 function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}` }
 function digits(s?: string | null) { return (s ?? '').replace(/\D/g, '') }
+function initials(name?: string) { return (name ?? '?').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() }
+function reviewDate(d: string) { return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) }
 
-export function StoreClient({ store, products, rating, reviewCount }: {
+function Stars({ n, size = 14 }: { n: number; size?: number }) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 1 }}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star key={i} size={size} fill={i <= n ? '#F59E0B' : 'none'} color={i <= n ? '#F59E0B' : '#D6C9BF'} />
+      ))}
+    </span>
+  )
+}
+
+export function StoreClient({ store, products, rating, reviewCount, reviews = [], photos = [] }: {
   store: Store; products: Product[]; rating?: number | null; reviewCount?: number
+  reviews?: Review[]; photos?: string[]
 }) {
   const { items, addItem, total, storeId } = useCartStore()
   const [query, setQuery] = useState('')
@@ -94,6 +111,17 @@ export function StoreClient({ store, products, rating, reviewCount }: {
 
       {/* Info + Products */}
       <div className="container" style={{ padding: '24px 20px 120px' }}>
+        {/* Galeria de fotos */}
+        {photos.length > 0 && (
+          <div className={`hideScroll ${styles.gallery}`}>
+            {photos.map((url, i) => (
+              <a key={i} href={url} target="_blank" rel="noopener noreferrer" className={styles.galleryItem}>
+                <Image src={url} alt={`${store.name} foto ${i + 1}`} fill sizes="220px" style={{ objectFit: 'cover' }} />
+              </a>
+            ))}
+          </div>
+        )}
+
         {/* Sobre a loja */}
         {(store.address || store.phone) && (
           <div className={styles.infoCard}>
@@ -174,6 +202,37 @@ export function StoreClient({ store, products, rating, reviewCount }: {
               ))
             })()}
           </>
+        )}
+
+        {/* Avaliações */}
+        {reviews.length > 0 && (
+          <section className={styles.reviews}>
+            <div className={styles.reviewsHead}>
+              <h2 className={styles.menuTitle}>Avaliações</h2>
+              {rating != null && rating > 0 && (
+                <div className={styles.reviewsScore}>
+                  <Star size={16} fill="#F59E0B" color="#F59E0B" />
+                  <strong>{Number(rating).toFixed(1)}</strong>
+                  <span className={styles.menuCount}>· {reviewCount} avaliaç{reviewCount === 1 ? 'ão' : 'ões'}</span>
+                </div>
+              )}
+            </div>
+            <div className={styles.reviewGrid}>
+              {reviews.map(r => (
+                <div key={r.id} className={styles.reviewCard}>
+                  <div className={styles.reviewTop}>
+                    <span className={styles.reviewAvatar}>{initials(r.user?.name)}</span>
+                    <div className={styles.reviewWho}>
+                      <span className={styles.reviewName}>{r.user?.name?.split(' ')[0] ?? 'Cliente'}</span>
+                      <span className={styles.reviewDate}>{reviewDate(r.createdAt)}</span>
+                    </div>
+                    <Stars n={r.rating} />
+                  </div>
+                  {r.comment && <p className={styles.reviewComment}>{r.comment}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
         )}
       </div>
 

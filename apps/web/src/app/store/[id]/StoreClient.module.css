@@ -44,6 +44,35 @@
 .searchBar:focus-within { border-color: var(--orange); }
 .searchInput { flex: 1; border: none; outline: none; background: transparent; font-size: 14.5px; color: var(--text); }
 
+/* Galeria de fotos */
+.gallery { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 22px; }
+.galleryItem {
+  position: relative; flex-shrink: 0;
+  width: 220px; height: 140px; border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--border); background: var(--bg-warm);
+  transition: transform 0.16s, box-shadow 0.16s;
+}
+.galleryItem:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+
+/* Avaliações */
+.reviews { margin-top: 34px; }
+.reviewsHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.reviewsScore { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; }
+.reviewsScore strong { font-family: var(--display); font-size: 18px; }
+.reviewGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.reviewCard { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+.reviewTop { display: flex; align-items: center; gap: 10px; }
+.reviewAvatar {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+  color: #fff; font-weight: 800; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+}
+.reviewWho { flex: 1; display: flex; flex-direction: column; }
+.reviewName { font-weight: 700; font-size: 14px; }
+.reviewDate { font-size: 12px; color: var(--faint); }
+.reviewComment { margin-top: 10px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+
 /* Categorias */
 .catSection { margin-bottom: 26px; }
 .catTitle {
