@@ -1,0 +1,146 @@
+'use client'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import Link from 'next/link'
+import { Power, Pause, Play, ArrowRight, Clock } from 'lucide-react'
+import { api } from '@/lib/api'
+import { Store, Order, STATUS_LABEL, STATUS_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL, money, timeAgo } from '@/lib/types'
+import styles from './page.module.css'
+
+function startOfToday() {
+  const d = new Date(); d.setHours(0, 0, 0, 0); return d
+}
+
+export default function LojistaDashboard() {
+  const qc = useQueryClient()
+
+  const storeQ = useQuery<Store>({
+    queryKey: ['store-my'],
+    queryFn: async () => (await api.get('/stores/my')).data,
+  })
+
+  const ordersQ = useQuery<Order[]>({
+    queryKey: ['store-orders'],
+    queryFn: async () => (await api.get('/orders/store')).data,
+    refetchInterval: 20_000,
+  })
+
+  const toggleOpen = useMutation({
+    mutationFn: async () => (await api.patch('/stores/my/toggle-open')).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['store-my'] }),
+  })
+  const togglePause = useMutation({
+    mutationFn: async () => (await api.patch('/stores/my/toggle-pause')).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['store-my'] }),
+  })
+  const advance = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) =>
+      (await api.patch(`/orders/${id}/status`, { status })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['store-orders'] }),
+  })
+
+  const store = storeQ.data
+  const orders = ordersQ.data ?? []
+
+  const today = startOfToday()
+  const todayOrders = orders.filter(o => new Date(o.createdAt) >= today && o.status !== 'CANCELLED')
+  const revenue = todayOrders.reduce((s, o) => s + Number(o.total ?? 0), 0)
+  const pending = orders.filter(o => o.status === 'PENDING').length
+  const active = orders.filter(o => ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'].includes(o.status))
+
+  return (
+    <div>
+      <div className={styles.headerRow}>
+        <div>
+          <h1 className={styles.title}>{store?.name ?? 'Minha loja'}</h1>
+          <p className={styles.subtitle}>Painel do lojista</p>
+        </div>
+        {store && (
+          <div className={styles.storeActions}>
+            <button
+              className={`${styles.stateBtn} ${store.isOpen ? styles.stateOn : styles.stateOff}`}
+              onClick={() => toggleOpen.mutate()}
+              disabled={toggleOpen.isPending}
+            >
+              <Power size={16} />
+              {store.isOpen ? 'Loja aberta' : 'Loja fechada'}
+            </button>
+            {store.isOpen && (
+              <button
+                className={`${styles.stateBtn} ${store.isPaused ? styles.statePaused : styles.stateNeutral}`}
+                onClick={() => togglePause.mutate()}
+                disabled={togglePause.isPending}
+              >
+                {store.isPaused ? <Play size={16} /> : <Pause size={16} />}
+                {store.isPaused ? 'Retomar pedidos' : 'Pausar pedidos'}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className={styles.stats}>
+        <div className={styles.statCard}>
+          <div className={styles.statLabel}>Pedidos hoje</div>
+          <div className={styles.statValue}>{todayOrders.length}</div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statLabel}>Faturamento hoje</div>
+          <div className={styles.statValue}>{money(revenue)}</div>
+        </div>
+        <div className={styles.statCard} style={{ borderColor: pending > 0 ? '#F59E0B' : undefined }}>
+          <div className={styles.statLabel}>Aguardando</div>
+          <div className={styles.statValue} style={{ color: pending > 0 ? '#D97706' : undefined }}>{pending}</div>
+        </div>
+      </div>
+
+      <div className={styles.sectionHead}>
+        <h2 className={styles.sectionTitle}>Pedidos ativos</h2>
+        <Link href="/lojista/pedidos" className={styles.seeAll}>Ver todos →</Link>
+      </div>
+
+      {ordersQ.isLoading ? (
+        <div className={styles.empty}>Carregando pedidos…</div>
+      ) : active.length === 0 ? (
+        <div className={styles.empty}>Nenhum pedido ativo no momento.</div>
+      ) : (
+        <div className={styles.orderList}>
+          {active.map(o => {
+            const next = NEXT_STATUS[o.status]
+            return (
+              <div key={o.id} className={styles.orderCard}>
+                <div className={styles.orderMain}>
+                  <div className={styles.orderTop}>
+                    <span className={styles.orderId}>#{o.id.slice(-6).toUpperCase()}</span>
+                    <span className={styles.badge} style={{ background: `${STATUS_COLOR[o.status]}18`, color: STATUS_COLOR[o.status] }}>
+                      {STATUS_LABEL[o.status]}
+                    </span>
+                    {o.scheduledFor && (
+                      <span className={styles.schedule}><Clock size={12} /> {new Date(o.scheduledFor).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    )}
+                  </div>
+                  <div className={styles.orderClient}>{o.user?.name ?? 'Cliente'}</div>
+                  <div className={styles.orderItems}>
+                    {(o.items ?? []).map(i => `${i.quantity}x ${i.product?.name ?? 'item'}`).join(', ') || '—'}
+                  </div>
+                  <div className={styles.orderMeta}>
+                    <span className={styles.orderTotal}>{money(o.total)}</span>
+                    <span className={styles.orderTime}><Clock size={11} /> {timeAgo(o.createdAt)}</span>
+                  </div>
+                </div>
+                {next && (
+                  <button
+                    className={styles.advanceBtn}
+                    onClick={() => advance.mutate({ id: o.id, status: next })}
+                    disabled={advance.isPending}
+                  >
+                    {NEXT_STATUS_LABEL[o.status]} <ArrowRight size={15} />
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}

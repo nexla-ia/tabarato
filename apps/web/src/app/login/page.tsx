@@ -21,7 +21,8 @@ export default function LoginPage() {
     try {
       const { data } = await api.post('/auth/login', { email, password })
       login(data.accessToken, data.user)
-      router.push('/')
+      // Route by role: store owners land on the lojista panel
+      router.push(data.user?.role === 'STORE' ? '/lojista' : '/')
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Credenciais inválidas')
     } finally {
