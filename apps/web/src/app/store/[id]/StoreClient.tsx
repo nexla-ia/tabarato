@@ -11,9 +11,13 @@ interface Variation { id: string; name: string; price: number | string; stock?: 
 interface Product {
   id: string; name: string; description?: string
   imageUrl?: string; basePrice?: number | string; isActive: boolean
+  stock?: number | null
   hasVariations?: boolean
   variations?: Variation[]
 }
+
+// estoque null = ilimitado; <= 0 = esgotado
+function isOut(stock?: number | null) { return stock != null && stock <= 0 }
 
 interface Store {
   id: string; name: string; description?: string; logoUrl?: string
@@ -129,42 +133,60 @@ function ProductCard({ product, onAdd }: {
   product: Product
   onAdd: (p: Product, v?: Variation) => void
 }) {
-  const [selectedVar, setSelectedVar] = useState(product.variations?.[0])
+  const [selectedVar, setSelectedVar] = useState(
+    product.variations?.find(v => !isOut(v.stock)) ?? product.variations?.[0],
+  )
   const price = Number(selectedVar?.price ?? product.basePrice ?? 0)
   const items = useCartStore(s => s.items)
   const qty = items.filter(
     i => i.productId === product.id && i.variationId === selectedVar?.id
   ).reduce((a, i) => a + i.quantity, 0)
 
+  const hasVars = !!(product.variations && product.variations.length > 0)
+  // esgotado: sem variações → estoque do produto; com variações → todas esgotadas
+  const allVarsOut = hasVars && product.variations!.every(v => isOut(v.stock))
+  const productOut = !hasVars && isOut(product.stock)
+  const outOfStock = productOut || allVarsOut
+  // esgotado da opção atualmente selecionada
+  const selectionOut = outOfStock || (selectedVar ? isOut(selectedVar.stock) : isOut(product.stock))
+
   return (
-    <div className={styles.productCard}>
+    <div className={`${styles.productCard} ${outOfStock ? styles.cardOut : ''}`}>
       <div className={styles.productImg}>
         {product.imageUrl
           ? <Image src={product.imageUrl} alt={product.name} fill style={{ objectFit: 'cover' }} />
           : <div className={styles.productImgFallback}>📦</div>
         }
+        {outOfStock && <span className={styles.outRibbon}>Esgotado</span>}
       </div>
       <div className={styles.productInfo}>
         <h3 className={styles.productName}>{product.name}</h3>
         {product.description && <p className={styles.productDesc}>{product.description}</p>}
 
-        {product.variations && product.variations.length > 0 && (
+        {hasVars && (
           <div className={styles.varRow}>
-            {product.variations.map(v => (
-              <button
-                key={v.id}
-                className={`${styles.varChip} ${selectedVar?.id === v.id ? styles.varChipActive : ''}`}
-                onClick={() => setSelectedVar(v)}
-              >
-                {v.name}
-              </button>
-            ))}
+            {product.variations!.map(v => {
+              const vOut = isOut(v.stock)
+              return (
+                <button
+                  key={v.id}
+                  className={`${styles.varChip} ${selectedVar?.id === v.id ? styles.varChipActive : ''} ${vOut ? styles.varChipOut : ''}`}
+                  onClick={() => setSelectedVar(v)}
+                  disabled={vOut}
+                  title={vOut ? 'Sem estoque' : undefined}
+                >
+                  {v.name}{vOut ? ' · esgotado' : ''}
+                </button>
+              )
+            })}
           </div>
         )}
 
         <div className={styles.productBottom}>
           <span className={styles.productPrice}>{fmtBRL(price)}</span>
-          {qty > 0 ? (
+          {selectionOut ? (
+            <span className={styles.outLabel}>Indisponível</span>
+          ) : qty > 0 ? (
             <div className={styles.qtyControl}>
               <button className={styles.qtyBtn} onClick={() => useCartStore.getState().updateQty(product.id, selectedVar?.id, qty - 1)}>
                 <Minus size={14} />
