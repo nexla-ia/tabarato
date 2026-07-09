@@ -5,6 +5,7 @@ import MercadoPagoConfig, { Payment as MPPayment } from 'mercadopago'
 import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import { MpOauthService } from './mp-oauth.service'
 
 @Injectable()
 export class PaymentsService {
@@ -16,6 +17,7 @@ export class PaymentsService {
     private prisma: PrismaService,
     private push: PushService,
     private notifications: NotificationsService,
+    private mpOauth: MpOauthService,
   ) {
     const client = new MercadoPagoConfig({
       accessToken: this.config.get<string>('MERCADO_PAGO_ACCESS_TOKEN') ?? '',
@@ -125,10 +127,13 @@ export class PaymentsService {
   // ── Webhook ───────────────────────────────────────────────────────────────────
 
   async handleWebhook(body: any, xSignature?: string, xRequestId?: string, rawBody?: Buffer) {
-    // Verify MP webhook signature when secret is configured
+    const mpId = body?.data?.id
+
+    // Verify MP webhook signature when secret is configured.
+    // Manifesto correto do MP: id:<data.id>;request-id:<x-request-id>;ts:<ts>;
     const webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET')
-    if (webhookSecret && xSignature && rawBody) {
-      if (!this.verifyMpSignature(webhookSecret, xSignature, xRequestId, rawBody)) {
+    if (webhookSecret && xSignature) {
+      if (!this.verifyMpSignature(webhookSecret, xSignature, xRequestId, mpId)) {
         this.logger.warn('Webhook signature verification failed — ignoring request')
         return
       }
@@ -136,11 +141,25 @@ export class PaymentsService {
 
     if (body?.type !== 'payment' && body?.action !== 'payment.updated') return
 
-    const mpId = body?.data?.id
     if (!mpId) return
 
     try {
-      const mpPayment = await this.mp.get({ id: String(mpId) })
+      // Resolve o token certo: split (marketplace) usa o token do lojista;
+      // modo centralizado usa o token da plataforma.
+      const localPayment = await this.prisma.payment.findFirst({
+        where: { gatewayId: String(mpId) },
+        include: {
+          orders: {
+            include: {
+              store: { select: { id: true, mpConnected: true, mpAccessToken: true, mpRefreshToken: true, mpTokenExpiresAt: true } },
+            },
+          },
+        },
+      })
+      const store = localPayment?.orders?.[0]?.store as any
+      const sellerToken = store?.mpConnected ? await this.mpOauth.getValidSellerToken(store) : null
+
+      const mpPayment = await this.clientFor(sellerToken).get({ id: String(mpId) })
       if (!mpPayment || !mpPayment.external_reference) return
 
       const orderId  = mpPayment.external_reference as string
@@ -210,12 +229,17 @@ export class PaymentsService {
   async syncPaymentStatus(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { payment: true },
+      include: {
+        payment: true,
+        store: { select: { id: true, mpConnected: true, mpAccessToken: true, mpRefreshToken: true, mpTokenExpiresAt: true } },
+      },
     })
     if (!order?.payment?.gatewayId || order.payment.status !== 'PENDING') return order?.payment
 
     try {
-      const mpPayment = await this.mp.get({ id: order.payment.gatewayId })
+      const store = order.store as any
+      const sellerToken = store?.mpConnected ? await this.mpOauth.getValidSellerToken(store) : null
+      const mpPayment = await this.clientFor(sellerToken).get({ id: order.payment.gatewayId })
       if (mpPayment.status === 'approved') {
         const updated = await this.prisma.payment.update({
           where: { id: order.payment.id },
@@ -231,7 +255,7 @@ export class PaymentsService {
 
   // ── Signature verification ────────────────────────────────────────────────────
 
-  private verifyMpSignature(secret: string, xSignature: string, xRequestId: string | undefined, rawBody: Buffer): boolean {
+  private verifyMpSignature(secret: string, xSignature: string, xRequestId: string | undefined, dataId: string | number | undefined): boolean {
     try {
       // MP signature format: "ts=<timestamp>,v1=<hash>"
       const parts: Record<string, string> = {}
@@ -244,10 +268,14 @@ export class PaymentsService {
       const hash = parts['v1']
       if (!ts || !hash) return false
 
-      const manifest = `id:${xRequestId ?? ''};request-id:${xRequestId ?? ''};ts:${ts};`
+      // data.id deve ser lowercase quando alfanumérico (regra do MP)
+      const id = String(dataId ?? '').toLowerCase()
+      const manifest = `id:${id};request-id:${xRequestId ?? ''};ts:${ts};`
       const expected = crypto.createHmac('sha256', secret).update(manifest).digest('hex')
 
-      return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expected))
+      const a = Buffer.from(hash)
+      const b = Buffer.from(expected)
+      return a.length === b.length && crypto.timingSafeEqual(a, b)
     } catch {
       return false
     }

@@ -302,7 +302,11 @@ export class OrdersService {
     if (marketplaceOn) {
       const sellerToken = await this.mpOauth.getValidSellerToken(store as any)
       const platformCommission = Math.round(subtotal * 0.10 * 100) / 100
-      splitOpts = { sellerToken, applicationFee: platformCommission + deliveryFee }
+      // A taxa da plataforma NUNCA pode passar do total cobrado (senão o MP recusa
+      // e o lojista receberia valor negativo). Descontos reduzem primeiro a parte da loja.
+      const rawFee = platformCommission + deliveryFee
+      const applicationFee = Math.max(0, Math.min(rawFee, Math.round(total * 100) / 100))
+      splitOpts = { sellerToken, applicationFee }
     }
 
     // PIX — await so the QR code is available when the response returns
