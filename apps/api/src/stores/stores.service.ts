@@ -40,6 +40,9 @@ function computeIsOpen(openingHours: any): boolean | null {
   const toMin   = parseMinutes(day.to)
   if (fromMin === null || toMin === null) return null // invalid schedule — don't auto-close
 
+  // Horário que cruza a meia-noite (ex.: 18:00 → 02:00): aberto se for depois da
+  // abertura OU antes do fechamento.
+  if (toMin < fromMin) return currentMinutes >= fromMin || currentMinutes <= toMin
   return currentMinutes >= fromMin && currentMinutes <= toMin
 }
 
@@ -48,13 +51,13 @@ export class StoresService {
   private readonly logger = new Logger(StoresService.name)
   constructor(private prisma: PrismaService, private wallet: WalletService) {}
 
-  private async syncIsOpen(storeId: string, openingHours: any, currentIsOpen: boolean): Promise<void> {
-    const shouldBeOpen = computeIsOpen(openingHours)
-    if (shouldBeOpen !== null && shouldBeOpen !== currentIsOpen) {
-      await this.prisma.store.update({
-        where: { id: storeId },
-        data: { isOpen: shouldBeOpen },
-      })
+  // isOpen (mostrado ao cliente) = aberto pelo horário E não pausado manualmente.
+  private async syncIsOpen(storeId: string, openingHours: any, currentIsOpen: boolean, isPaused = false): Promise<void> {
+    const scheduleOpen = computeIsOpen(openingHours)
+    // Horário inválido → não auto-gerencia por horário, mas respeita o pause.
+    const effective = scheduleOpen === null ? !isPaused : scheduleOpen && !isPaused
+    if (effective !== currentIsOpen) {
+      await this.prisma.store.update({ where: { id: storeId }, data: { isOpen: effective } })
     }
   }
 
@@ -65,8 +68,10 @@ export class StoresService {
     const cnpjExists = await this.prisma.store.findUnique({ where: { cnpj: dto.cnpj } })
     if (cnpjExists) throw new ConflictException('CNPJ already registered')
 
+    // Loja nasce PENDENTE e só aparece no marketplace após aprovação do admin
+    // (evita loja falsa com CNPJ de terceiros + chave PIX do golpista).
     return this.prisma.store.create({
-      data: { ...dto, userId, status: 'APPROVED' },
+      data: { ...dto, userId, status: 'PENDING' },
     })
   }
 
@@ -91,7 +96,7 @@ export class StoresService {
     await Promise.allSettled(
       stores
         .filter((s) => s.openingHours)
-        .map((s) => this.syncIsOpen(s.id, s.openingHours, s.isOpen))
+        .map((s) => this.syncIsOpen(s.id, s.openingHours, s.isOpen, s.isPaused))
     )
 
     // Re-fetch with updated isOpen — preserve ALL original filters (categoryId + search)
@@ -141,7 +146,7 @@ export class StoresService {
     })
     if (!store) throw new NotFoundException('Store not found')
 
-    await this.syncIsOpen(store.id, store.openingHours, store.isOpen)
+    await this.syncIsOpen(store.id, store.openingHours, store.isOpen, store.isPaused)
 
     // Return with updated isOpen if changed
     const shouldBeOpen = computeIsOpen(store.openingHours)
@@ -155,7 +160,7 @@ export class StoresService {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
 
-    await this.syncIsOpen(store.id, store.openingHours, store.isOpen)
+    await this.syncIsOpen(store.id, store.openingHours, store.isOpen, store.isPaused)
 
     const shouldBeOpen = computeIsOpen(store.openingHours)
     return {
@@ -174,16 +179,25 @@ export class StoresService {
     })
   }
 
+  // Abrir/fechar manual = pausar/retomar (o "aberto" real também depende do horário).
+  // Persistir em isPaused evita que o auto-schedule reverta na próxima leitura.
   async toggleOpen(userId: string) {
+    return this.togglePause(userId).then((r) => ({ isPaused: r.isPaused, isOpen: !r.isPaused }))
+  }
+
+  async togglePause(userId: string) {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
 
-    // Manual toggle overrides auto-schedule until next sync
-    return this.prisma.store.update({
+    const nextPaused = !store.isPaused
+    const scheduleOpen = computeIsOpen(store.openingHours)
+    const effectiveOpen = scheduleOpen === null ? !nextPaused : (scheduleOpen && !nextPaused)
+
+    await this.prisma.store.update({
       where: { id: store.id },
-      data: { isOpen: !store.isOpen },
-      select: { id: true, isOpen: true },
+      data: { isPaused: nextPaused, isOpen: effectiveOpen },
     })
+    return { isPaused: nextPaused, isOpen: effectiveOpen }
   }
 
   async addCategory(userId: string, categoryId: string) {
@@ -215,21 +229,6 @@ export class StoresService {
     if (!store) throw new NotFoundException('Store not found')
     await this.wallet.debit(store.id, 'STORE', amount, 'Saque solicitado', `saque-${crypto.randomUUID()}`)
     return { message: 'Saque solicitado com sucesso. Será processado em até 24h via PIX.' }
-  }
-
-  async togglePause(userId: string) {
-    const store = await this.prisma.store.findUnique({ where: { userId } })
-    if (!store) throw new NotFoundException('Store not found')
-    // isPaused stored in openingHours json as a meta flag to avoid schema change
-    const meta = (store as any).pausedUntil
-    if (meta) {
-      // Unpause: clear flag, restore isOpen based on schedule
-      await this.prisma.store.update({ where: { id: store.id }, data: { isOpen: computeIsOpen(store.openingHours) ?? store.isOpen } })
-      return { isPaused: false }
-    }
-    // Pause: close the store temporarily
-    await this.prisma.store.update({ where: { id: store.id }, data: { isOpen: false } })
-    return { isPaused: true }
   }
 
   async findMyReviews(userId: string, page = 1) {

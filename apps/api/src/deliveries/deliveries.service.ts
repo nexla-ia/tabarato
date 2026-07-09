@@ -5,6 +5,17 @@ const COURIER_INCLUDE = {
   courier: { include: { user: { select: { name: true, phone: true } } } },
 }
 
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.asin(Math.sqrt(a))
+}
+function calcCourierFee(distanceKm: number): number {
+  return Math.round((10 + distanceKm * 2) * 100) / 100
+}
+
 @Injectable()
 export class DeliveriesService {
   constructor(private prisma: PrismaService) {}
@@ -15,6 +26,7 @@ export class DeliveriesService {
 
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, storeId: store.id, status: 'READY' },
+      include: { address: { select: { lat: true, lng: true } } },
     })
     if (!order) throw new NotFoundException('Pedido não encontrado ou não está pronto')
 
@@ -24,8 +36,17 @@ export class DeliveriesService {
     const existing = await this.prisma.delivery.findUnique({ where: { orderId } })
     if (existing) throw new ConflictException('Entregador já atribuído a este pedido')
 
+    // Calcula a distância e a taxa reais (antes ficava 0 — entregador não recebia)
+    const distanceKm = haversineKm(store.lat, store.lng, order.address.lat, order.address.lng)
+    const courierFee = calcCourierFee(distanceKm)
+
     return this.prisma.delivery.create({
-      data: { orderId, courierId, distanceKm: 0, courierFee: 0, status: 'COURIER_ASSIGNED' },
+      data: {
+        orderId, courierId,
+        distanceKm: Math.round(distanceKm * 10) / 10,
+        courierFee,
+        status: 'COURIER_ASSIGNED',
+      },
       include: COURIER_INCLUDE,
     })
   }

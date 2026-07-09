@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Headers, Param, Post, RawBodyRequest, Req, UseGuards } from '@nestjs/common'
+import { SkipThrottle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { PaymentsService } from './payments.service'
@@ -14,6 +15,7 @@ export class PaymentsController {
   }
 }
 
+@SkipThrottle()
 @Controller('webhooks')
 export class WebhooksController {
   constructor(private readonly paymentsService: PaymentsService) {}

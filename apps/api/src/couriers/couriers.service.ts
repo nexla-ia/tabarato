@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
@@ -139,6 +139,10 @@ export class CouriersService {
   async acceptDelivery(userId: string, deliveryId: string) {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier not found')
+    // Entregador suspenso/pendente não pode aceitar entregas
+    if (courier.status !== 'APPROVED') {
+      throw new ForbiddenException('Sua conta de entregador ainda não está aprovada.')
+    }
 
     // Atomic update: only succeeds if delivery is still unassigned (prevents TOCTOU race)
     const result = await this.prisma.delivery.updateMany({
@@ -212,10 +216,23 @@ export class CouriersService {
       throw new BadRequestException('Não é possível devolver após coletar o pedido.')
     }
 
-    return this.prisma.delivery.update({
+    const updated = await this.prisma.delivery.update({
       where: { id: deliveryId },
       data: { courierId: null, status: 'SEARCHING_COURIER' },
     })
+
+    // Reinicia a busca por entregador — antes a entrega devolvida ficava "silenciosa"
+    // (nenhum push a outros entregadores) até reiniciar o servidor.
+    const order = await this.prisma.order.findUnique({
+      where: { id: delivery.orderId },
+      select: { store: { select: { lat: true, lng: true } } },
+    })
+    if (order?.store) {
+      this.matching?.startMatching(deliveryId, order.store.lat, order.store.lng)
+        .catch((err) => this.logger.warn('Re-match after return failed', err))
+    }
+
+    return updated
   }
 
   async advanceDelivery(userId: string, deliveryId: string, photoUrl?: string) {
@@ -236,6 +253,7 @@ export class CouriersService {
     if (!delivery) throw new NotFoundException('Delivery not found')
 
     const transitions: Partial<Record<DeliveryStatus, DeliveryStatus>> = {
+      COURIER_ASSIGNED: 'COURIER_HEADING_TO_STORE', // atribuição manual pela loja
       COURIER_HEADING_TO_STORE: 'COURIER_AT_STORE',
       COURIER_AT_STORE: 'PICKED_UP',
       PICKED_UP: 'DELIVERED',

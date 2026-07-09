@@ -11,7 +11,13 @@ export class UploadsService {
   )
 
   async uploadImage(file: Express.Multer.File): Promise<string> {
-    const ext = file.originalname.split('.').pop() ?? 'jpg'
+    // Extensão derivada do MIME real (não do nome enviado pelo cliente) — evita
+    // spoofing e injeção de subcaminho na key do storage.
+    const EXT_BY_MIME: Record<string, string> = {
+      'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png',
+      'image/webp': 'webp', 'image/gif': 'gif', 'application/pdf': 'pdf',
+    }
+    const ext = EXT_BY_MIME[file.mimetype] ?? 'bin'
     const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
     const { error } = await this.supabase.storage

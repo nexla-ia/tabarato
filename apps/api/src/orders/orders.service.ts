@@ -26,7 +26,11 @@ function isStoreOpenNow(openingHours: any, scheduleExceptions?: any): boolean | 
   const now  = local.getUTCHours() * 60 + local.getUTCMinutes()
   const [fh, fm] = (day.from as string).split(':').map(Number)
   const [th, tm] = (day.to   as string).split(':').map(Number)
-  return now >= fh * 60 + fm && now <= th * 60 + tm
+  const fromMin = fh * 60 + fm
+  const toMin   = th * 60 + tm
+  // Cruza a meia-noite (ex.: 18:00 → 02:00)
+  if (toMin < fromMin) return now >= fromMin || now <= toMin
+  return now >= fromMin && now <= toMin
 }
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -98,7 +102,8 @@ export class OrdersService {
     // in which case it's fine for the store to be closed at the moment of ordering.
     if (!scheduledDate) {
       const openNow = isStoreOpenNow(store.openingHours, (store as any).scheduleExceptions)
-      const closed  = openNow !== null ? !openNow : !store.isOpen
+      // Fechada se: fora do horário, ou isOpen false, ou pausada manualmente pelo lojista.
+      const closed = (openNow !== null ? !openNow : !store.isOpen) || (store as any).isPaused
       if (closed) throw new BadRequestException('Esta loja está fechada no momento. Tente novamente mais tarde.')
     }
 
@@ -300,20 +305,19 @@ export class OrdersService {
         })
       }
 
+      // Decremento de estoque ATÔMICO e condicional (dentro da transação): evita
+      // oversell em compras simultâneas — se não houver estoque, aborta o pedido.
+      for (const { id, type, by } of stockDecrements) {
+        const res = type === 'variation'
+          ? await tx.productVariation.updateMany({ where: { id, stock: { gte: by } }, data: { stock: { decrement: by } } })
+          : await tx.product.updateMany({ where: { id, stock: { gte: by } }, data: { stock: { decrement: by } } })
+        if (res.count === 0) {
+          throw new BadRequestException('Estoque insuficiente para um dos itens. Revise seu carrinho.')
+        }
+      }
+
       return { payment, order }
     })
-
-    // Decrement stock (best-effort; stock is advisory not a hard constraint here)
-    await Promise.all(
-      stockDecrements.map(({ id, type, by }) => {
-        if (type === 'variation') {
-          return this.prisma.productVariation.updateMany({ where: { id }, data: { stock: { decrement: by } } })
-            .catch((err) => this.logger.warn(`Stock decrement failed for variation ${id}`, err))
-        }
-        return this.prisma.product.updateMany({ where: { id }, data: { stock: { decrement: by } } })
-          .catch((err) => this.logger.warn(`Stock decrement failed for product ${id}`, err))
-      }),
-    )
 
     // Split de pagamento (marketplace): cobra na conta do lojista e retém a
     // comissão da plataforma + a taxa de entrega (com que a plataforma paga o entregador).
@@ -467,9 +471,21 @@ export class OrdersService {
     })
     if (!order) throw new NotFoundException('Order not found')
 
+    // Máquina de estados: a LOJA só avança PENDING→CONFIRMED→PREPARING→READY.
+    // PICKED_UP/DELIVERED são exclusivos do fluxo do entregador; regressões são barradas.
+    // (Cancelamento é por outro endpoint: cancelByStore.)
+    const STORE_ALLOWED: Record<string, OrderStatus[]> = {
+      PENDING: ['CONFIRMED'],
+      CONFIRMED: ['PREPARING'],
+      PREPARING: ['READY'],
+    }
+    if (!STORE_ALLOWED[order.status]?.includes(status)) {
+      throw new BadRequestException('Transição de status não permitida.')
+    }
+
     // A loja não pode preparar/despachar um pedido que ainda não foi pago
-    // (ex.: PIX gerado e nunca pago). Cancelar/recusar sempre é permitido.
-    if (['CONFIRMED', 'PREPARING', 'READY'].includes(status) && order.payment?.status !== 'PAID') {
+    // (ex.: PIX gerado e nunca pago).
+    if (order.payment?.status !== 'PAID') {
       throw new BadRequestException('O pedido ainda não foi pago.')
     }
 
@@ -515,6 +531,25 @@ export class OrdersService {
     return updated
   }
 
+  /** Devolve ao estoque os itens de um pedido cancelado (só os que controlam estoque). */
+  private async restoreStock(orderId: string) {
+    const items = await this.prisma.orderItem.findMany({
+      where: { orderId },
+      select: { productId: true, variationId: true, quantity: true },
+    })
+    for (const it of items) {
+      if (it.variationId) {
+        await this.prisma.productVariation.updateMany({
+          where: { id: it.variationId }, data: { stock: { increment: it.quantity } },
+        }).catch(() => {})
+      } else {
+        await this.prisma.product.updateMany({
+          where: { id: it.productId, stock: { not: null } }, data: { stock: { increment: it.quantity } },
+        }).catch(() => {})
+      }
+    }
+  }
+
   async cancel(userId: string, orderId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
@@ -529,6 +564,7 @@ export class OrdersService {
       where: { id: orderId },
       data: { status: 'CANCELLED' },
     })
+    await this.restoreStock(orderId)
 
     const pushMsg = STATUS_PUSH['CANCELLED']
     if (pushMsg && order.user?.pushToken) {
@@ -575,6 +611,7 @@ export class OrdersService {
       where: { id: orderId },
       data: { status: 'CANCELLED', refusalNote: note },
     })
+    await this.restoreStock(orderId)
 
     if (order.user?.pushToken) {
       this.push.send(order.user.pushToken, '❌ Pedido cancelado', note ?? 'A loja cancelou seu pedido.', { orderId })

@@ -32,6 +32,12 @@ export class AuthService {
       if (referrer) referrerId = referrer.id
     }
 
+    // Segurança: o cadastro público NUNCA pode virar ADMIN. Só permite os papéis
+    // de auto-registro (consumidor, lojista, entregador). Promoção a ADMIN é fluxo
+    // interno/manual, jamais via /auth/register.
+    const SELF_ROLES = ['CONSUMER', 'STORE_OWNER', 'COURIER'] as const
+    const role = SELF_ROLES.includes(dto.role as any) ? (dto.role as any) : 'CONSUMER'
+
     const passwordHash = await bcrypt.hash(dto.password, 10)
     const user = await this.prisma.user.create({
       data: {
@@ -41,7 +47,7 @@ export class AuthService {
         city: dto.city,
         state: dto.state,
         passwordHash,
-        role: dto.role ?? 'CONSUMER',
+        role,
         referralCode: generateReferralCode(),
         referredBy: referrerId,
       },
@@ -110,14 +116,15 @@ export class AuthService {
   private generateTokens(userId: string, email: string, role: string) {
     const payload = { sub: userId, email, role }
 
+    // Defaults explícitos: token nunca fica sem expiração se a env faltar.
     const accessToken = this.jwt.sign(payload, {
       secret: this.config.get('JWT_SECRET'),
-      expiresIn: this.config.get('JWT_EXPIRES_IN'),
+      expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '7d',
     })
 
     const refreshToken = this.jwt.sign(payload, {
       secret: this.config.get('JWT_REFRESH_SECRET'),
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN'),
+      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN') ?? '30d',
     })
 
     return { accessToken, refreshToken }

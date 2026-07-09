@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import helmet from 'helmet'
 import { AppModule } from './app.module'
 
 async function bootstrap() {
@@ -8,6 +9,9 @@ async function bootstrap() {
     // rawBody needed for MP webhook signature verification
     rawBody: true,
   })
+
+  // Headers de segurança (HSTS, nosniff, no-sniff, etc). CSP off pra não quebrar o Swagger UI.
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }))
 
   // Origins extras via env (ex.: domínio da plataforma web após o deploy).
   // Aceita múltiplos separados por vírgula. São SOMADOS aos defaults abaixo
