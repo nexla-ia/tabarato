@@ -64,4 +64,8 @@ export class CreateOrderDto {
   @Min(0)
   @IsOptional()
   pointsToRedeem?: number // loyalty points to redeem (multiples of 100)
+
+  @IsString()
+  @IsOptional()
+  idempotencyKey?: string // evita pedido/cobrança duplicada em retry de rede
 }

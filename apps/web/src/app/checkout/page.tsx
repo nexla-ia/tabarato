@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, FormEvent } from 'react'
+import { useState, useEffect, useRef, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
@@ -41,6 +41,9 @@ export default function CheckoutPage() {
   const router = useRouter()
   const { items, storeId, total, clear } = useCartStore()
   const { user, ready } = useAuth()
+
+  // Chave de idempotência: estável entre retries do mesmo checkout (evita pedido duplicado)
+  const idemKey = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`)
 
   // Exige login pra finalizar o pedido
   useEffect(() => {
@@ -119,6 +122,7 @@ export default function CheckoutPage() {
         cardToken,
         installments: isCard ? installments : undefined,
         payerCpf: isCard ? cardCpf : undefined,
+        idempotencyKey: idemKey.current,
         items: items.map(i => ({ productId: i.productId, variationId: i.variationId, quantity: i.quantity })),
       })
 

@@ -73,6 +73,24 @@ export class OrdersService {
   ) {}
 
   async create(userId: string, dto: CreateOrderDto) {
+    // Idempotência: se já existe um pedido com essa chave, devolve o mesmo
+    // (evita pedido/cobrança duplicada em retry de rede ou duplo-tap no checkout).
+    if (dto.idempotencyKey) {
+      const existing = await this.prisma.payment.findUnique({
+        where: { idempotencyKey: dto.idempotencyKey },
+        include: {
+          orders: {
+            include: {
+              items: { include: { product: true, variation: true } },
+              payment: true, address: true,
+              store: { select: { id: true, name: true, logoUrl: true } },
+            },
+          },
+        },
+      })
+      if (existing?.orders?.[0]) return existing.orders[0]
+    }
+
     const [store, payer] = await Promise.all([
       this.prisma.store.findUnique({
         where: { id: dto.storeId },
@@ -240,7 +258,7 @@ export class OrdersService {
     // Create payment + order in a single transaction to avoid orphaned records
     const { payment, order } = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
-        data: { method: dto.paymentMethod, amount: total, status: 'PENDING' },
+        data: { method: dto.paymentMethod, amount: total, status: 'PENDING', idempotencyKey: dto.idempotencyKey },
       })
 
       const order = await tx.order.create({
