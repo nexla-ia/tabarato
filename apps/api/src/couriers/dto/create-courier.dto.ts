@@ -15,6 +15,10 @@ export class CreateCourierDto {
 
   @IsOptional()
   @IsString()
+  pixKey?: string
+
+  @IsOptional()
+  @IsString()
   cnhPhotoUrl?: string
 
   @IsOptional()

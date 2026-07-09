@@ -84,6 +84,13 @@ export class CouriersController {
 
   @UseGuards(RolesGuard)
   @Roles('COURIER')
+  @Patch('me/pix')
+  updatePixKey(@CurrentUser() user: any, @Body() body: { pixKey: string }) {
+    return this.couriersService.updatePixKey(user.sub, body.pixKey)
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('COURIER')
   @Patch('me/deliveries/:id/advance')
   advanceDelivery(@CurrentUser() user: any, @Param('id') id: string, @Body() body: { photoUrl?: string }) {
     return this.couriersService.advanceDelivery(user.sub, id, body.photoUrl)

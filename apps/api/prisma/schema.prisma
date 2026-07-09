@@ -401,6 +401,7 @@ model Courier {
   cnh                String        @unique
   vehiclePlate       String        @map("vehicle_plate")
   vehicleType        String        @default("moto") @map("vehicle_type")
+  pixKey             String?       @map("pix_key")
   photoUrl           String?       @map("photo_url")
   cnhPhotoUrl        String?       @map("cnh_photo_url")
   identityPhotoUrl   String?       @map("identity_photo_url")

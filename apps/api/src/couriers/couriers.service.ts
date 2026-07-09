@@ -181,8 +181,19 @@ export class CouriersService {
   async requestWithdrawal(userId: string, amount: number) {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier not found')
-    await this.wallet.debit(courier.id, 'COURIER', amount, 'Saque solicitado', `saque-${crypto.randomUUID()}`)
-    return { message: 'Saque solicitado com sucesso. Será processado em até 24h via PIX.' }
+    if (!courier.pixKey) throw new BadRequestException('Cadastre sua chave PIX antes de solicitar o saque.')
+    await this.wallet.debit(courier.id, 'COURIER', amount, `Saque via PIX (${courier.pixKey})`, `saque-${crypto.randomUUID()}`)
+    return { message: 'Saque solicitado! O valor será enviado via PIX para a chave cadastrada.' }
+  }
+
+  /** Cadastra/atualiza a chave PIX do entregador (pra receber os saques). */
+  async updatePixKey(userId: string, pixKey: string) {
+    const courier = await this.prisma.courier.findUnique({ where: { userId } })
+    if (!courier) throw new NotFoundException('Courier not found')
+    const key = (pixKey ?? '').trim()
+    if (!key) throw new BadRequestException('Informe uma chave PIX válida.')
+    await this.prisma.courier.update({ where: { id: courier.id }, data: { pixKey: key } })
+    return { pixKey: key }
   }
 
   async returnDelivery(userId: string, deliveryId: string) {
