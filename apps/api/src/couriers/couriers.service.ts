@@ -6,6 +6,7 @@ import { PushService } from '../common/push.service'
 import { WalletService } from '../wallet/wallet.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { LoyaltyService } from '../loyalty/loyalty.service'
+import { MpOauthService } from '../payments/mp-oauth.service'
 import { DeliveryMatchingService } from './delivery-matching.service'
 import { DeliveryGateway } from './delivery.gateway'
 import { CreateCourierDto } from './dto/create-courier.dto'
@@ -22,6 +23,7 @@ export class CouriersService {
     private notifications: NotificationsService,
     private loyalty: LoyaltyService,
     private config: ConfigService,
+    private mpOauth: MpOauthService,
     @Optional() private matching: DeliveryMatchingService,
     @Optional() private gateway: DeliveryGateway,
   ) {}
@@ -269,22 +271,29 @@ export class CouriersService {
       // no pagamento — não creditar a carteira (evita pagar em dobro).
       const storePaidViaSplit = this.marketplaceOn && Boolean(fullOrder.store?.mpConnected)
 
+      // Repasse automático ao entregador (split 1:N). Se transferir direto pra conta MP
+      // dele, não credita a carteira. Enquanto o 1:N não estiver habilitado, cai na carteira.
+      const courierPayout = await this.mpOauth.payoutCourier(courier as any, courierFee, delivery.orderId)
+      const courierPaidViaMp = courierPayout.done
+
       // Delivery update + order status + both wallet credits — all in one atomic transaction
       updated = await this.prisma.$transaction(async (tx) => {
         const d = await tx.delivery.update({ where: { id: deliveryId }, data: updateData })
         await tx.order.update({ where: { id: delivery.orderId }, data: { status: 'DELIVERED' } })
 
-        // Courier wallet — get/create then credit
-        const courierWallet = await tx.wallet.upsert({
-          where: { ownerId_ownerType: { ownerId: courier.id, ownerType: 'COURIER' } },
-          update: {},
-          create: { ownerId: courier.id, ownerType: 'COURIER', balance: 0 },
-        })
-        await tx.wallet.update({ where: { id: courierWallet.id }, data: { balance: { increment: courierFee } } })
-        await tx.transaction.create({
-          data: { walletId: courierWallet.id, amount: courierFee, type: 'CREDIT',
-            description: `Entrega #${delivery.orderId.slice(0, 8)}`, referenceId: delivery.id },
-        })
+        // Courier wallet — só credita se NÃO foi pago direto via MP (split 1:N)
+        if (!courierPaidViaMp) {
+          const courierWallet = await tx.wallet.upsert({
+            where: { ownerId_ownerType: { ownerId: courier.id, ownerType: 'COURIER' } },
+            update: {},
+            create: { ownerId: courier.id, ownerType: 'COURIER', balance: 0 },
+          })
+          await tx.wallet.update({ where: { id: courierWallet.id }, data: { balance: { increment: courierFee } } })
+          await tx.transaction.create({
+            data: { walletId: courierWallet.id, amount: courierFee, type: 'CREDIT',
+              description: `Entrega #${delivery.orderId.slice(0, 8)}`, referenceId: delivery.id },
+          })
+        }
 
         // Store wallet — só credita no modelo centralizado (sem split direto)
         if (!storePaidViaSplit) {

@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Req, Res, UseGuards, BadRequestException } from '@nestjs/common'
+import { Controller, Get, Query, Res, UseGuards, BadRequestException } from '@nestjs/common'
 import type { Response } from 'express'
 import { ConfigService } from '@nestjs/config'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -14,7 +14,6 @@ export class MpConnectController {
     private readonly config: ConfigService,
   ) {}
 
-  /** Status da conexão MP da loja do lojista logado. */
   @UseGuards(JwtAuthGuard)
   @Get('status')
   async status(@CurrentUser() user: any) {
@@ -22,46 +21,72 @@ export class MpConnectController {
       where: { userId: user.sub },
       select: { mpConnected: true, mpUserId: true },
     })
-    return {
-      enabled: this.mp.isEnabled(),
-      connected: Boolean(store?.mpConnected),
-      mpUserId: store?.mpUserId ?? null,
-    }
+    return { enabled: this.mp.isEnabled(), connected: Boolean(store?.mpConnected), mpUserId: store?.mpUserId ?? null }
   }
 
-  /** Devolve a URL de autorização pra conectar a conta MP do lojista. */
   @UseGuards(JwtAuthGuard)
   @Get('connect')
   async connect(@CurrentUser() user: any) {
     const store = await this.prisma.store.findUnique({ where: { userId: user.sub }, select: { id: true } })
     if (!store) throw new BadRequestException('Loja não encontrada.')
-    return { url: this.mp.getAuthUrl(store.id) }
+    return { url: this.mp.getAuthUrl('store', store.id) }
   }
 
-  /** Desconecta a conta MP. */
   @UseGuards(JwtAuthGuard)
   @Get('disconnect')
   async disconnect(@CurrentUser() user: any) {
     const store = await this.prisma.store.findUnique({ where: { userId: user.sub }, select: { id: true } })
     if (!store) throw new BadRequestException('Loja não encontrada.')
-    await this.mp.disconnect(store.id)
+    await this.mp.disconnect('store', store.id)
     return { connected: false }
   }
 
-  /** Callback do Mercado Pago (browser). Troca o code, salva e volta pro painel. */
+  /** Callback único do MP (browser) — dispatcha loja ou entregador pelo state. */
   @Get('callback')
-  async callback(@Query('code') code: string, @Query('state') state: string, @Res() res: Response, @Req() _req: any) {
+  async callback(@Query('code') code: string, @Query('state') state: string, @Res() res: Response) {
     const panel = this.config.get<string>('WEB_URL') ?? 'https://tabarato-production.up.railway.app'
-    const back = (ok: boolean) => `${panel}/lojista/config?mp=${ok ? 'ok' : 'erro'}`
+    const parsed = state ? this.mp.verifyState(state) : null
+    const dest = parsed?.type === 'courier' ? '/lojista/config' : '/lojista/config' // entregador usa o app; volta pra web só como confirmação
+    const back = (ok: boolean) => `${panel}${dest}?mp=${ok ? 'ok' : 'erro'}`
 
-    const storeId = state ? this.mp.verifyState(state) : null
-    if (!code || !storeId) return res.redirect(back(false))
-
+    if (!code || !parsed) return res.redirect(back(false))
     try {
-      await this.mp.connectStore(storeId, code)
+      await this.mp.connect(parsed.type, parsed.id, code)
       return res.redirect(back(true))
     } catch {
       return res.redirect(back(false))
     }
+  }
+}
+
+@Controller('couriers/mp')
+export class MpCourierConnectController {
+  constructor(private readonly mp: MpOauthService, private readonly prisma: PrismaService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Get('status')
+  async status(@CurrentUser() user: any) {
+    const courier = await this.prisma.courier.findUnique({
+      where: { userId: user.sub },
+      select: { mpConnected: true, mpUserId: true },
+    })
+    return { enabled: this.mp.isAdvancedEnabled(), connected: Boolean(courier?.mpConnected), mpUserId: courier?.mpUserId ?? null }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('connect')
+  async connect(@CurrentUser() user: any) {
+    const courier = await this.prisma.courier.findUnique({ where: { userId: user.sub }, select: { id: true } })
+    if (!courier) throw new BadRequestException('Entregador não encontrado.')
+    return { url: this.mp.getAuthUrl('courier', courier.id) }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('disconnect')
+  async disconnect(@CurrentUser() user: any) {
+    const courier = await this.prisma.courier.findUnique({ where: { userId: user.sub }, select: { id: true } })
+    if (!courier) throw new BadRequestException('Entregador não encontrado.')
+    await this.mp.disconnect('courier', courier.id)
+    return { connected: false }
   }
 }

@@ -66,3 +66,35 @@ No painel (web `/lojista/config` ou app → Configurações da loja), o lojista 
 | GET | `/api/stores/mp/disconnect` | Desconecta a conta |
 
 Tokens do lojista são renovados automaticamente (refresh) antes de cada cobrança.
+
+---
+
+## Repasse automático ao ENTREGADOR (split 1:N) — opcional
+
+O split da venda é **2 vias** (loja + plataforma), e o entregador só é definido **depois** do
+pagamento. Por isso o repasse ao entregador acontece **na entrega**, transferindo a taxa dele
+da conta da plataforma pra conta MP do entregador.
+
+Isso usa o modelo **1:N (Advanced Payments)** do Mercado Pago, que **exige aprovação comercial**
+(falar com o time do MP). Está tudo pronto no código, atrás de uma flag:
+
+| Variável | Valor |
+|---|---|
+| `MERCADO_PAGO_ADVANCED` | `true` (liga o repasse automático ao entregador) |
+
+Enquanto `MERCADO_PAGO_ADVANCED` **não** for `true`:
+- o entregador continua recebendo pela **carteira + saque PIX** (fluxo atual);
+- o card "Conectar Mercado Pago" **não aparece** no app do entregador.
+
+Quando ligar (após aprovação 1:N do MP):
+- cada entregador conecta a conta MP dele (app → Carteira → "Conectar Mercado Pago");
+- endpoints: `GET /couriers/mp/status | connect | disconnect` (callback compartilhado em `/stores/mp/callback`);
+- na entrega, `MpOauthService.payoutCourier()` transfere a taxa direto pra conta dele.
+
+> ⚠️ **Ponto único a finalizar com o MP:** a chamada exata de transferência em
+> `payoutCourier()` (endpoint de disbursement/transferência do modelo 1:N). Até confirmar,
+> o método retorna `done:false` e o valor cai na carteira (nada é movimentado "no escuro").
+
+### Tokens criptografados
+Os access/refresh tokens do MP (loja e entregador) são guardados **criptografados**
+(AES-256-GCM). Defina `MP_ENCRYPTION_KEY` (32 bytes hex/base64) — senão é derivada do `JWT_SECRET`.

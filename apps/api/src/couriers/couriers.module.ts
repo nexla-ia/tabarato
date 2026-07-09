@@ -9,6 +9,7 @@ import { PushService } from '../common/push.service'
 import { WalletModule } from '../wallet/wallet.module'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { LoyaltyModule } from '../loyalty/loyalty.module'
+import { PaymentsModule } from '../payments/payments.module'
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { LoyaltyModule } from '../loyalty/loyalty.module'
     WalletModule,
     NotificationsModule,
     LoyaltyModule,
+    PaymentsModule,
   ],
   controllers: [CouriersController],
   providers: [CouriersService, PushService, DeliveryMatchingService, DeliveryGateway],
