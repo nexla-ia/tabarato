@@ -186,18 +186,21 @@ export class OrdersService {
     const distanceKm = distToAddress // already calculated above
     const deliveryFee = calcCourierFee(distanceKm)
 
-    let discount = 0
+    // Descontos separados por QUEM os custeia:
+    //  • cupom  → absorvido pela LOJA (promoção dela)
+    //  • fidelidade → absorvido pela PLATAFORMA (programa dela)
+    let couponDiscount = 0
     let couponId: string | undefined
     let couponMaxUses: number | null = null
     if (dto.couponCode) {
       const result = await this.coupons.validate(dto.couponCode, userId, subtotal, dto.storeId)
-      discount = result.discount
+      couponDiscount = result.discount
       couponId = result.coupon.id
       couponMaxUses = (result.coupon as any).maxUses ?? null
     }
 
     // ── Loyalty redemption (100 pts = R$10) ──────────────────────────────
-    // Validated here and applied atomically inside the transaction below.
+    let loyaltyDiscount = 0
     let loyaltyRedeem = 0
     let loyaltyAccountId: string | undefined
     if (dto.pointsToRedeem && dto.pointsToRedeem > 0) {
@@ -209,26 +212,24 @@ export class OrdersService {
       if (!account || account.points < pts) {
         throw new BadRequestException('Saldo de pontos insuficiente para o resgate.')
       }
-      // O desconto (cupom + fidelidade) só incide sobre os PRODUTOS, nunca sobre a
-      // taxa de entrega — assim o total nunca zera (total >= deliveryFee > 0) e o
-      // entregador/loja sempre têm de onde ser pagos. Limita ao que ainda "cabe".
-      const maxExtra = Math.max(0, subtotal - discount)
-      let loyaltyDiscount = (pts / 100) * 10
-      if (loyaltyDiscount > maxExtra) {
+      // Desconto só sobre PRODUTOS (nunca a entrega) e sem passar do que resta após o cupom.
+      const maxExtra = Math.max(0, subtotal - couponDiscount)
+      let ld = (pts / 100) * 10
+      if (ld > maxExtra) {
         const usableBlocks = Math.floor(maxExtra / 10)
         loyaltyRedeem = usableBlocks * 100
-        loyaltyDiscount = usableBlocks * 10
+        ld = usableBlocks * 10
       } else {
         loyaltyRedeem = pts
       }
       if (loyaltyRedeem > 0) {
-        discount += loyaltyDiscount
+        loyaltyDiscount = ld
         loyaltyAccountId = account.id
       }
     }
 
-    // Segurança extra: o desconto nunca ultrapassa o subtotal (a entrega sempre é paga).
-    if (discount > subtotal) discount = subtotal
+    let discount = Math.round((couponDiscount + loyaltyDiscount) * 100) / 100
+    if (discount > subtotal) discount = subtotal // segurança: entrega sempre é paga
     const total = Math.round((subtotal + deliveryFee - discount) * 100) / 100
 
     // Create payment + order in a single transaction to avoid orphaned records
@@ -247,6 +248,8 @@ export class OrdersService {
           subtotal,
           deliveryFee,
           discount,
+          couponDiscount,
+          loyaltyDiscount,
           total,
           notes: dto.notes,
           scheduledFor: scheduledDate,
@@ -318,10 +321,12 @@ export class OrdersService {
     if (marketplaceOn) {
       const sellerToken = await this.mpOauth.getValidSellerToken(store as any)
       const platformCommission = Math.round(subtotal * 0.10 * 100) / 100
-      // A taxa da plataforma NUNCA pode passar do total cobrado (senão o MP recusa
-      // e o lojista receberia valor negativo). Descontos reduzem primeiro a parte da loja.
-      const rawFee = platformCommission + deliveryFee
-      const applicationFee = Math.max(0, Math.min(rawFee, Math.round(total * 100) / 100))
+      // Loja recebe (total − fee). Queremos que a loja fique com:
+      //   subtotal − cupom − comissão  (absorve o cupom, NÃO a fidelidade)
+      // → fee = comissão + entrega − fidelidade (a plataforma banca a fidelidade).
+      // Clamp em [0, total]: o split do MP não deixa a fee ser negativa nem > total.
+      const rawFee = platformCommission + deliveryFee - loyaltyDiscount
+      const applicationFee = Math.max(0, Math.min(Math.round(rawFee * 100) / 100, total))
       splitOpts = { sellerToken, applicationFee }
     }
 

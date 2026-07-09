@@ -311,6 +311,8 @@ model Order {
   subtotal    Decimal
   deliveryFee Decimal     @map("delivery_fee")
   discount    Decimal     @default(0)
+  couponDiscount  Decimal @default(0) @map("coupon_discount")
+  loyaltyDiscount Decimal @default(0) @map("loyalty_discount")
   total       Decimal
   couponId    String?     @map("coupon_id")
   status       OrderStatus @default(PENDING)

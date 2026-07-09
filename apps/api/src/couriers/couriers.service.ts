@@ -259,7 +259,7 @@ export class CouriersService {
       const fullOrder = await this.prisma.order.findUnique({
         where: { id: delivery.orderId },
         select: {
-          subtotal: true, total: true, storeId: true,
+          subtotal: true, couponDiscount: true, storeId: true,
           store: { select: { mpConnected: true } },
           payment: { select: { status: true } },
         },
@@ -278,9 +278,9 @@ export class CouriersService {
       const isPaid = fullOrder.payment?.status === 'PAID'
       const courierFee = Number(delivery.courierFee)
       const platformCommission = Math.round(Number(fullOrder.subtotal) * 0.10 * 100) / 100
-      // Loja recebe o que foi EFETIVAMENTE PAGO menos a taxa do entregador e a comissão
-      // (consistente com o split: a loja absorve o desconto, a plataforma mantém a comissão).
-      const storeAmount = Math.max(0, Math.round((Number(fullOrder.total) - courierFee - platformCommission) * 100) / 100)
+      // Loja recebe: subtotal − cupom − comissão. Absorve o CUPOM (promo dela), mas NÃO
+      // a fidelidade (bancada pela plataforma). Consistente com o cálculo do split.
+      const storeAmount = Math.max(0, Math.round((Number(fullOrder.subtotal) - Number(fullOrder.couponDiscount) - platformCommission) * 100) / 100)
       const storePaidViaSplit = this.marketplaceOn && Boolean(fullOrder.store?.mpConnected)
 
       // Repasse ao entregador via MP (só após vencer o claim e se pago)
