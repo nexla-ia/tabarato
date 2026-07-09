@@ -69,18 +69,21 @@ export default function OrderDetailPage() {
           {STATUS_LABEL[order.status] ?? order.status}
         </div>
 
-        {/* Progress steps */}
-        {!['CANCELLED'].includes(order.status) && (
-          <div className={styles.progress}>
-            {['Aguardando','Confirmado','Preparando','Pronto','Entregue'].map((label, i) => (
-              <div key={i} className={styles.progressItem}>
-                <div className={`${styles.progressDot} ${i <= stepIdx ? styles.progressDotActive : ''}`}
-                  style={i <= stepIdx ? { background: color, borderColor: color } : {}}>
-                  {i < stepIdx && <span style={{ color: '#fff', fontSize: 10 }}>✓</span>}
+        {/* Progress tracker */}
+        {order.status !== 'CANCELLED' && (
+          <div className={styles.tracker}>
+            {['Aguardando','Confirmado','Preparando','Pronto','Entregue'].map((label, i) => {
+              const done = i < stepIdx
+              const current = i === stepIdx
+              return (
+                <div key={i} className={`${styles.trackStep} ${i <= stepIdx ? styles.trackStepOn : ''}`}>
+                  <span className={`${styles.trackDot} ${done ? styles.trackDotDone : ''} ${current ? styles.trackDotCurrent : ''}`}>
+                    {done ? '✓' : i + 1}
+                  </span>
+                  <span className={`${styles.trackLabel} ${i <= stepIdx ? styles.trackLabelOn : ''}`}>{label}</span>
                 </div>
-                {i < 4 && <div className={`${styles.progressLine} ${i < stepIdx ? styles.progressLineActive : ''}`} style={i < stepIdx ? { background: color } : {}} />}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 

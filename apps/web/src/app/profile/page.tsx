@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { ShoppingBag, LayoutDashboard, Store as StoreIcon, ChevronRight } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -123,6 +125,36 @@ export default function ProfilePage() {
 
         <div className="container">
           <div className={styles.body}>
+
+            {/* Quick links */}
+            <div className={styles.quickLinks}>
+              <Link href="/orders" className={styles.quickLink}>
+                <span className={styles.quickIcon}><ShoppingBag size={20} /></span>
+                <span className={styles.quickText}>
+                  <span className={styles.quickTitle}>Meus pedidos</span>
+                  <span className={styles.quickSub}>Acompanhe suas compras</span>
+                </span>
+                <ChevronRight size={18} className={styles.quickChev} />
+              </Link>
+              {profile.role === 'STORE_OWNER' && (
+                <Link href="/lojista" className={styles.quickLink}>
+                  <span className={styles.quickIcon}><LayoutDashboard size={20} /></span>
+                  <span className={styles.quickText}>
+                    <span className={styles.quickTitle}>Meu painel</span>
+                    <span className={styles.quickSub}>Gerencie sua loja</span>
+                  </span>
+                  <ChevronRight size={18} className={styles.quickChev} />
+                </Link>
+              )}
+              <Link href="/" className={styles.quickLink}>
+                <span className={styles.quickIcon}><StoreIcon size={20} /></span>
+                <span className={styles.quickText}>
+                  <span className={styles.quickTitle}>Explorar lojas</span>
+                  <span className={styles.quickSub}>Peça do comércio local</span>
+                </span>
+                <ChevronRight size={18} className={styles.quickChev} />
+              </Link>
+            </div>
 
             {/* Edit profile */}
             <div className={styles.card}>

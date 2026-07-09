@@ -4,13 +4,39 @@
 .title { font-family: var(--display); font-size: 24px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; margin-bottom: 12px; }
 .statusBadge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 20px; }
 
-.progress { display: flex; align-items: center; margin-bottom: 24px; }
-.progressItem { display: flex; flex: 1; align-items: center; }
-.progressItem:last-child { flex: 0; }
-.progressDot { width: 24px; height: 24px; border-radius: 12px; border: 2px solid var(--border); background: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.3s; }
-.progressDotActive { background: #059669; border-color: #059669; }
-.progressLine { flex: 1; height: 2.5px; background: var(--border); margin: 0 2px; transition: background 0.3s; }
-.progressLineActive { background: #059669; }
+.tracker {
+  display: flex;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px 12px 18px;
+  margin-bottom: 20px; box-shadow: var(--shadow-sm);
+}
+.trackStep {
+  flex: 1; position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+/* linha conectora com o passo anterior */
+.trackStep::before {
+  content: ''; position: absolute; top: 15px; right: 50%; width: 100%; height: 3px;
+  background: var(--border); z-index: 0;
+}
+.trackStep:first-child::before { display: none; }
+.trackStepOn::before { background: var(--orange); }
+
+.trackDot {
+  position: relative; z-index: 1;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #fff; border: 2px solid var(--border);
+  color: var(--faint); font-size: 13px; font-weight: 800;
+  transition: all 0.3s;
+}
+.trackDotDone { background: var(--orange); border-color: var(--orange); color: #fff; }
+.trackDotCurrent {
+  background: #fff; border-color: var(--orange); color: var(--orange);
+  box-shadow: 0 0 0 5px rgba(255,85,0,0.15);
+}
+.trackLabel { font-size: 11.5px; font-weight: 600; color: var(--faint); text-align: center; }
+.trackLabelOn { color: var(--text); font-weight: 700; }
 
 .pixBox { background: #FFFBEB; border: 1.5px solid #FDE68A; border-radius: 16px; padding: 20px; margin-bottom: 20px; text-align: center; }
 .pixTitle { font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
@@ -18,15 +44,15 @@
 .checkPixBtn { background: var(--orange); color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; width: 100%; }
 .checkPixBtn:disabled { opacity: 0.65; }
 
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
-.storeName { font-size: 17px; font-weight: 800; color: var(--text); margin-bottom: 14px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-sm); }
+.storeName { font-family: var(--display); font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 14px; }
 .item { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 14px; }
 .itemQty { background: #F0E8E0; border-radius: 6px; padding: 2px 7px; font-size: 12px; font-weight: 700; color: var(--muted); }
 .itemName { flex: 1; color: var(--text); font-weight: 600; }
 .itemPrice { color: var(--text); font-weight: 700; }
 .divider { height: 1px; background: var(--border); margin: 12px 0; }
 .totalRow { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-.grandTotal { display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; color: var(--text); margin-top: 8px; }
+.grandTotal { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--display); font-size: 19px; font-weight: 800; color: var(--text); margin-top: 8px; }
 
 .sectionLabel { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
 .courierName { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
