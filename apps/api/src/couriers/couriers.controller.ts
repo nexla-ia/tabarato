@@ -99,8 +99,8 @@ export class CouriersController {
   @UseGuards(RolesGuard)
   @Roles('COURIER')
   @Patch('me/deliveries/:id/advance')
-  advanceDelivery(@CurrentUser() user: any, @Param('id') id: string, @Body() body: { photoUrl?: string; code?: string }) {
-    return this.couriersService.advanceDelivery(user.sub, id, body.photoUrl, body.code)
+  advanceDelivery(@CurrentUser() user: any, @Param('id') id: string, @Body() body: { photoUrl?: string; code?: string; lat?: number; lng?: number }) {
+    return this.couriersService.advanceDelivery(user.sub, id, body.photoUrl, body.code, body.lat, body.lng)
   }
 
   @UseGuards(RolesGuard)

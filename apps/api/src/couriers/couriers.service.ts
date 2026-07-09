@@ -12,6 +12,17 @@ import { DeliveryGateway } from './delivery.gateway'
 import { CreateCourierDto } from './dto/create-courier.dto'
 import { UpdateLocationDto } from './dto/update-location.dto'
 
+/** Distância em metros entre dois pontos (Haversine). */
+function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000 // raio da Terra em metros
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.asin(Math.sqrt(a))
+}
+
 @Injectable()
 export class CouriersService {
   private readonly logger = new Logger(CouriersService.name)
@@ -27,6 +38,18 @@ export class CouriersService {
     @Optional() private matching: DeliveryMatchingService,
     @Optional() private gateway: DeliveryGateway,
   ) {}
+
+  /**
+   * Raio (em metros) da cerca geográfica para confirmar entrega. O entregador
+   * precisa estar a até esse raio do endereço do cliente para finalizar.
+   * Default 300m. Defina DELIVERY_GEOFENCE_METERS=0 para desativar.
+   */
+  private get geofenceMeters(): number {
+    const raw = this.config.get<string>('DELIVERY_GEOFENCE_METERS')
+    if (raw === undefined || raw === '') return 300
+    const v = Number(raw)
+    return Number.isFinite(v) && v > 0 ? v : 0
+  }
 
   /** Marketplace ativo (split) quando as credenciais MP existem. */
   private get marketplaceOn(): boolean {
@@ -255,7 +278,7 @@ export class CouriersService {
     return updated
   }
 
-  async advanceDelivery(userId: string, deliveryId: string, photoUrl?: string, code?: string) {
+  async advanceDelivery(userId: string, deliveryId: string, photoUrl?: string, code?: string, lat?: number, lng?: number) {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier not found')
 
@@ -266,6 +289,7 @@ export class CouriersService {
           include: {
             user: { select: { id: true, pushToken: true } },
             store: { include: { user: { select: { id: true, pushToken: true } } } },
+            address: { select: { lat: true, lng: true } },
           },
         },
       },
@@ -293,6 +317,23 @@ export class CouriersService {
         const provided = (code ?? '').trim()
         if (!provided) throw new BadRequestException('Informe o código de entrega do cliente.')
         if (provided !== expected) throw new BadRequestException('Código de entrega incorreto.')
+      }
+
+      // ANTI-FRAUDE (cerca geográfica): o entregador precisa estar fisicamente
+      // próximo ao endereço do cliente para finalizar. Impede marcar "entregue"
+      // longe do local. Só aplica se houver coords do endereço e a cerca estiver ativa.
+      const radius = this.geofenceMeters
+      const addr = (delivery as any).order?.address as { lat: number | null; lng: number | null } | undefined
+      if (radius > 0 && addr?.lat != null && addr?.lng != null) {
+        if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+          throw new BadRequestException('Ative a localização para confirmar a entrega no endereço do cliente.')
+        }
+        const dist = distanceMeters(lat, lng, Number(addr.lat), Number(addr.lng))
+        if (dist > radius) {
+          throw new BadRequestException(
+            `Você está a ${Math.round(dist)}m do endereço. Aproxime-se do cliente para confirmar a entrega.`,
+          )
+        }
       }
     }
 
