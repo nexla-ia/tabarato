@@ -1,5 +1,5 @@
 .headerRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
-.title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.title { font-family: var(--display); font-size: 24px; font-weight: 800; letter-spacing: -0.025em; }
 .subtitle { color: var(--muted); font-size: 14px; margin-top: 2px; }
 
 .newBtn {
@@ -24,7 +24,10 @@
   background: var(--card); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 12px;
   display: flex; align-items: center; gap: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.16s, box-shadow 0.16s;
 }
+.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .inactive { opacity: 0.6; }
 
 .thumb {
@@ -73,7 +76,7 @@
   width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto;
 }
 .modalHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.modalHead h3 { font-size: 18px; font-weight: 800; }
+.modalHead h3 { font-family: var(--display); font-size: 18px; font-weight: 800; }
 .modalHead button { color: var(--muted); display: flex; }
 
 .label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin: 12px 0 5px; }

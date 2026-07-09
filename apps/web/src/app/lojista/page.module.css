@@ -6,7 +6,7 @@
   margin-bottom: 26px;
   flex-wrap: wrap;
 }
-.title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.title { font-family: var(--display); font-size: 24px; font-weight: 800; letter-spacing: -0.025em; }
 .subtitle { color: var(--muted); font-size: 14px; margin-top: 2px; }
 
 .storeActions { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -33,12 +33,13 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 18px 20px;
+  box-shadow: var(--shadow-sm);
 }
 .statLabel { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
-.statValue { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.statValue { font-family: var(--display); font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
 
 .sectionHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.sectionTitle { font-size: 16px; font-weight: 700; }
+.sectionTitle { font-family: var(--display); font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
 .seeAll { color: var(--orange); font-size: 13px; font-weight: 600; }
 
 .empty {
@@ -52,7 +53,10 @@
   background: var(--card); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 16px 18px;
   display: flex; align-items: center; gap: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s;
 }
+.orderCard:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: transparent; }
 .orderMain { flex: 1; min-width: 0; }
 .orderTop { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
 .orderId { font-weight: 800; font-size: 13px; }
