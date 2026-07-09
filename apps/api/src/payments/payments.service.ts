@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import * as crypto from 'crypto'
 import MercadoPagoConfig, { Payment as MPPayment } from 'mercadopago'
@@ -226,15 +226,20 @@ export class PaymentsService {
 
   // ── Poll status (consumer app pulls if webhook misses) ─────────────────────
 
-  async syncPaymentStatus(orderId: string) {
+  async syncPaymentStatus(orderId: string, userId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
         payment: true,
-        store: { select: { id: true, mpConnected: true, mpAccessToken: true, mpRefreshToken: true, mpTokenExpiresAt: true } },
+        store: { select: { id: true, userId: true, mpConnected: true, mpAccessToken: true, mpRefreshToken: true, mpTokenExpiresAt: true } },
       },
     })
-    if (!order?.payment?.gatewayId || order.payment.status !== 'PENDING') return order?.payment
+    if (!order) throw new NotFoundException('Pedido não encontrado.')
+    // Só o dono do pedido (ou o lojista) pode consultar o pagamento
+    if (userId && order.userId !== userId && order.store?.userId !== userId) {
+      throw new ForbiddenException('Acesso negado.')
+    }
+    if (!order.payment?.gatewayId || order.payment.status !== 'PENDING') return order.payment
 
     try {
       const store = order.store as any

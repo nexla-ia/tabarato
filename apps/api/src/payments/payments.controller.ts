@@ -9,8 +9,8 @@ export class PaymentsController {
 
   @UseGuards(JwtAuthGuard)
   @Get('orders/:orderId/sync')
-  syncStatus(@Param('orderId') orderId: string, @CurrentUser() _user: any) {
-    return this.paymentsService.syncPaymentStatus(orderId)
+  syncStatus(@Param('orderId') orderId: string, @CurrentUser() user: any) {
+    return this.paymentsService.syncPaymentStatus(orderId, user.sub)
   }
 }
 

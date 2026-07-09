@@ -14,7 +14,18 @@ export class WalletService {
     })
   }
 
+  /** Garante que o valor é um número finito e estritamente positivo. */
+  private safeAmount(amount: number): number {
+    const n = Number(amount)
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new BadRequestException('Valor inválido.')
+    }
+    // Normaliza para centavos (evita floats com muitas casas)
+    return Math.round(n * 100) / 100
+  }
+
   async credit(ownerId: string, ownerType: WalletOwnerType, amount: number, description: string, referenceId?: string) {
+    amount = this.safeAmount(amount)
     const wallet = await this.getOrCreate(ownerId, ownerType)
     await this.prisma.$transaction([
       this.prisma.wallet.update({
@@ -28,6 +39,7 @@ export class WalletService {
   }
 
   async debit(ownerId: string, ownerType: WalletOwnerType, amount: number, description: string, referenceId?: string) {
+    amount = this.safeAmount(amount)
     // Balance check inside the transaction to prevent double-spend race condition
     await this.prisma.$transaction(async (tx) => {
       const wallet = await tx.wallet.findFirst({
