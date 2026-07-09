@@ -40,25 +40,18 @@ export class WalletService {
 
   async debit(ownerId: string, ownerType: WalletOwnerType, amount: number, description: string, referenceId?: string) {
     amount = this.safeAmount(amount)
-    // Balance check inside the transaction to prevent double-spend race condition
+    const wallet = await this.getOrCreate(ownerId, ownerType)
+
     await this.prisma.$transaction(async (tx) => {
-      const wallet = await tx.wallet.findFirst({
-        where: { ownerId, ownerType },
-      })
-
-      if (!wallet) throw new BadRequestException('Carteira não encontrada.')
-
-      // Prisma Decimal comes as a string or Decimal object; compare safely
-      const currentBalance = Number(wallet.balance)
-      if (currentBalance < amount) {
-        throw new BadRequestException('Saldo insuficiente para o saque solicitado.')
-      }
-
-      await tx.wallet.update({
-        where: { id: wallet.id },
+      // Débito atômico condicional: o WHERE balance >= amount + o decrement são um
+      // único UPDATE, então duas requisições simultâneas não conseguem gastar 2×.
+      const res = await tx.wallet.updateMany({
+        where: { id: wallet.id, balance: { gte: amount } },
         data: { balance: { decrement: amount } },
       })
-
+      if (res.count === 0) {
+        throw new BadRequestException('Saldo insuficiente para o saque solicitado.')
+      }
       await tx.transaction.create({
         data: { walletId: wallet.id, amount, type: 'DEBIT', description, referenceId },
       })

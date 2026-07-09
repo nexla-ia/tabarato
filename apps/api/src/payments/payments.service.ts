@@ -131,10 +131,12 @@ export class PaymentsService {
 
     // Verify MP webhook signature when secret is configured.
     // Manifesto correto do MP: id:<data.id>;request-id:<x-request-id>;ts:<ts>;
+    // Se o secret está configurado, a assinatura é OBRIGATÓRIA — rejeita se o
+    // header faltar ou não bater (evita bypass omitindo o x-signature).
     const webhookSecret = this.config.get<string>('MERCADO_PAGO_WEBHOOK_SECRET')
-    if (webhookSecret && xSignature) {
-      if (!this.verifyMpSignature(webhookSecret, xSignature, xRequestId, mpId)) {
-        this.logger.warn('Webhook signature verification failed — ignoring request')
+    if (webhookSecret) {
+      if (!xSignature || !this.verifyMpSignature(webhookSecret, xSignature, xRequestId, mpId)) {
+        this.logger.warn('Webhook signature ausente/inválida — ignorando request')
         return
       }
     }

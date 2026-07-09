@@ -180,15 +180,20 @@ export class OrdersService {
       })
     }
 
+    // Normaliza o subtotal a centavos (evita floats tipo 59.9999 chegando ao gateway)
+    subtotal = Math.round(subtotal * 100) / 100
+
     const distanceKm = distToAddress // already calculated above
     const deliveryFee = calcCourierFee(distanceKm)
 
     let discount = 0
     let couponId: string | undefined
+    let couponMaxUses: number | null = null
     if (dto.couponCode) {
       const result = await this.coupons.validate(dto.couponCode, userId, subtotal, dto.storeId)
       discount = result.discount
       couponId = result.coupon.id
+      couponMaxUses = (result.coupon as any).maxUses ?? null
     }
 
     // ── Loyalty redemption (100 pts = R$10) ──────────────────────────────
@@ -204,9 +209,10 @@ export class OrdersService {
       if (!account || account.points < pts) {
         throw new BadRequestException('Saldo de pontos insuficiente para o resgate.')
       }
-      // Never let the loyalty discount exceed the remaining order value —
-      // cap the redeemed points to whole R$10 blocks that actually fit.
-      const maxExtra = subtotal + deliveryFee - discount
+      // O desconto (cupom + fidelidade) só incide sobre os PRODUTOS, nunca sobre a
+      // taxa de entrega — assim o total nunca zera (total >= deliveryFee > 0) e o
+      // entregador/loja sempre têm de onde ser pagos. Limita ao que ainda "cabe".
+      const maxExtra = Math.max(0, subtotal - discount)
       let loyaltyDiscount = (pts / 100) * 10
       if (loyaltyDiscount > maxExtra) {
         const usableBlocks = Math.floor(maxExtra / 10)
@@ -221,7 +227,9 @@ export class OrdersService {
       }
     }
 
-    const total = subtotal + deliveryFee - discount
+    // Segurança extra: o desconto nunca ultrapassa o subtotal (a entrega sempre é paga).
+    if (discount > subtotal) discount = subtotal
+    const total = Math.round((subtotal + deliveryFee - discount) * 100) / 100
 
     // Create payment + order in a single transaction to avoid orphaned records
     const { payment, order } = await this.prisma.$transaction(async (tx) => {
@@ -257,26 +265,34 @@ export class OrdersService {
         data: { orderId: order.id, status: 'PENDING', changedBy: userId, note: 'Pedido criado' },
       })
 
-      // Coupon use + counter increment in the same transaction — prevents double-use
+      // Coupon use — @@unique([couponId,userId]) barra reuso pelo mesmo usuário;
+      // o incremento do limite GLOBAL é condicional/atômico (barra estouro do maxUses).
       if (couponId) {
         await tx.couponUse.create({ data: { couponId, userId, orderId: order.id } })
-        await tx.coupon.update({ where: { id: couponId }, data: { usedCount: { increment: 1 } } })
+        const upd = await tx.coupon.updateMany({
+          where: couponMaxUses != null ? { id: couponId, usedCount: { lt: couponMaxUses } } : { id: couponId },
+          data: { usedCount: { increment: 1 } },
+        })
+        if (upd.count === 0) throw new BadRequestException('Este cupom atingiu o limite de usos.')
       }
 
-      // Loyalty redemption — decrement points + ledger entry in the same transaction
+      // Loyalty redemption — decremento ATÔMICO condicional (evita resgate acima do
+      // saldo em checkouts simultâneos). Só registra o ledger se realmente debitou.
       if (loyaltyAccountId && loyaltyRedeem > 0) {
-        await tx.loyaltyAccount.update({
-          where: { id: loyaltyAccountId },
+        const res = await tx.loyaltyAccount.updateMany({
+          where: { id: loyaltyAccountId, points: { gte: loyaltyRedeem } },
+          data: { points: { decrement: loyaltyRedeem } },
+        })
+        if (res.count === 0) {
+          throw new BadRequestException('Saldo de pontos insuficiente para o resgate.')
+        }
+        await tx.loyaltyTransaction.create({
           data: {
-            points: { decrement: loyaltyRedeem },
-            transactions: {
-              create: {
-                points: -loyaltyRedeem,
-                type: 'REDEEM',
-                description: `Resgate de ${loyaltyRedeem} pontos (R$ ${((loyaltyRedeem / 100) * 10).toFixed(2)} de desconto)`,
-                orderId: order.id,
-              },
-            },
+            accountId: loyaltyAccountId,
+            points: -loyaltyRedeem,
+            type: 'REDEEM',
+            description: `Resgate de ${loyaltyRedeem} pontos (R$ ${((loyaltyRedeem / 100) * 10).toFixed(2)} de desconto)`,
+            orderId: order.id,
           },
         })
       }
@@ -420,9 +436,15 @@ export class OrdersService {
     })
     if (!order) throw new NotFoundException('Order not found')
 
+    // Só quem tem relação com o pedido pode vê-lo:
+    // consumidor dono, dono da loja, entregador ATRIBUÍDO, ou admin.
     const isOwner = order.userId === userId
-    const isElevated = ['STORE_OWNER', 'ADMIN', 'COURIER'].includes(userRole)
-    if (!isOwner && !isElevated) throw new ForbiddenException()
+    const isStoreOwner = (order as any).store?.userId === userId
+    const isAssignedCourier = (order as any).delivery?.courier?.userId === userId
+    const isAdmin = userRole === 'ADMIN'
+    if (!isOwner && !isStoreOwner && !isAssignedCourier && !isAdmin) {
+      throw new ForbiddenException()
+    }
 
     return order
   }
@@ -435,9 +457,16 @@ export class OrdersService {
       where: { id: orderId, storeId: store.id },
       include: {
         address: { select: { lat: true, lng: true } },
+        payment: { select: { status: true } },
       },
     })
     if (!order) throw new NotFoundException('Order not found')
+
+    // A loja não pode preparar/despachar um pedido que ainda não foi pago
+    // (ex.: PIX gerado e nunca pago). Cancelar/recusar sempre é permitido.
+    if (['CONFIRMED', 'PREPARING', 'READY'].includes(status) && order.payment?.status !== 'PAID') {
+      throw new BadRequestException('O pedido ainda não foi pago.')
+    }
 
     const updated = await this.prisma.order.update({
       where: { id: orderId },
@@ -556,12 +585,22 @@ export class OrdersService {
   }
 
   async getStatusHistory(orderId: string, userId: string, userRole: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        userId: true,
+        store: { select: { userId: true } },
+        delivery: { select: { courier: { select: { userId: true } } } },
+      },
+    })
     if (!order) throw new NotFoundException('Order not found')
 
     const isOwner = order.userId === userId
-    const isElevated = ['STORE_OWNER', 'ADMIN', 'COURIER'].includes(userRole)
-    if (!isOwner && !isElevated) throw new ForbiddenException()
+    const isStoreOwner = order.store?.userId === userId
+    const isAssignedCourier = order.delivery?.courier?.userId === userId
+    if (!isOwner && !isStoreOwner && !isAssignedCourier && userRole !== 'ADMIN') {
+      throw new ForbiddenException()
+    }
 
     return this.prisma.orderStatusHistory.findMany({
       where: { orderId },

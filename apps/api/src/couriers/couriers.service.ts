@@ -252,41 +252,50 @@ export class CouriersService {
       if (photoUrl) updateData.photoUrl = photoUrl
     }
 
-    let updated: Awaited<ReturnType<typeof this.prisma.delivery.update>>
+    const fromStatus = delivery.status
+    let updated: any = null
 
     if (nextStatus === 'DELIVERED') {
-      // Fetch full order data needed for wallet credits
       const fullOrder = await this.prisma.order.findUnique({
         where: { id: delivery.orderId },
-        select: { subtotal: true, storeId: true, store: { select: { mpConnected: true } } },
+        select: {
+          subtotal: true, total: true, storeId: true,
+          store: { select: { mpConnected: true } },
+          payment: { select: { status: true } },
+        },
       })
-
       if (!fullOrder) throw new NotFoundException('Order not found')
 
-      const platformFee = Math.round(Number(fullOrder.subtotal) * 0.10 * 100) / 100
-      const storeAmount = Math.round((Number(fullOrder.subtotal) - platformFee) * 100) / 100
-      const courierFee  = Number(delivery.courierFee)
+      // CLAIM ATÔMICO: só UM chamador move o status atual -> DELIVERED. Evita
+      // double-credit por chamadas concorrentes (duplo-tap, retry).
+      const claim = await this.prisma.delivery.updateMany({
+        where: { id: deliveryId, status: fromStatus },
+        data: updateData,
+      })
+      if (claim.count === 0) throw new ConflictException('Entrega já foi atualizada.')
 
-      // Se o marketplace está ativo e a loja recebe via split, ela JÁ recebeu direto
-      // no pagamento — não creditar a carteira (evita pagar em dobro).
+      // Só movimenta dinheiro se o pedido foi realmente pago.
+      const isPaid = fullOrder.payment?.status === 'PAID'
+      const courierFee = Number(delivery.courierFee)
+      const platformCommission = Math.round(Number(fullOrder.subtotal) * 0.10 * 100) / 100
+      // Loja recebe o que foi EFETIVAMENTE PAGO menos a taxa do entregador e a comissão
+      // (consistente com o split: a loja absorve o desconto, a plataforma mantém a comissão).
+      const storeAmount = Math.max(0, Math.round((Number(fullOrder.total) - courierFee - platformCommission) * 100) / 100)
       const storePaidViaSplit = this.marketplaceOn && Boolean(fullOrder.store?.mpConnected)
 
-      // Repasse automático ao entregador (split 1:N). Se transferir direto pra conta MP
-      // dele, não credita a carteira. Enquanto o 1:N não estiver habilitado, cai na carteira.
-      const courierPayout = await this.mpOauth.payoutCourier(courier as any, courierFee, delivery.orderId)
-      const courierPaidViaMp = courierPayout.done
+      // Repasse ao entregador via MP (só após vencer o claim e se pago)
+      const courierPaidViaMp = isPaid
+        ? (await this.mpOauth.payoutCourier(courier as any, courierFee, delivery.orderId)).done
+        : false
 
-      // Delivery update + order status + both wallet credits — all in one atomic transaction
-      updated = await this.prisma.$transaction(async (tx) => {
-        const d = await tx.delivery.update({ where: { id: deliveryId }, data: updateData })
+      await this.prisma.$transaction(async (tx) => {
         await tx.order.update({ where: { id: delivery.orderId }, data: { status: 'DELIVERED' } })
+        if (!isPaid) return // pedido não pago: não credita ninguém
 
-        // Courier wallet — só credita se NÃO foi pago direto via MP (split 1:N)
         if (!courierPaidViaMp) {
           const courierWallet = await tx.wallet.upsert({
             where: { ownerId_ownerType: { ownerId: courier.id, ownerType: 'COURIER' } },
-            update: {},
-            create: { ownerId: courier.id, ownerType: 'COURIER', balance: 0 },
+            update: {}, create: { ownerId: courier.id, ownerType: 'COURIER', balance: 0 },
           })
           await tx.wallet.update({ where: { id: courierWallet.id }, data: { balance: { increment: courierFee } } })
           await tx.transaction.create({
@@ -295,12 +304,10 @@ export class CouriersService {
           })
         }
 
-        // Store wallet — só credita no modelo centralizado (sem split direto)
-        if (!storePaidViaSplit) {
+        if (!storePaidViaSplit && storeAmount > 0) {
           const storeWallet = await tx.wallet.upsert({
             where: { ownerId_ownerType: { ownerId: fullOrder.storeId, ownerType: 'STORE' } },
-            update: {},
-            create: { ownerId: fullOrder.storeId, ownerType: 'STORE', balance: 0 },
+            update: {}, create: { ownerId: fullOrder.storeId, ownerType: 'STORE', balance: 0 },
           })
           await tx.wallet.update({ where: { id: storeWallet.id }, data: { balance: { increment: storeAmount } } })
           await tx.transaction.create({
@@ -308,21 +315,23 @@ export class CouriersService {
               description: `Pedido #${delivery.orderId.slice(0, 8)}`, referenceId: delivery.orderId },
           })
         }
-
-        return d
       })
 
-      // Credit loyalty points to the consumer (fire-and-forget)
-      const order = await this.prisma.order.findUnique({
-        where: { id: delivery.orderId },
-        select: { userId: true, subtotal: true },
-      })
-      if (order) {
-        this.loyalty.earnPoints(order.userId, delivery.orderId, Number(order.subtotal)).catch(() => {})
+      updated = await this.prisma.delivery.findUnique({ where: { id: deliveryId } })
+
+      // Pontos de fidelidade ao consumidor (só se pago; fire-and-forget)
+      if (isPaid) {
+        const ord = await this.prisma.order.findUnique({ where: { id: delivery.orderId }, select: { userId: true } })
+        if (ord) this.loyalty.earnPoints(ord.userId, delivery.orderId, Number(fullOrder.subtotal)).catch(() => {})
       }
     } else {
-      // For non-terminal transitions just update the delivery
-      updated = await this.prisma.delivery.update({ where: { id: deliveryId }, data: updateData })
+      // Transição não-terminal — claim atômico também (evita avanço concorrente)
+      const claim = await this.prisma.delivery.updateMany({
+        where: { id: deliveryId, status: fromStatus },
+        data: updateData,
+      })
+      if (claim.count === 0) throw new ConflictException('Entrega já foi atualizada.')
+      updated = await this.prisma.delivery.findUnique({ where: { id: deliveryId } })
     }
 
     const pushMessages: Partial<Record<DeliveryStatus, { title: string; body: string }>> = {

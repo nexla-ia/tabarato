@@ -22,7 +22,11 @@ export class MpOauthService {
   private clientId() { return this.config.get<string>('MERCADO_PAGO_CLIENT_ID') ?? '' }
   private clientSecret() { return this.config.get<string>('MERCADO_PAGO_CLIENT_SECRET') ?? '' }
   private redirectUri() { return this.config.get<string>('MERCADO_PAGO_REDIRECT_URI') ?? '' }
-  private stateSecret() { return this.config.get<string>('JWT_SECRET') ?? 'tabarato-mp-state' }
+  // Sem fallback público: se não houver segredo forte, o marketplace fica desligado
+  // (fail-closed) — impede forjar o state com uma constante conhecida.
+  private stateSecret() {
+    return this.config.get<string>('MP_STATE_SECRET') || this.config.get<string>('JWT_SECRET') || ''
+  }
 
   // ── Criptografia dos tokens em repouso (AES-256-GCM) ──
   // Chave de MP_ENCRYPTION_KEY (32 bytes hex/base64) ou derivada do JWT_SECRET.
@@ -61,9 +65,9 @@ export class MpOauthService {
     }
   }
 
-  /** Marketplace 1:1 (loja) liga quando as credenciais existem. */
+  /** Marketplace 1:1 (loja) liga quando as credenciais E um segredo de state forte existem. */
   isEnabled(): boolean {
-    return Boolean(this.clientId() && this.clientSecret() && this.redirectUri())
+    return Boolean(this.clientId() && this.clientSecret() && this.redirectUri() && this.stateSecret())
   }
 
   /** Split 1:N (repasse automático ao entregador) — precisa de aprovação comercial do MP. */
