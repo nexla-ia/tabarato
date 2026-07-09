@@ -166,6 +166,21 @@ export class CouriersService {
     return this.wallet.findByOwner(courier.id, 'COURIER')
   }
 
+  /** Stats da home do entregador: entregas e ganhos de hoje + avaliação. */
+  async getStats(userId: string) {
+    const courier = await this.prisma.courier.findUnique({ where: { userId } })
+    if (!courier) throw new NotFoundException('Courier profile not found')
+
+    const start = new Date(); start.setHours(0, 0, 0, 0)
+    const today = await this.prisma.delivery.findMany({
+      where: { courierId: courier.id, status: 'DELIVERED', deliveredAt: { gte: start } },
+      select: { courierFee: true },
+    })
+    const todayCount = today.length
+    const todayEarnings = today.reduce((s, d) => s + Number(d.courierFee), 0)
+    return { todayCount, todayEarnings, rating: courier.rating }
+  }
+
   async findDeliveryHistory(userId: string) {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier profile not found')

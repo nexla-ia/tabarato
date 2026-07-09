@@ -318,6 +318,7 @@ model Order {
   couponId    String?     @map("coupon_id")
   status       OrderStatus @default(PENDING)
   scheduledFor DateTime?  @map("scheduled_for")
+  scheduledReminderSent Boolean @default(false) @map("scheduled_reminder_sent")
   notes        String?
   refusalNote  String?    @map("refusal_note")
   createdAt   DateTime    @default(now()) @map("created_at")

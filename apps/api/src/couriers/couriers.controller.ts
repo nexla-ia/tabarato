@@ -77,6 +77,13 @@ export class CouriersController {
 
   @UseGuards(RolesGuard)
   @Roles('COURIER')
+  @Get('me/stats')
+  getStats(@CurrentUser() user: any) {
+    return this.couriersService.getStats(user.sub)
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('COURIER')
   @Post('me/wallet/withdraw')
   requestWithdrawal(@CurrentUser() user: any, @Body() body: { amount: number }) {
     return this.couriersService.requestWithdrawal(user.sub, body.amount)
