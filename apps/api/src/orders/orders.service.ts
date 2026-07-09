@@ -5,6 +5,7 @@ import { CouponsService } from '../coupons/coupons.service'
 import { PushService } from '../common/push.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { PaymentsService } from '../payments/payments.service'
+import { MpOauthService } from '../payments/mp-oauth.service'
 import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
 import { CreateOrderDto } from './dto/create-order.dto'
 
@@ -63,6 +64,7 @@ export class OrdersService {
     private push: PushService,
     private notifications: NotificationsService,
     private payments: PaymentsService,
+    private mpOauth: MpOauthService,
     @Optional() private matching: DeliveryMatchingService,
   ) {}
 
@@ -75,6 +77,13 @@ export class OrdersService {
       this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
     ])
     if (!store) throw new BadRequestException('Loja não encontrada')
+
+    // Marketplace (split): a loja precisa ter o Mercado Pago conectado pra receber.
+    // Só bloqueia quando o marketplace está configurado (feature flag).
+    const marketplaceOn = this.mpOauth.isEnabled()
+    if (marketplaceOn && !(store as any).mpConnected) {
+      throw new BadRequestException('Esta loja está finalizando a configuração de pagamentos e ainda não pode receber pedidos.')
+    }
 
     // Validate the scheduled time (if any) — must be a valid future date
     let scheduledDate: Date | undefined
@@ -287,11 +296,21 @@ export class OrdersService {
       }),
     )
 
+    // Split de pagamento (marketplace): cobra na conta do lojista e retém a
+    // comissão da plataforma + a taxa de entrega (com que a plataforma paga o entregador).
+    let splitOpts: { sellerToken?: string | null; applicationFee?: number } | undefined
+    if (marketplaceOn) {
+      const sellerToken = await this.mpOauth.getValidSellerToken(store as any)
+      const platformCommission = Math.round(subtotal * 0.10 * 100) / 100
+      splitOpts = { sellerToken, applicationFee: platformCommission + deliveryFee }
+    }
+
     // PIX — await so the QR code is available when the response returns
     if (dto.paymentMethod === 'PIX') {
       try {
         await this.payments.createPixPayment(
           payment.id, total, order.id, payer?.email ?? 'cliente@tabarato.com.br',
+          splitOpts,
         )
       } catch (err) {
         this.logger.error('PIX payment creation failed after order was saved', err)
@@ -308,6 +327,7 @@ export class OrdersService {
           dto.installments ?? 1,
           payer?.email ?? 'cliente@tabarato.com.br',
           dto.payerCpf,
+          splitOpts,
         )
         if (result.status === 'PAID') {
           await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } })

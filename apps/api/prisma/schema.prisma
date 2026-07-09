@@ -175,6 +175,12 @@ model Store {
   scheduleExceptions   Json?    @map("schedule_exceptions")
   isOpen               Boolean  @default(false) @map("is_open")
   maxConcurrentOrders  Int?     @map("max_concurrent_orders")
+  // Mercado Pago — split de pagamento (marketplace)
+  mpUserId          String?   @map("mp_user_id")
+  mpAccessToken     String?   @map("mp_access_token")
+  mpRefreshToken    String?   @map("mp_refresh_token")
+  mpTokenExpiresAt  DateTime? @map("mp_token_expires_at")
+  mpConnected       Boolean   @default(false) @map("mp_connected")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 

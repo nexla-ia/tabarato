@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { DeliveryStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
@@ -20,9 +21,19 @@ export class CouriersService {
     private wallet: WalletService,
     private notifications: NotificationsService,
     private loyalty: LoyaltyService,
+    private config: ConfigService,
     @Optional() private matching: DeliveryMatchingService,
     @Optional() private gateway: DeliveryGateway,
   ) {}
+
+  /** Marketplace ativo (split) quando as credenciais MP existem. */
+  private get marketplaceOn(): boolean {
+    return Boolean(
+      this.config.get<string>('MERCADO_PAGO_CLIENT_ID') &&
+      this.config.get<string>('MERCADO_PAGO_CLIENT_SECRET') &&
+      this.config.get<string>('MERCADO_PAGO_REDIRECT_URI'),
+    )
+  }
 
   async register(userId: string, dto: CreateCourierDto) {
     const existing = await this.prisma.courier.findUnique({ where: { userId } })
@@ -234,7 +245,7 @@ export class CouriersService {
       // Fetch full order data needed for wallet credits
       const fullOrder = await this.prisma.order.findUnique({
         where: { id: delivery.orderId },
-        select: { subtotal: true, storeId: true },
+        select: { subtotal: true, storeId: true, store: { select: { mpConnected: true } } },
       })
 
       if (!fullOrder) throw new NotFoundException('Order not found')
@@ -242,6 +253,10 @@ export class CouriersService {
       const platformFee = Math.round(Number(fullOrder.subtotal) * 0.10 * 100) / 100
       const storeAmount = Math.round((Number(fullOrder.subtotal) - platformFee) * 100) / 100
       const courierFee  = Number(delivery.courierFee)
+
+      // Se o marketplace está ativo e a loja recebe via split, ela JÁ recebeu direto
+      // no pagamento — não creditar a carteira (evita pagar em dobro).
+      const storePaidViaSplit = this.marketplaceOn && Boolean(fullOrder.store?.mpConnected)
 
       // Delivery update + order status + both wallet credits — all in one atomic transaction
       updated = await this.prisma.$transaction(async (tx) => {
@@ -260,17 +275,19 @@ export class CouriersService {
             description: `Entrega #${delivery.orderId.slice(0, 8)}`, referenceId: delivery.id },
         })
 
-        // Store wallet — get/create then credit
-        const storeWallet = await tx.wallet.upsert({
-          where: { ownerId_ownerType: { ownerId: fullOrder.storeId, ownerType: 'STORE' } },
-          update: {},
-          create: { ownerId: fullOrder.storeId, ownerType: 'STORE', balance: 0 },
-        })
-        await tx.wallet.update({ where: { id: storeWallet.id }, data: { balance: { increment: storeAmount } } })
-        await tx.transaction.create({
-          data: { walletId: storeWallet.id, amount: storeAmount, type: 'CREDIT',
-            description: `Pedido #${delivery.orderId.slice(0, 8)}`, referenceId: delivery.orderId },
-        })
+        // Store wallet — só credita no modelo centralizado (sem split direto)
+        if (!storePaidViaSplit) {
+          const storeWallet = await tx.wallet.upsert({
+            where: { ownerId_ownerType: { ownerId: fullOrder.storeId, ownerType: 'STORE' } },
+            update: {},
+            create: { ownerId: fullOrder.storeId, ownerType: 'STORE', balance: 0 },
+          })
+          await tx.wallet.update({ where: { id: storeWallet.id }, data: { balance: { increment: storeAmount } } })
+          await tx.transaction.create({
+            data: { walletId: storeWallet.id, amount: storeAmount, type: 'CREDIT',
+              description: `Pedido #${delivery.orderId.slice(0, 8)}`, referenceId: delivery.orderId },
+          })
+        }
 
         return d
       })

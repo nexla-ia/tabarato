@@ -23,14 +23,23 @@ export class PaymentsService {
     this.mp = new MPPayment(client)
   }
 
+  /** Cliente MP com o token do lojista (split) ou o token da plataforma (centralizado). */
+  private clientFor(sellerToken?: string | null): MPPayment {
+    if (!sellerToken) return this.mp
+    return new MPPayment(new MercadoPagoConfig({ accessToken: sellerToken }))
+  }
+
   // ── PIX ──────────────────────────────────────────────────────────────────────
 
-  async createPixPayment(paymentId: string, amount: number, orderId: string, payerEmail: string) {
+  async createPixPayment(
+    paymentId: string, amount: number, orderId: string, payerEmail: string,
+    opts?: { sellerToken?: string | null; applicationFee?: number },
+  ) {
     const apiUrl = this.config.get<string>('API_URL') ?? ''
     const webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
       ?? `${apiUrl}/api/webhooks/mercadopago`
 
-    const response = await this.mp.create({
+    const response = await this.clientFor(opts?.sellerToken).create({
       body: {
         transaction_amount: amount,
         description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
@@ -39,7 +48,11 @@ export class PaymentsService {
         notification_url: webhookUrl,
         external_reference: orderId,
         date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      },
+        // Split: comissão da plataforma vai pra conta da Tá Barato
+        ...(opts?.sellerToken && opts?.applicationFee
+          ? { application_fee: Math.round(opts.applicationFee * 100) / 100 }
+          : {}),
+      } as any,
     })
 
     const pixCode     = response.point_of_interaction?.transaction_data?.qr_code ?? null
@@ -69,11 +82,12 @@ export class PaymentsService {
     installments: number,
     payerEmail: string,
     payerCpf?: string,
+    opts?: { sellerToken?: string | null; applicationFee?: number },
   ) {
     const webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
       ?? `${this.config.get<string>('API_URL') ?? ''}/api/webhooks/mercadopago`
 
-    const response = await this.mp.create({
+    const response = await this.clientFor(opts?.sellerToken).create({
       body: {
         transaction_amount: amount,
         token: cardToken,
@@ -87,6 +101,9 @@ export class PaymentsService {
         },
         notification_url: webhookUrl,
         external_reference: orderId,
+        ...(opts?.sellerToken && opts?.applicationFee
+          ? { application_fee: Math.round(opts.applicationFee * 100) / 100 }
+          : {}),
       } as any,
     })
 

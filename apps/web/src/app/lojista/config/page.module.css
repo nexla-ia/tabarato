@@ -29,3 +29,46 @@
 }
 .saveBtn:hover { background: var(--orange-dark); }
 .saveBtn:disabled { opacity: 0.6; }
+
+/* Mercado Pago */
+.mpHead { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.mpIcon {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: #E7F0FF; color: #2563EB;
+  display: flex; align-items: center; justify-content: center;
+}
+.mpTitle { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--text); }
+.mpSub { font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+
+.mpWarn {
+  display: flex; align-items: center; gap: 7px;
+  background: #FFFBEB; border: 1px solid #FDE68A; color: #B45309;
+  padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  margin-bottom: 14px;
+}
+.mpOkMsg, .mpErrMsg {
+  display: flex; align-items: center; gap: 7px;
+  padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; margin-bottom: 14px;
+}
+.mpOkMsg { background: #ECFDF5; border: 1px solid #A7F3D0; color: #059669; }
+.mpErrMsg { background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; }
+
+.mpConnectBtn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 14px; border-radius: 12px;
+  background: #009EE3; color: #fff; font-size: 15px; font-weight: 800;
+  transition: background 0.15s, transform 0.12s;
+}
+.mpConnectBtn:hover { background: #0081BC; transform: translateY(-1px); }
+.mpConnectBtn:disabled { opacity: 0.7; }
+.spin { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.mpConnected { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mpBadgeOk {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0;
+  padding: 8px 14px; border-radius: 999px; font-size: 13.5px; font-weight: 700;
+}
+.mpDisconnect { color: #DC2626; font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 8px; }
+.mpDisconnect:hover { background: #FEF2F2; }
