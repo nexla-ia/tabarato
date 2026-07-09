@@ -319,6 +319,7 @@ model Order {
   status       OrderStatus @default(PENDING)
   scheduledFor DateTime?  @map("scheduled_for")
   scheduledReminderSent Boolean @default(false) @map("scheduled_reminder_sent")
+  deliveryCode String?    @map("delivery_code")
   notes        String?
   refusalNote  String?    @map("refusal_note")
   createdAt   DateTime    @default(now()) @map("created_at")

@@ -104,7 +104,7 @@ export class CouriersService {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier profile not found')
 
-    return this.prisma.delivery.findMany({
+    const deliveries = await this.prisma.delivery.findMany({
       where: {
         courierId: courier.id,
         status: { notIn: ['SEARCHING_COURIER', 'DELIVERED', 'FAILED'] },
@@ -119,10 +119,13 @@ export class CouriersService {
       },
       orderBy: { createdAt: 'desc' },
     })
+    // Nunca expor o código de entrega ao entregador (anti-fraude).
+    for (const d of deliveries) if ((d as any).order) (d as any).order.deliveryCode = null
+    return deliveries
   }
 
   async findAvailableDeliveries() {
-    return this.prisma.delivery.findMany({
+    const deliveries = await this.prisma.delivery.findMany({
       where: { courierId: null, status: 'SEARCHING_COURIER' },
       include: {
         order: {
@@ -134,6 +137,8 @@ export class CouriersService {
       },
       orderBy: { createdAt: 'asc' },
     })
+    for (const d of deliveries) if ((d as any).order) (d as any).order.deliveryCode = null
+    return deliveries
   }
 
   async acceptDelivery(userId: string, deliveryId: string) {
@@ -250,7 +255,7 @@ export class CouriersService {
     return updated
   }
 
-  async advanceDelivery(userId: string, deliveryId: string, photoUrl?: string) {
+  async advanceDelivery(userId: string, deliveryId: string, photoUrl?: string, code?: string) {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier not found')
 
@@ -277,6 +282,19 @@ export class CouriersService {
 
     const nextStatus = transitions[delivery.status]
     if (!nextStatus) throw new BadRequestException('Cannot advance from current delivery status')
+
+    // ANTI-FRAUDE: para finalizar (→ DELIVERED) o entregador precisa informar o
+    // código de 4 dígitos que o CLIENTE vê no app. Sem o código correto, não
+    // finaliza e não recebe. Impede "marcar entregue" sem entregar de fato.
+    if (nextStatus === 'DELIVERED') {
+      const expected = (delivery as any).order?.deliveryCode as string | null | undefined
+      // Só exige código quando o pedido tem um (pedidos antigos sem código ficam liberados).
+      if (expected) {
+        const provided = (code ?? '').trim()
+        if (!provided) throw new BadRequestException('Informe o código de entrega do cliente.')
+        if (provided !== expected) throw new BadRequestException('Código de entrega incorreto.')
+      }
+    }
 
     const updateData: Record<string, any> = { status: nextStatus }
     if (nextStatus === 'PICKED_UP') updateData.pickedUpAt = new Date()

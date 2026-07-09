@@ -255,6 +255,10 @@ export class OrdersService {
     if (discount > subtotal) discount = subtotal // segurança: entrega sempre é paga
     const total = Math.round((subtotal + deliveryFee - discount) * 100) / 100
 
+    // Código de entrega (anti-fraude): 4 dígitos que o cliente informa ao entregador.
+    // Sem ele, o entregador não consegue finalizar a corrida e receber (padrão iFood).
+    const deliveryCode = String(Math.floor(1000 + Math.random() * 9000))
+
     // Create payment + order in a single transaction to avoid orphaned records
     const { payment, order } = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
@@ -276,6 +280,7 @@ export class OrdersService {
           total,
           notes: dto.notes,
           scheduledFor: scheduledDate,
+          deliveryCode,
           items: { create: orderItems },
         },
         include: {
@@ -471,6 +476,12 @@ export class OrdersService {
     const isAdmin = userRole === 'ADMIN'
     if (!isOwner && !isStoreOwner && !isAssignedCourier && !isAdmin) {
       throw new ForbiddenException()
+    }
+
+    // O código de entrega SÓ pode ser visto pelo cliente dono (e admin). Se o
+    // entregador ou a loja pudessem lê-lo, a proteção anti-fraude não valeria nada.
+    if (!isOwner && !isAdmin) {
+      ;(order as any).deliveryCode = null
     }
 
     return order

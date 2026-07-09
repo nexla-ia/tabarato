@@ -132,6 +132,18 @@ export default function OrderDetailPage() {
               : <p className={styles.searching}>🔍 Buscando entregador...</p>
             }
             <p className={styles.deliveryStatus}>{order.delivery.status?.replace(/_/g, ' ')}</p>
+
+            {/* Código de entrega (anti-fraude): cliente informa ao entregador */}
+            {order.deliveryCode
+              && order.delivery.status !== 'SEARCHING_COURIER'
+              && order.status !== 'DELIVERED'
+              && order.status !== 'CANCELLED' && (
+              <div className={styles.deliveryCode}>
+                <span className={styles.deliveryCodeLabel}>🔒 Código de entrega</span>
+                <span className={styles.deliveryCodeDigits}>{order.deliveryCode}</span>
+                <span className={styles.deliveryCodeHint}>Informe este código ao entregador para confirmar a entrega.</span>
+              </div>
+            )}
           </div>
         )}
 
