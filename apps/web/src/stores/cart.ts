@@ -41,8 +41,11 @@ export const useCartStore = create<CartState>()(
         const existing = state.items.find(
           i => i.productId === item.productId && i.variationId === item.variationId,
         )
+        // Sempre persiste o userId (dono do carrinho), pra invalidação por usuário funcionar
+        const uid = userId ?? state.userId ?? null
         if (existing) {
           set({
+            userId: uid,
             items: state.items.map(i =>
               i.productId === item.productId && i.variationId === item.variationId
                 ? { ...i, quantity: i.quantity + item.quantity }
@@ -50,7 +53,7 @@ export const useCartStore = create<CartState>()(
             ),
           })
         } else {
-          set({ storeId, storeName, items: [...state.items, item] })
+          set({ storeId, storeName, userId: uid, items: [...state.items, item] })
         }
       },
 
