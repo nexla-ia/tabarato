@@ -20,7 +20,10 @@ export class ReviewsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.reviewsService.findByStore(storeId, Number(page) || 1, Number(limit) || 10)
+    // Clamp: evita take/skip gigantes ou negativos (DoS / erro no Prisma).
+    const safePage = Math.max(1, Number(page) || 1)
+    const safeLimit = Math.min(Math.max(1, Number(limit) || 10), 50)
+    return this.reviewsService.findByStore(storeId, safePage, safeLimit)
   }
 
   @UseGuards(JwtAuthGuard)

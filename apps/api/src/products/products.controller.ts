@@ -6,6 +6,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { ProductsService } from './products.service'
 import { CreateProductDto } from './dto/create-product.dto'
 import { CreateVariationDto } from './dto/create-variation.dto'
+import { BulkToggleDto, BulkUpdateDto } from './dto/bulk-product.dto'
 
 @Controller('products')
 export class ProductsController {
@@ -13,7 +14,10 @@ export class ProductsController {
 
   @Get('popular')
   getPopular(@Query('limit') limit?: string) {
-    return this.productsService.findPopular(limit ? parseInt(limit) : 12)
+    // Clamp: limit vira `take` no Prisma; sem teto/validação seria DoS (e NaN → 500).
+    const n = parseInt(limit ?? '', 10)
+    const safeLimit = Math.min(Math.max(1, Number.isFinite(n) ? n : 12), 50)
+    return this.productsService.findPopular(safeLimit)
   }
 
   @Get('store/:storeId')
@@ -125,20 +129,14 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('STORE_OWNER')
   @Patch('bulk/toggle')
-  bulkToggle(
-    @CurrentUser() user: any,
-    @Body() body: { productIds: string[]; active: boolean },
-  ) {
+  bulkToggle(@CurrentUser() user: any, @Body() body: BulkToggleDto) {
     return this.productsService.bulkToggle(user.sub, body.productIds, body.active)
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('STORE_OWNER')
   @Patch('bulk/update')
-  bulkUpdate(
-    @CurrentUser() user: any,
-    @Body() body: { productIds: string[]; basePrice?: number; stock?: number; isActive?: boolean },
-  ) {
+  bulkUpdate(@CurrentUser() user: any, @Body() body: BulkUpdateDto) {
     const { productIds, ...data } = body
     return this.productsService.bulkUpdate(user.sub, productIds, data)
   }

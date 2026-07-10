@@ -351,20 +351,11 @@ export class CouriersService {
       const fullOrder = await this.prisma.order.findUnique({
         where: { id: delivery.orderId },
         select: {
-          subtotal: true, couponDiscount: true, storeId: true,
-          store: { select: { mpConnected: true } },
+          subtotal: true, couponDiscount: true, storeId: true, paidViaSplit: true,
           payment: { select: { status: true } },
         },
       })
       if (!fullOrder) throw new NotFoundException('Order not found')
-
-      // CLAIM ATÔMICO: só UM chamador move o status atual -> DELIVERED. Evita
-      // double-credit por chamadas concorrentes (duplo-tap, retry).
-      const claim = await this.prisma.delivery.updateMany({
-        where: { id: deliveryId, status: fromStatus },
-        data: updateData,
-      })
-      if (claim.count === 0) throw new ConflictException('Entrega já foi atualizada.')
 
       // Só movimenta dinheiro se o pedido foi realmente pago.
       const isPaid = fullOrder.payment?.status === 'PAID'
@@ -373,14 +364,29 @@ export class CouriersService {
       // Loja recebe: subtotal − cupom − comissão. Absorve o CUPOM (promo dela), mas NÃO
       // a fidelidade (bancada pela plataforma). Consistente com o cálculo do split.
       const storeAmount = Math.max(0, Math.round((Number(fullOrder.subtotal) - Number(fullOrder.couponDiscount) - platformCommission) * 100) / 100)
-      const storePaidViaSplit = this.marketplaceOn && Boolean(fullOrder.store?.mpConnected)
+      // Fonte da verdade: a flag gravada no pedido no momento da cobrança (não o
+      // mpConnected atual, que pode ter mudado após o split → evita pagar a loja 2x).
+      const storePaidViaSplit = fullOrder.paidViaSplit
 
-      // Repasse ao entregador via MP (só após vencer o claim e se pago)
+      // Repasse ao entregador via MP (externo; atualmente no-op/flag-guarded, cai na
+      // carteira). DEVE ser idempotente por orderId quando o endpoint 1:N do MP entrar,
+      // pois roda antes do commit da transação abaixo.
       const courierPaidViaMp = isPaid
         ? (await this.mpOauth.payoutCourier(courier as any, courierFee, delivery.orderId)).done
         : false
 
+      // H5: claim + status DELIVERED + créditos num ÚNICO $transaction. Se qualquer
+      // parte falhar, NADA é commitado (o status não vira DELIVERED) → o retry
+      // reprocessa limpo, sem perder o crédito da loja/entregador.
       await this.prisma.$transaction(async (tx) => {
+        // CLAIM ATÔMICO dentro da transação: só UM chamador move fromStatus -> DELIVERED
+        // (barra double-credit por duplo-tap/retry concorrente).
+        const claim = await tx.delivery.updateMany({
+          where: { id: deliveryId, status: fromStatus },
+          data: updateData,
+        })
+        if (claim.count === 0) throw new ConflictException('Entrega já foi atualizada.')
+
         await tx.order.update({ where: { id: delivery.orderId }, data: { status: 'DELIVERED' } })
         if (!isPaid) return // pedido não pago: não credita ninguém
 

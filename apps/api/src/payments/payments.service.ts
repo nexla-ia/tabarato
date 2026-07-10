@@ -1,7 +1,7 @@
-import { Injectable, Logger, ForbiddenException, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import * as crypto from 'crypto'
-import MercadoPagoConfig, { Payment as MPPayment } from 'mercadopago'
+import MercadoPagoConfig, { Payment as MPPayment, PaymentRefund } from 'mercadopago'
 import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
 import { NotificationsService } from '../notifications/notifications.service'
@@ -258,6 +258,49 @@ export class PaymentsService {
     } catch {}
 
     return order.payment
+  }
+
+  /**
+   * Estorno TOTAL de um pagamento pago — usado no cancelamento de pedido.
+   * No modo split o dinheiro está na conta do lojista, então estorna com o token
+   * do seller; no modo centralizado usa o token da plataforma. Idempotente: se já
+   * estiver REFUNDED devolve sucesso; se não estiver PAID, não há o que estornar.
+   * Lança BadRequestException se o gateway recusar (o cancelamento deve abortar
+   * para não marcar o pedido como cancelado sem devolver o dinheiro).
+   */
+  async refundPayment(orderId: string): Promise<{ refunded: boolean }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        payment: true,
+        store: { select: { mpConnected: true, mpAccessToken: true, mpRefreshToken: true, mpTokenExpiresAt: true, mpUserId: true } },
+      },
+    })
+    const payment = order?.payment
+    if (!payment) return { refunded: false }
+    if (payment.status === 'REFUNDED') return { refunded: true }
+    if (payment.status !== 'PAID' || !payment.gatewayId) return { refunded: false }
+
+    const store = order!.store as any
+    const sellerToken = order!.paidViaSplit && store?.mpConnected
+      ? await this.mpOauth.getValidSellerToken(store)
+      : null
+    const config = new MercadoPagoConfig({
+      accessToken: sellerToken ?? (this.config.get<string>('MERCADO_PAGO_ACCESS_TOKEN') ?? ''),
+    })
+    try {
+      await new PaymentRefund(config).total({
+        payment_id: payment.gatewayId,
+        requestOptions: { idempotencyKey: `refund-${payment.id}` },
+      })
+      const updated = await this.prisma.payment.update({
+        where: { id: payment.id }, data: { status: 'REFUNDED' },
+      })
+      return { refunded: updated.status === 'REFUNDED' }
+    } catch (err) {
+      this.logger.error(`Refund failed for order ${orderId}`, err as any)
+      throw new BadRequestException('Não foi possível estornar o pagamento no Mercado Pago. Tente novamente.')
+    }
   }
 
   // ── Signature verification ────────────────────────────────────────────────────

@@ -281,6 +281,9 @@ export class OrdersService {
           notes: dto.notes,
           scheduledFor: scheduledDate,
           deliveryCode,
+          // Marca se o pagamento será cobrado via split (dinheiro cai direto na loja).
+          // Lido no repasse (evita creditar a loja 2x) e no estorno (qual token usar).
+          paidViaSplit: marketplaceOn && ['PIX', 'CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod),
           items: { create: orderItems },
         },
         include: {
@@ -366,6 +369,10 @@ export class OrdersService {
         )
       } catch (err) {
         this.logger.error('PIX payment creation failed after order was saved', err)
+        // Pedido já gravado mas o PIX não foi gerado: cancela e devolve estoque/cupom/pontos.
+        await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } }).catch(() => {})
+        await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } }).catch(() => {})
+        await this.restoreOrderConsumption(order.id)
         throw new BadRequestException('Não foi possível gerar o QR Code PIX. Tente outro método de pagamento.')
       }
     }
@@ -391,6 +398,8 @@ export class OrdersService {
         } else if (result.status === 'FAILED') {
           await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } })
           await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } })
+          // Cartão recusado: devolve estoque, libera o cupom e re-credita os pontos.
+          await this.restoreOrderConsumption(order.id)
           throw new BadRequestException(`Pagamento recusado. Motivo: ${result.statusDetail ?? 'cartão não autorizado'}. Verifique os dados e tente novamente.`)
         }
       } catch (err: any) {
@@ -437,7 +446,7 @@ export class OrdersService {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
 
-    return this.prisma.order.findMany({
+    const orders = await this.prisma.order.findMany({
       where: { storeId: store.id },
       include: {
         user: { select: { id: true, name: true, phone: true } },
@@ -448,6 +457,10 @@ export class OrdersService {
       },
       orderBy: { createdAt: 'desc' },
     })
+    // O código de entrega é segredo do cliente — nunca expor ao lojista (anti-fraude),
+    // senão poderia repassá-lo a um entregador cúmplice para finalizar sem entregar.
+    for (const o of orders) (o as any).deliveryCode = null
+    return orders
   }
 
   async findById(id: string, userId: string, userRole: string) {
@@ -579,6 +592,52 @@ export class OrdersService {
     }
   }
 
+  /**
+   * Reverte tudo que o pedido consumiu na criação: estoque, uso de cupom e pontos
+   * de fidelidade resgatados. Usado no cancelamento e quando o pagamento falha
+   * depois do pedido já ter sido gravado. Best-effort (loga falhas). O estorno de
+   * DINHEIRO é tratado à parte (payments.refundPayment).
+   */
+  private async restoreOrderConsumption(orderId: string) {
+    await this.restoreStock(orderId)
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { userId: true, couponId: true, loyaltyDiscount: true },
+    })
+    if (!order) return
+
+    // Cupom: libera o uso pelo usuário e devolve 1 ao contador global de usos.
+    if (order.couponId) {
+      await this.prisma.couponUse.deleteMany({ where: { orderId } }).catch(() => {})
+      await this.prisma.coupon.updateMany({
+        where: { id: order.couponId, usedCount: { gt: 0 } },
+        data: { usedCount: { decrement: 1 } },
+      }).catch(() => {})
+    }
+
+    // Fidelidade: devolve os pontos resgatados (100 pts = R$10). Guarda contra
+    // dupla-restauração checando se já existe um estorno lançado para este pedido.
+    const loyaltyDiscount = Number(order.loyaltyDiscount)
+    if (loyaltyDiscount > 0) {
+      const points = Math.round(loyaltyDiscount * 10)
+      const already = await this.prisma.loyaltyTransaction.findFirst({
+        where: { orderId, type: 'REFUND' }, select: { id: true },
+      })
+      if (!already && points > 0) {
+        const account = await this.prisma.loyaltyAccount.findUnique({ where: { userId: order.userId } })
+        if (account) {
+          await this.prisma.$transaction([
+            this.prisma.loyaltyAccount.update({ where: { id: account.id }, data: { points: { increment: points } } }),
+            this.prisma.loyaltyTransaction.create({
+              data: { accountId: account.id, points, type: 'REFUND', description: `Estorno de ${points} pontos (pedido cancelado)`, orderId },
+            }),
+          ]).catch((err) => this.logger.warn('Loyalty restore failed', err))
+        }
+      }
+    }
+  }
+
   async cancel(userId: string, orderId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
@@ -589,11 +648,15 @@ export class OrdersService {
       throw new BadRequestException('Order cannot be cancelled at this stage')
     }
 
+    // Estorna o pagamento se já foi pago (idempotente; lança se o MP recusar,
+    // abortando o cancelamento — nunca marcamos CANCELLED sem devolver o dinheiro).
+    await this.payments.refundPayment(orderId)
+
     const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: 'CANCELLED' },
     })
-    await this.restoreStock(orderId)
+    await this.restoreOrderConsumption(orderId)
 
     const pushMsg = STATUS_PUSH['CANCELLED']
     if (pushMsg && order.user?.pushToken) {
@@ -636,11 +699,14 @@ export class OrdersService {
       throw new BadRequestException('Não é possível cancelar: o entregador já coletou o pedido.')
     }
 
+    // Estorna o pagamento se já foi pago (idempotente; lança se o MP recusar).
+    await this.payments.refundPayment(orderId)
+
     const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: 'CANCELLED', refusalNote: note },
     })
-    await this.restoreStock(orderId)
+    await this.restoreOrderConsumption(orderId)
 
     if (order.user?.pushToken) {
       this.push.send(order.user.pushToken, '❌ Pedido cancelado', note ?? 'A loja cancelou seu pedido.', { orderId })
