@@ -52,6 +52,10 @@ export class DeliveryMatchingService implements OnModuleInit {
 
   async startMatching(deliveryId: string, storeLat: number, storeLng: number) {
     this.logger.log(`[Match] Starting for delivery ${deliveryId.slice(0, 8)}`)
+    // Limpa qualquer ciclo anterior (e seu timer armado) antes de reiniciar —
+    // evita timer órfão disparando tryRadius em paralelo (double-offer / radius pulado).
+    const prev = this.state.get(deliveryId)
+    if (prev?.timeout) clearTimeout(prev.timeout)
     this.state.set(deliveryId, { offeredTo: new Set(), timeout: null, storeLat, storeLng, currentRadius: 1 })
     await this.tryRadius(deliveryId, storeLat, storeLng, 1)
   }

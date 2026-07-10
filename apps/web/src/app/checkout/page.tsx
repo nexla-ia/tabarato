@@ -45,9 +45,9 @@ export default function CheckoutPage() {
   // Chave de idempotência: estável entre retries do mesmo checkout (evita pedido duplicado)
   const idemKey = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`)
 
-  // Exige login pra finalizar o pedido
+  // Exige login pra finalizar o pedido — volta pro checkout após autenticar.
   useEffect(() => {
-    if (ready && !user) router.push('/login')
+    if (ready && !user) router.push('/login?redirect=/checkout')
   }, [ready, user, router])
 
   const [addresses, setAddresses] = useState<Address[]>([])

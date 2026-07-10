@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
+import { randomUUID } from 'crypto'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
@@ -237,7 +238,9 @@ export class CouriersService {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier not found')
     if (!courier.pixKey) throw new BadRequestException('Cadastre sua chave PIX antes de solicitar o saque.')
-    await this.wallet.debit(courier.id, 'COURIER', amount, `Saque via PIX (${courier.pixKey})`, `saque-${crypto.randomUUID()}`)
+    // O débito cria um lançamento DEBIT no ledger (referenceId = saque-<uuid>),
+    // que serve de registro auditável do saque até o repasse PIX manual.
+    await this.wallet.debit(courier.id, 'COURIER', amount, `Saque via PIX (${courier.pixKey})`, `saque-${randomUUID()}`)
     return { message: 'Saque solicitado! O valor será enviado via PIX para a chave cadastrada.' }
   }
 

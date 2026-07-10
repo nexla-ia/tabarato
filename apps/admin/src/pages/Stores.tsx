@@ -43,6 +43,8 @@ export function Stores() {
   }, [filter, refresh]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAction = async (id: string, status: 'APPROVED' | 'REJECTED') => {
+    // Confirma ações destrutivas (rejeitar remove a loja do marketplace).
+    if (status === 'REJECTED' && !window.confirm('Rejeitar esta loja? Ela não poderá receber pedidos.')) return
     try {
       await api.updateStoreStatus(id, status)
       showToast(status === 'APPROVED' ? 'Loja aprovada!' : 'Loja rejeitada.', status === 'APPROVED' ? 'success' : 'error')

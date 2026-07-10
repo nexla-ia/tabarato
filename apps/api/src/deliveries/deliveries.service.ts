@@ -44,15 +44,22 @@ export class DeliveriesService {
     const distanceKm = haversineKm(store.lat, store.lng, order.address.lat, order.address.lng)
     const courierFee = calcCourierFee(distanceKm)
 
-    return this.prisma.delivery.create({
-      data: {
-        orderId, courierId,
-        distanceKm: Math.round(distanceKm * 10) / 10,
-        courierFee,
-        status: 'COURIER_ASSIGNED',
-      },
-      include: COURIER_INCLUDE,
-    })
+    try {
+      return await this.prisma.delivery.create({
+        data: {
+          orderId, courierId,
+          distanceKm: Math.round(distanceKm * 10) / 10,
+          courierFee,
+          status: 'COURIER_ASSIGNED',
+        },
+        include: COURIER_INCLUDE,
+      })
+    } catch (err: any) {
+      // Corrida entre a checagem acima e o create (ou com o auto-match): a constraint
+      // única de orderId barra a duplicata — devolve 409 no lugar de um 500 cru.
+      if (err?.code === 'P2002') throw new ConflictException('Entregador já atribuído a este pedido')
+      throw err
+    }
   }
 
   async getByOrder(userId: string, orderId: string) {

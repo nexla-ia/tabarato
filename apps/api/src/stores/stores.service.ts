@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { WalletService } from '../wallet/wallet.service'
 import { CreateStoreDto } from './dto/create-store.dto'
@@ -145,6 +146,8 @@ export class StoresService {
       },
     })
     if (!store) throw new NotFoundException('Store not found')
+    // Página pública: loja não-aprovada responde 404 (não enumerar pendentes/suspensas).
+    if (store.status !== 'APPROVED') throw new NotFoundException('Store not found')
 
     await this.syncIsOpen(store.id, store.openingHours, store.isOpen, store.isPaused)
 
@@ -228,7 +231,7 @@ export class StoresService {
   async requestWithdrawal(userId: string, amount: number) {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
-    await this.wallet.debit(store.id, 'STORE', amount, 'Saque solicitado', `saque-${crypto.randomUUID()}`)
+    await this.wallet.debit(store.id, 'STORE', amount, 'Saque solicitado', `saque-${randomUUID()}`)
     return { message: 'Saque solicitado com sucesso. Será processado em até 24h via PIX.' }
   }
 
@@ -237,7 +240,8 @@ export class StoresService {
     if (!store) throw new NotFoundException('Store not found')
 
     const limit = 20
-    const skip  = (page - 1) * limit
+    const safePage = Math.max(1, Math.floor(Number(page)) || 1)
+    const skip  = (safePage - 1) * limit
     const [reviews, total, agg] = await Promise.all([
       this.prisma.review.findMany({
         where: { storeId: store.id },

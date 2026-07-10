@@ -4,6 +4,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { UsersService } from './users.service'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { CreateAddressDto } from './dto/create-address.dto'
+import { PushTokenDto } from './dto/push-token.dto'
 
 @UseGuards(JwtAuthGuard)
 @Controller('users')
@@ -30,8 +31,8 @@ export class UsersController {
   }
 
   @Put('me/push-token')
-  updatePushToken(@CurrentUser() user: any, @Body('token') token: string) {
-    return this.usersService.updatePushToken(user.sub, token)
+  updatePushToken(@CurrentUser() user: any, @Body() dto: PushTokenDto) {
+    return this.usersService.updatePushToken(user.sub, dto.token)
   }
 
   @Get('me/addresses')

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -44,6 +45,8 @@ export class CouponsController {
   }
 
   // Consumer: validate coupon before placing order
+  // Throttle: barra brute-force de códigos de cupom (enumeração).
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @Get('validate')
   validatePublic(
     @CurrentUser() user: any,

@@ -25,6 +25,7 @@ export class AdminService {
         user: { select: { name: true, email: true, phone: true, avatarUrl: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 500,
     })
   }
 
@@ -80,6 +81,7 @@ export class AdminService {
         categories: { select: { name: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 500,
     })
   }
 
@@ -104,6 +106,7 @@ export class AdminService {
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
+      take: 1000,
     })
   }
 

@@ -27,6 +27,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [addresses, setAddresses] = useState<Address[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   const [name, setName]   = useState('')
   const [phone, setPhone] = useState('')
@@ -39,18 +40,19 @@ export default function ProfilePage() {
     if (!ready) return
     if (!user) { router.push('/login'); return }
 
-    Promise.all([
-      api.get<UserProfile>('/users/me'),
-      api.get<Address[]>('/users/me/addresses'),
-    ])
-      .then(([p, a]) => {
+    // Buscas independentes: uma falha em endereços não deve zerar o perfil inteiro.
+    api.get<UserProfile>('/users/me')
+      .then((p) => {
         setProfile(p.data)
         setName(p.data.name)
         setPhone(p.data.phone ?? '')
-        setAddresses(a.data)
       })
-      .catch(() => {})
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
+
+    api.get<Address[]>('/users/me/addresses')
+      .then((a) => setAddresses(a.data))
+      .catch(() => {})
   }, [user, ready])
 
   async function handleSave(e: FormEvent) {
@@ -103,7 +105,18 @@ export default function ProfilePage() {
     )
   }
 
-  if (!user || !profile) return null
+  if (!user) return null
+  // Falha ao carregar o perfil: mostra erro em vez de tela branca.
+  if (!profile) {
+    return (
+      <>
+        <Navbar />
+        <div style={{ padding: 80, textAlign: 'center', color: 'var(--muted)', fontSize: 15 }}>
+          {loadError ? 'Não foi possível carregar seu perfil. Recarregue a página e tente novamente.' : 'Carregando perfil...'}
+        </div>
+      </>
+    )
+  }
 
   return (
     <>

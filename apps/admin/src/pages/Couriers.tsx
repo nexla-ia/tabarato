@@ -94,6 +94,8 @@ export function Couriers() {
 
   const handleOverallAction = async (status: 'APPROVED' | 'REJECTED') => {
     if (!selected) return
+    // Confirma ação destrutiva (rejeitar bloqueia o entregador de aceitar corridas).
+    if (status === 'REJECTED' && !window.confirm('Rejeitar este entregador? Ele não poderá aceitar entregas.')) return
     setActioning(status)
     try {
       const updated = await api.updateCourierStatus(selected.id, status)

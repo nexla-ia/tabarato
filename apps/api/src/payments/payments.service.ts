@@ -183,25 +183,21 @@ export class PaymentsService {
       if (!order?.payment) return
 
       if (mpStatus === 'approved' && order.payment.status !== 'PAID') {
-        // Idempotency: use gatewayId to prevent double-processing on MP retries
-        const alreadyProcessed = await this.prisma.payment.findFirst({
-          where: { gatewayId: String(mpId), status: 'PAID' },
+        // Idempotência ATÔMICA: só UM chamador vence a transição -> PAID (barra
+        // notificação/processamento duplicado em retries concorrentes do MP).
+        const claim = await this.prisma.payment.updateMany({
+          where: { id: order.payment.id, status: { not: 'PAID' } },
+          data: { status: 'PAID', paidAt: new Date(), gatewayId: String(mpId) },
         })
-        if (alreadyProcessed) {
+        if (claim.count === 0) {
           this.logger.log(`Webhook ${mpId} already processed — skipping`)
           return
         }
 
-        await this.prisma.$transaction([
-          this.prisma.payment.update({
-            where: { id: order.payment.id },
-            data: { status: 'PAID', paidAt: new Date(), gatewayId: String(mpId) },
-          }),
-          this.prisma.order.update({
-            where: { id: orderId },
-            data: { status: 'CONFIRMED' },
-          }),
-        ])
+        await this.prisma.order.update({
+          where: { id: orderId },
+          data: { status: 'CONFIRMED' },
+        })
 
         if (order.user?.pushToken) {
           this.push.send(

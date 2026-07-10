@@ -54,6 +54,10 @@ export class ProductsService {
   }
 
   async findByStore(storeId: string) {
+    // Só expõe catálogo de loja APROVADA (evita enumeração de lojas pendentes/suspensas).
+    const store = await this.prisma.store.findUnique({ where: { id: storeId }, select: { status: true } })
+    if (!store || store.status !== 'APPROVED') return []
+
     return this.prisma.product.findMany({
       where: { storeId, isActive: true },
       include: {

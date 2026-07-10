@@ -22,8 +22,16 @@ export default function LoginPage() {
     try {
       const { data } = await api.post('/auth/login', { email, password })
       login(data.accessToken, data.user)
-      // Route by role: store owners land on the lojista panel
-      router.push(data.user?.role === 'STORE_OWNER' ? '/lojista' : '/')
+      // Se veio de uma página protegida (ex.: checkout), volta pra lá.
+      const redirect = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('redirect')
+        : null
+      if (redirect && redirect.startsWith('/')) {
+        router.push(redirect)
+      } else {
+        // Route by role: store owners land on the lojista panel
+        router.push(data.user?.role === 'STORE_OWNER' ? '/lojista' : '/')
+      }
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Credenciais inválidas')
     } finally {
