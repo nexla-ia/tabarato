@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Headers, Param, Post, RawBodyRequest, Req, UseGuards } from '@nestjs/common'
-import { SkipThrottle } from '@nestjs/throttler'
+import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { PaymentsService } from './payments.service'
@@ -15,11 +15,12 @@ export class PaymentsController {
   }
 }
 
-@SkipThrottle()
 @Controller('webhooks')
 export class WebhooksController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
+  // Throttle generoso: aguenta a rajada de retries do MP, mas barra flood anônimo.
+  @Throttle({ default: { ttl: 60_000, limit: 300 } })
   @Post('mercadopago')
   async handleMp(
     @Body() body: any,

@@ -56,16 +56,16 @@ export default function OrdersPage() {
             {orders.map(o => (
               <Link key={o.id} href={`/orders/${o.id}`} className={styles.card}>
                 <div className={styles.cardTop}>
-                  <div className={styles.storeName}>{o.store.name}</div>
+                  <div className={styles.storeName}>{o.store?.name ?? 'Loja'}</div>
                   <span className={styles.badge} style={{ background: STATUS_COLOR[o.status] + '18', color: STATUS_COLOR[o.status] }}>
                     {STATUS_LABEL[o.status] ?? o.status}
                   </span>
                 </div>
                 <div className={styles.cardItems}>
-                  {o.items.slice(0, 2).map((i, idx) => (
-                    <span key={idx}>{i.quantity}x {i.product.name}</span>
+                  {(o.items ?? []).slice(0, 2).map((i, idx) => (
+                    <span key={idx}>{i.quantity}x {i.product?.name ?? 'Item'}</span>
                   ))}
-                  {o.items.length > 2 && <span>+{o.items.length - 2} mais</span>}
+                  {(o.items?.length ?? 0) > 2 && <span>+{o.items.length - 2} mais</span>}
                 </div>
                 <div className={styles.cardBottom}>
                   <span className={styles.total}>{fmtBRL(o.total)}</span>

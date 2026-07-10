@@ -1,50 +1,67 @@
-import { IsArray, IsNumber, IsOptional, IsString } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsNumber, IsObject, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator'
 
 export class UpdateStoreDto {
   @IsString()
   @IsOptional()
+  @MaxLength(120)
   name?: string
 
   @IsString()
   @IsOptional()
+  @MaxLength(1000)
   description?: string
 
   @IsString()
   @IsOptional()
+  @MaxLength(20)
   phone?: string
 
   @IsNumber()
   @IsOptional()
+  @Min(0)
+  @Max(600)
   prepTimeMin?: number
 
   @IsNumber()
   @IsOptional()
+  @Min(0)
+  @Max(100)
   deliveryRadiusKm?: number
 
   @IsNumber()
   @IsOptional()
+  @Min(-90)
+  @Max(90)
   lat?: number
 
   @IsNumber()
   @IsOptional()
+  @Min(-180)
+  @Max(180)
   lng?: number
 
   @IsString()
   @IsOptional()
+  @MaxLength(250)
   address?: string
 
   @IsString()
   @IsOptional()
+  @MaxLength(140)
   pixKey?: string
 
   @IsString()
   @IsOptional()
+  @MaxLength(500)
   logoUrl?: string
 
   @IsArray()
+  @ArrayMaxSize(20)
+  @IsUrl({}, { each: true })
   @IsOptional()
   photos?: string[]
 
+  @IsObject()
   @IsOptional()
   openingHours?: Record<string, any>
 }

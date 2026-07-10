@@ -147,7 +147,13 @@ export class CouriersService {
     return deliveries
   }
 
-  async findAvailableDeliveries() {
+  async findAvailableDeliveries(userId: string) {
+    // Só entregador APROVADO pode ver entregas disponíveis (elas expõem endereço
+    // do cliente — PII). Um cadastro PENDING/suspenso não deve enumerar isso.
+    const courier = await this.prisma.courier.findUnique({ where: { userId } })
+    if (!courier) throw new NotFoundException('Courier profile not found')
+    if (courier.status !== 'APPROVED') return []
+
     const deliveries = await this.prisma.delivery.findMany({
       where: { courierId: null, status: 'SEARCHING_COURIER' },
       include: {
@@ -314,9 +320,20 @@ export class CouriersService {
       const expected = (delivery as any).order?.deliveryCode as string | null | undefined
       // Só exige código quando o pedido tem um (pedidos antigos sem código ficam liberados).
       if (expected) {
+        const attempts = (delivery as any).order?.deliveryCodeAttempts ?? 0
+        // Bloqueio anti-brute-force: após 5 tentativas erradas, trava o código.
+        if (attempts >= 5) {
+          throw new BadRequestException('Muitas tentativas de código incorreto. Contate o suporte para concluir a entrega.')
+        }
         const provided = (code ?? '').trim()
         if (!provided) throw new BadRequestException('Informe o código de entrega do cliente.')
-        if (provided !== expected) throw new BadRequestException('Código de entrega incorreto.')
+        if (provided !== expected) {
+          await this.prisma.order.update({
+            where: { id: delivery.orderId }, data: { deliveryCodeAttempts: { increment: 1 } },
+          }).catch(() => {})
+          const left = Math.max(0, 5 - (attempts + 1))
+          throw new BadRequestException(`Código de entrega incorreto.${left > 0 ? ` ${left} tentativa(s) restante(s).` : ''}`)
+        }
       }
 
       // ANTI-FRAUDE (cerca geográfica): o entregador precisa estar fisicamente

@@ -320,6 +320,7 @@ model Order {
   scheduledFor DateTime?  @map("scheduled_for")
   scheduledReminderSent Boolean @default(false) @map("scheduled_reminder_sent")
   deliveryCode String?    @map("delivery_code")
+  deliveryCodeAttempts Int @default(0) @map("delivery_code_attempts")
   paidViaSplit Boolean    @default(false) @map("paid_via_split")
   notes        String?
   refusalNote  String?    @map("refusal_note")

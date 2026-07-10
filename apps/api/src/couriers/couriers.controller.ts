@@ -50,8 +50,8 @@ export class CouriersController {
   @UseGuards(RolesGuard)
   @Roles('COURIER')
   @Get('me/available-deliveries')
-  getAvailableDeliveries() {
-    return this.couriersService.findAvailableDeliveries()
+  getAvailableDeliveries(@CurrentUser() user: any) {
+    return this.couriersService.findAvailableDeliveries(user.sub)
   }
 
   @UseGuards(RolesGuard)

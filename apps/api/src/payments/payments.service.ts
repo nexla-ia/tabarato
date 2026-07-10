@@ -139,6 +139,11 @@ export class PaymentsService {
         this.logger.warn('Webhook signature ausente/inválida — ignorando request')
         return
       }
+    } else if (this.config.get<string>('NODE_ENV') === 'production') {
+      // Fail-closed: em produção, sem secret configurado não processamos nada
+      // (evita endpoint anônimo processando/amplificando chamadas ao MP).
+      this.logger.error('MERCADO_PAGO_WEBHOOK_SECRET ausente em produção — webhook rejeitado')
+      return
     }
 
     if (body?.type !== 'payment' && body?.action !== 'payment.updated') return
@@ -317,6 +322,13 @@ export class PaymentsService {
       const ts   = parts['ts']
       const hash = parts['v1']
       if (!ts || !hash) return false
+
+      // Anti-replay: rejeita assinaturas antigas (> 5 min). ts pode vir em s ou ms.
+      const tsNum = Number(ts)
+      if (Number.isFinite(tsNum)) {
+        const tsMs = tsNum > 1e12 ? tsNum : tsNum * 1000
+        if (Math.abs(Date.now() - tsMs) > 5 * 60 * 1000) return false
+      }
 
       // data.id deve ser lowercase quando alfanumérico (regra do MP)
       const id = String(dataId ?? '').toLowerCase()

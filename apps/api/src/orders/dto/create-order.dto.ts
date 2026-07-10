@@ -1,4 +1,4 @@
-import { IsArray, IsEnum, IsNumber, IsOptional, IsPositive, IsString, Min, ValidateNested } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsEnum, IsNumber, IsOptional, IsPositive, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { PaymentMethod } from '@prisma/client'
 
@@ -12,10 +12,12 @@ export class OrderItemDto {
 
   @IsNumber()
   @Min(1)
+  @Max(1000)
   quantity: number
 
   @IsString()
   @IsOptional()
+  @MaxLength(300)
   notes?: string
 }
 
@@ -27,6 +29,7 @@ export class CreateOrderDto {
   addressId: string
 
   @IsArray()
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[]
@@ -36,6 +39,7 @@ export class CreateOrderDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(500)
   notes?: string
 
   @IsString()
@@ -49,6 +53,7 @@ export class CreateOrderDto {
 
   @IsNumber()
   @IsPositive()
+  @Max(24)
   @IsOptional()
   installments?: number
 
@@ -62,10 +67,12 @@ export class CreateOrderDto {
 
   @IsNumber()
   @Min(0)
+  @Max(1_000_000)
   @IsOptional()
   pointsToRedeem?: number // loyalty points to redeem (multiples of 100)
 
   @IsString()
   @IsOptional()
+  @MaxLength(100)
   idempotencyKey?: string // evita pedido/cobrança duplicada em retry de rede
 }

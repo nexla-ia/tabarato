@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { CourierReviewsService } from './courier-reviews.service'
+import { CreateCourierReviewDto } from './dto/create-courier-review.dto'
 
 @UseGuards(JwtAuthGuard)
 @Controller('courier-reviews')
@@ -9,7 +10,7 @@ export class CourierReviewsController {
   constructor(private readonly service: CourierReviewsService) {}
 
   @Post()
-  create(@CurrentUser() user: any, @Body() body: { orderId: string; rating: number; comment?: string }) {
+  create(@CurrentUser() user: any, @Body() body: CreateCourierReviewDto) {
     return this.service.create(user.sub, body)
   }
 

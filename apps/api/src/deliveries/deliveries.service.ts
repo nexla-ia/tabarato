@@ -32,6 +32,10 @@ export class DeliveriesService {
 
     const courier = await this.prisma.courier.findUnique({ where: { id: courierId } })
     if (!courier) throw new NotFoundException('Entregador não encontrado')
+    // Não permite atribuir a entregador não-aprovado (pendente/suspenso).
+    if (courier.status !== 'APPROVED') {
+      throw new ForbiddenException('Este entregador não está aprovado para receber entregas.')
+    }
 
     const existing = await this.prisma.delivery.findUnique({ where: { orderId } })
     if (existing) throw new ConflictException('Entregador já atribuído a este pedido')

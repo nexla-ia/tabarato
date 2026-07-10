@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
+import { randomInt } from 'crypto'
 import { OrderStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { CouponsService } from '../coupons/coupons.service'
@@ -99,6 +100,12 @@ export class OrdersService {
       this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
     ])
     if (!store) throw new BadRequestException('Loja não encontrada')
+
+    // Loja precisa estar APROVADA para receber pedidos (barra loja pendente/suspensa
+    // acessada por storeId direto, fora da listagem que já filtra por APPROVED).
+    if ((store as any).status !== 'APPROVED') {
+      throw new BadRequestException('Esta loja não está disponível para pedidos no momento.')
+    }
 
     // Marketplace (split): a loja precisa ter o Mercado Pago conectado pra receber.
     // Só bloqueia quando o marketplace está configurado (feature flag).
@@ -255,9 +262,10 @@ export class OrdersService {
     if (discount > subtotal) discount = subtotal // segurança: entrega sempre é paga
     const total = Math.round((subtotal + deliveryFee - discount) * 100) / 100
 
-    // Código de entrega (anti-fraude): 4 dígitos que o cliente informa ao entregador.
-    // Sem ele, o entregador não consegue finalizar a corrida e receber (padrão iFood).
-    const deliveryCode = String(Math.floor(1000 + Math.random() * 9000))
+    // Código de entrega (anti-fraude): 6 dígitos CRIPTOGRÁFICOS que o cliente informa
+    // ao entregador. Sem ele, o entregador não finaliza a corrida (padrão iFood).
+    // 6 dígitos (900k combinações) + bloqueio por tentativas tornam brute-force inviável.
+    const deliveryCode = String(randomInt(100000, 1000000))
 
     // Create payment + order in a single transaction to avoid orphaned records
     const { payment, order } = await this.prisma.$transaction(async (tx) => {

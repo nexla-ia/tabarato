@@ -54,7 +54,13 @@ export default function OrderDetailPage() {
 
   if (!order) return <><Navbar /><div className={styles.loading}>Pedido não encontrado.</div></>
 
-  const stepIdx = order.status === 'DELIVERED' ? 4 : STEPS.indexOf(order.status)
+  // PICKED_UP não está em STEPS (é status legado entre READY e DELIVERED):
+  // mostra o passo "Pronto" como ativo em vez de zerar o tracker.
+  const stepIdx = order.status === 'DELIVERED'
+    ? 4
+    : order.status === 'PICKED_UP'
+      ? STEPS.indexOf('READY')
+      : STEPS.indexOf(order.status)
   const color = STATUS_COLOR[order.status] ?? '#888'
 
   return (

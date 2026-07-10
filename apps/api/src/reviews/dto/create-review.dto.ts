@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsOptional, IsString, IsUrl, Max, Min } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator'
 
 export class CreateReviewDto {
   @IsString()
@@ -11,9 +11,11 @@ export class CreateReviewDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(500)
   comment?: string
 
   @IsArray()
+  @ArrayMaxSize(10)
   @IsUrl({}, { each: true })
   @IsOptional()
   photos?: string[]

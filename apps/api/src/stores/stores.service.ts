@@ -148,11 +148,12 @@ export class StoresService {
 
     await this.syncIsOpen(store.id, store.openingHours, store.isOpen, store.isPaused)
 
-    // Return with updated isOpen if changed
-    const shouldBeOpen = computeIsOpen(store.openingHours)
+    // isOpen EFETIVO = horário de funcionamento E não pausado manualmente.
+    // (computeIsOpen é só o horário; sem isPaused a loja pausada apareceria "Aberta".)
+    const scheduleOpen = computeIsOpen(store.openingHours)
     return {
       ...store,
-      isOpen: shouldBeOpen !== null ? shouldBeOpen : store.isOpen,
+      isOpen: scheduleOpen === null ? !store.isPaused : scheduleOpen && !store.isPaused,
     }
   }
 
@@ -162,10 +163,10 @@ export class StoresService {
 
     await this.syncIsOpen(store.id, store.openingHours, store.isOpen, store.isPaused)
 
-    const shouldBeOpen = computeIsOpen(store.openingHours)
+    const scheduleOpen = computeIsOpen(store.openingHours)
     return {
       ...store,
-      isOpen: shouldBeOpen !== null ? shouldBeOpen : store.isOpen,
+      isOpen: scheduleOpen === null ? !store.isPaused : scheduleOpen && !store.isPaused,
     }
   }
 

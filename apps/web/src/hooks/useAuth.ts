@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { setToken, clearToken } from '@/lib/api'
 import { useCartStore } from '@/stores/cart'
 
@@ -9,6 +10,7 @@ export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [ready, setReady] = useState(false)
   const clearCart = useCartStore((s) => s.clear)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     try {
@@ -39,6 +41,9 @@ export function useAuth() {
     localStorage.removeItem('tb_token')
     localStorage.removeItem('tb_user')
     clearCart()
+    // Limpa o cache do React Query para não vazar dados (pedidos/PII) do usuário
+    // anterior para o próximo login no mesmo navegador.
+    queryClient.clear()
     setUser(null)
   }
 
@@ -48,7 +53,7 @@ export function useAuth() {
     if (prevRaw) {
       try {
         const prev: AuthUser = JSON.parse(prevRaw)
-        if (prev.id !== userData.id) clearCart()
+        if (prev.id !== userData.id) { clearCart(); queryClient.clear() }
       } catch {}
     }
 

@@ -39,6 +39,10 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))
 
   // ── OpenAPI / Swagger docs (served at /api/docs) ──────────────────────────
+  // Em produção fica DESLIGADO por padrão (não expor a superfície da API).
+  // Para habilitar num ambiente específico, defina ENABLE_SWAGGER=true.
+  const swaggerEnabled = process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true'
+  if (swaggerEnabled) {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Tá Barato — API')
     .setDescription(
@@ -66,6 +70,7 @@ async function bootstrap() {
     swaggerOptions: { persistAuthorization: true },
     customSiteTitle: 'Tá Barato — API Docs',
   })
+  }
 
   const port = process.env.PORT ?? 3000
   await app.listen(port, '0.0.0.0')
