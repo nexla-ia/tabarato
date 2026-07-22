@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsNumber, IsObject, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsInt, IsNumber, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator'
 
 export class UpdateStoreDto {
   @IsString()
@@ -61,7 +61,23 @@ export class UpdateStoreDto {
   @IsOptional()
   photos?: string[]
 
-  @IsObject()
+  // openingHours é um ARRAY de 7 dias ({ open, from, to }), indexado por dia da
+  // semana — é assim que o computeIsOpen lê (openingHours[dayOfWeek]).
+  @IsArray()
+  @ArrayMaxSize(7)
   @IsOptional()
-  openingHours?: Record<string, any>
+  openingHours?: any[]
+
+  // Feriados / dias fechados — array de { date, closed }.
+  @IsArray()
+  @ArrayMaxSize(366)
+  @IsOptional()
+  scheduleExceptions?: any[]
+
+  // Limite de pedidos simultâneos (null = ilimitado).
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  @IsOptional()
+  maxConcurrentOrders?: number | null
 }
