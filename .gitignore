@@ -7,3 +7,10 @@ dist
 *.log
 .DS_Store
 coverage
+
+# APKs gerados localmente
+*.apk
+
+# APKs/AABs gerados (nao versionar binarios grandes)
+*.apk
+*.aab
