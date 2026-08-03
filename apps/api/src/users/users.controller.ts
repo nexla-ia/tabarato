@@ -18,10 +18,10 @@ export class UsersController {
 
   @Get('me/referral')
   async getReferral(@CurrentUser() user: any) {
-    const u = await this.usersService.findById(user.sub)
+    const referralCode = await this.usersService.ensureReferralCode(user.sub)
     return {
-      referralCode: (u as any).referralCode,
-      shareText: `Use meu código ${(u as any).referralCode} no Tá Barato e ganhe 50 pontos de boas-vindas! 🎁`,
+      referralCode,
+      shareText: `Use meu código ${referralCode} no Tá Barato e ganhe 50 pontos de boas-vindas! 🎁`,
     }
   }
 

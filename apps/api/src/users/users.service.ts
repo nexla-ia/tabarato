@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
+import { randomBytes } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { CreateAddressDto } from './dto/create-address.dto'
@@ -6,6 +7,25 @@ import { CreateAddressDto } from './dto/create-address.dto'
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Retorna o código de indicação do usuário, gerando e persistindo um se ainda
+   * não existir (usuários antigos ficaram sem código). Idempotente.
+   */
+  async ensureReferralCode(userId: string): Promise<string> {
+    const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { referralCode: true } })
+    if (!u) throw new NotFoundException('User not found')
+    if (u.referralCode) return u.referralCode
+    // Tenta gerar um código único (colisão é raríssima; retenta poucas vezes).
+    for (let i = 0; i < 5; i++) {
+      const code = randomBytes(4).toString('hex').toUpperCase()
+      try {
+        await this.prisma.user.update({ where: { id: userId }, data: { referralCode: code } })
+        return code
+      } catch { /* colisão de unique — tenta de novo */ }
+    }
+    throw new NotFoundException('Não foi possível gerar o código de indicação.')
+  }
 
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({
@@ -19,6 +39,7 @@ export class UsersService {
         avatarUrl: true,
         city: true,
         state: true,
+        referralCode: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -39,6 +60,9 @@ export class UsersService {
         phone: true,
         role: true,
         avatarUrl: true,
+        city: true,
+        state: true,
+        referralCode: true,
         updatedAt: true,
       },
     })
