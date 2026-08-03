@@ -63,7 +63,8 @@ interface Order {
 function fmtDate(d: string) {
   return new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
-function fmtBRL(v: number) { return `R$ ${v.toFixed(2).replace('.', ',')}` }
+// Prisma serializa Decimal como STRING no JSON — coage pra número antes do toFixed.
+function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}` }
 
 function StatusBadge({ status }: { status: string }) {
   const color = STATUS_COLOR[status] ?? '#888'
@@ -244,13 +245,13 @@ export function Orders() {
               <div style={{ height: 1, background: BORDER }} />
               <Row label="Subtotal" value={fmtBRL(selected.subtotal)} />
               <Row label="Taxa de entrega" value={fmtBRL(selected.deliveryFee)} />
-              {selected.discount > 0 && <Row label="Desconto" value={`-${fmtBRL(selected.discount)}`} />}
+              {Number(selected.discount) > 0 && <Row label="Desconto" value={`-${fmtBRL(selected.discount)}`} />}
               <Row label="Total" value={fmtBRL(selected.total)} bold />
               {selected.delivery && (
                 <>
                   <div style={{ height: 1, background: BORDER }} />
                   <Row label="Status entrega" value={selected.delivery.status} />
-                  <Row label="Distância" value={`${selected.delivery.distanceKm.toFixed(1)} km`} />
+                  <Row label="Distância" value={`${Number(selected.delivery.distanceKm ?? 0).toFixed(1)} km`} />
                   <Row label="Taxa entregador" value={fmtBRL(selected.delivery.courierFee)} />
                   {selected.delivery.courier && <Row label="Entregador" value={selected.delivery.courier.user.name} />}
                 </>
