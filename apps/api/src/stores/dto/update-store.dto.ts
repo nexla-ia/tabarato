@@ -80,4 +80,12 @@ export class UpdateStoreDto {
   @Max(10000)
   @IsOptional()
   maxConcurrentOrders?: number | null
+
+  // Categorias da loja (many-to-many). Enviar o conjunto COMPLETO — o service
+  // faz `set`, substituindo as anteriores (permite adicionar E remover).
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @IsOptional()
+  categoryIds?: string[]
 }

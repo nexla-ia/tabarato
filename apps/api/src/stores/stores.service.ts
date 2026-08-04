@@ -161,7 +161,10 @@ export class StoresService {
   }
 
   async findMyStore(userId: string) {
-    const store = await this.prisma.store.findUnique({ where: { userId } })
+    const store = await this.prisma.store.findUnique({
+      where: { userId },
+      include: { categories: { select: { id: true, name: true, icon: true } } },
+    })
     if (!store) throw new NotFoundException('Store not found')
 
     await this.syncIsOpen(store.id, store.openingHours, store.isOpen, store.isPaused)
@@ -177,9 +180,17 @@ export class StoresService {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
 
+    // categoryIds não é campo escalar — vira relação `set` (substitui o conjunto).
+    const { categoryIds, ...rest } = dto
     return this.prisma.store.update({
       where: { id: store.id },
-      data: dto,
+      data: {
+        ...rest,
+        ...(categoryIds !== undefined && {
+          categories: { set: categoryIds.map((id) => ({ id })) },
+        }),
+      },
+      include: { categories: { select: { id: true, name: true, icon: true } } },
     })
   }
 
