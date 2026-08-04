@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation'
 import {
   Store, User, CreditCard, MapPin, Check, Loader2, ArrowLeft, ArrowRight,
   Eye, EyeOff, Mail, Lock, Phone, FileText, MessageSquare, Bike, Clock,
-  KeyRound, ShieldCheck, PartyPopper,
+  KeyRound, ShieldCheck, PartyPopper, Tag,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import styles from './page.module.css'
+
+interface Category { id: string; name: string; icon?: string | null }
 
 /* ── máscaras (iguais às do app) ───────────────────────────────────────── */
 function onlyDigits(v: string) { return v.replace(/\D/g, '') }
@@ -61,6 +63,8 @@ export default function CadastroLojaPage() {
   const [address, setAddress] = useState('')
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [locating, setLocating] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [selectedCats, setSelectedCats] = useState<string[]>([])
 
   // pagamento / entrega
   const [deliveryRadius, setDeliveryRadius] = useState('5')
@@ -77,6 +81,17 @@ export default function CadastroLojaPage() {
         .catch((err) => { if (err?.response?.status === 404) setStep(1) })
     }
   }, [ready, user, router])
+
+  // Categorias disponíveis pra vincular à loja.
+  useEffect(() => {
+    api.get<Category[]>('/stores/categories')
+      .then(({ data }) => setCategories(data))
+      .catch(() => setCategories([]))
+  }, [])
+
+  function toggleCat(id: string) {
+    setSelectedCats((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id])
+  }
 
   function getLocation() {
     if (!navigator.geolocation) { setError('Seu navegador não suporta localização.'); return }
@@ -123,10 +138,11 @@ export default function CadastroLojaPage() {
     setError('')
     if (!storeName.trim() || !cnpj || !address.trim()) { setError('Preencha nome da loja, CNPJ e endereço.'); return }
     if (onlyDigits(cnpj).length !== 14) { setError('CNPJ inválido — digite os 14 dígitos.'); return }
+    if (selectedCats.length === 0) { setError('Selecione ao menos uma categoria para sua loja.'); return }
     setStep(2)
   }
 
-  /* Passo 2 — cria a LOJA (retryável: a conta já existe). */
+  /* Passo 2 — cria a LOJA + vincula categorias (retryável: a conta já existe). */
   async function submitStore() {
     setError('')
     if (!pixKey.trim()) { setError('Informe sua chave PIX para receber pagamentos.'); return }
@@ -145,6 +161,10 @@ export default function CadastroLojaPage() {
         prepTimeMin: Number(prepTime) || 30,
         pixKey: pixKey.trim(),
       })
+      // Vincula as categorias — sem isso a loja não aparece em nenhum filtro/aba.
+      for (const catId of selectedCats) {
+        await api.post(`/stores/my/categories/${catId}`).catch(() => {})
+      }
       setDone(true)
     } catch (err: any) {
       const raw = err.response?.data?.message ?? 'Não foi possível criar a loja.'
@@ -256,6 +276,27 @@ export default function CadastroLojaPage() {
               <Field label="Nome da loja *" Icon={Store} value={storeName} onChange={setStoreName} placeholder="Ex: Burguer do Zé" />
               <Field label="CNPJ *" Icon={FileText} value={cnpj} onChange={(v) => setCnpj(formatCnpj(v))} placeholder="00.000.000/0000-00" />
               <Field label="Descrição da loja" Icon={MessageSquare} value={description} onChange={setDescription} placeholder="Conte um pouco sobre seu estabelecimento..." multiline />
+
+              {/* Categorias — sem ao menos uma, a loja não aparece nos filtros/aba */}
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}><Tag size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Categoria da loja *</span>
+                <div className={styles.catGrid}>
+                  {categories.map((c) => {
+                    const active = selectedCats.includes(c.id)
+                    return (
+                      <button
+                        type="button" key={c.id}
+                        className={`${styles.catChip} ${active ? styles.catChipActive : ''}`}
+                        onClick={() => toggleCat(c.id)}
+                      >
+                        {active && <Check size={13} />}{c.name}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className={styles.hint}>Escolha uma ou mais — é assim que sua loja aparece nas buscas e na aba Categorias.</p>
+              </div>
+
               <Field label="Telefone da loja" Icon={Phone} value={storePhone} onChange={(v) => setStorePhone(formatPhone(v))} placeholder="(69) 99999-0000" />
               <Field label="Endereço completo *" Icon={MapPin} value={address} onChange={setAddress} placeholder="Rua, número, bairro — Vilhena, RO" />
 
