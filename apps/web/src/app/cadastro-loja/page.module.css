@@ -64,6 +64,17 @@
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.catGrid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.catChip {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1.5px solid var(--border); border-radius: 20px;
+  padding: 8px 14px; font-size: 13px; font-weight: 700; color: var(--text);
+  background: var(--bg); transition: all 0.12s;
+}
+.catChip:hover { border-color: var(--orange); }
+.catChipActive { border-color: var(--orange); background: var(--orange-light); color: var(--orange-dark, var(--orange)); }
+.hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
 .error {
   background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA;
   border-radius: 10px; padding: 10px 13px; font-size: 13px; font-weight: 500;

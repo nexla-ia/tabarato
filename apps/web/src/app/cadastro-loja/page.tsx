@@ -1,11 +1,13 @@
 'use client'
-import { useState, FormEvent } from 'react'
+import { useEffect, useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Store, User, CreditCard, MapPin, Check, Loader2, ArrowLeft } from 'lucide-react'
+import { Store, User, CreditCard, MapPin, Check, Loader2, ArrowLeft, Tag } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import styles from './page.module.css'
+
+interface Category { id: string; name: string; icon?: string | null }
 
 function onlyDigits(v: string) { return v.replace(/\D/g, '') }
 function formatCnpj(v: string) {
@@ -36,9 +38,19 @@ export default function CadastroLojaPage() {
   const [pixKey, setPixKey] = useState('')
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [locating, setLocating] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [selectedCats, setSelectedCats] = useState<string[]>([])
 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    api.get<Category[]>('/stores/categories').then(({ data }) => setCategories(data)).catch(() => setCategories([]))
+  }, [])
+
+  function toggleCat(id: string) {
+    setSelectedCats(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
+  }
 
   function getLocation() {
     if (!navigator.geolocation) return
@@ -56,6 +68,7 @@ export default function CadastroLojaPage() {
     if (password.length < 6) { setError('A senha deve ter ao menos 6 caracteres.'); return }
     if (onlyDigits(cnpj).length !== 14) { setError('CNPJ inválido — digite os 14 dígitos.'); return }
     if (!pixKey.trim()) { setError('Informe sua chave PIX para receber pagamentos.'); return }
+    if (selectedCats.length === 0) { setError('Selecione ao menos uma categoria pra sua loja.'); return }
 
     setLoading(true)
     try {
@@ -82,6 +95,11 @@ export default function CadastroLojaPage() {
         prepTimeMin: Number(prepTime) || 30,
         pixKey: pixKey.trim(),
       })
+
+      // 3) vincula as categorias escolhidas (sem isso a loja não aparece em nenhum filtro)
+      for (const catId of selectedCats) {
+        await api.post(`/stores/my/categories/${catId}`).catch(() => {})
+      }
 
       router.push('/lojista')
     } catch (err: any) {
@@ -129,6 +147,22 @@ export default function CadastroLojaPage() {
           </div>
           <label className={styles.label}>Descrição</label>
           <textarea className={styles.input} rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="Sobre sua loja…" />
+
+          <label className={styles.label}><Tag size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Categoria da loja *</label>
+          <div className={styles.catGrid}>
+            {categories.map(c => (
+              <button
+                type="button"
+                key={c.id}
+                className={`${styles.catChip} ${selectedCats.includes(c.id) ? styles.catChipActive : ''}`}
+                onClick={() => toggleCat(c.id)}
+              >
+                {selectedCats.includes(c.id) && <Check size={13} />}
+                {c.name}
+              </button>
+            ))}
+          </div>
+          <p className={styles.hint}>Escolha uma ou mais — é assim que sua loja aparece nos filtros de busca.</p>
           <label className={styles.label}>Endereço *</label>
           <input className={styles.input} required value={address} onChange={e => setAddress(e.target.value)} placeholder="Rua, número, bairro — Vilhena, RO" />
           <button type="button" className={`${styles.locBtn} ${coords ? styles.locOk : ''}`} onClick={getLocation} disabled={locating}>
