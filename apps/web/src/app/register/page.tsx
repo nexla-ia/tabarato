@@ -3,7 +3,7 @@ import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, Store, ArrowRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import styles from '../login/page.module.css'
@@ -22,7 +22,9 @@ export default function RegisterPage() {
     e.preventDefault()
     setError(''); setLoading(true)
     try {
-      const { data } = await api.post('/auth/register', { name, email, password, phone: phone || undefined })
+      const { data } = await api.post('/auth/register', {
+        name, email, password, phone: phone || undefined, role: 'CONSUMER',
+      })
       login(data.accessToken, data.user)
       router.push('/')
     } catch (err: any) {
@@ -42,7 +44,26 @@ export default function RegisterPage() {
           </Link>
         </div>
         <h1 className={styles.title}>Criar conta grátis</h1>
-        <p className={styles.sub}>Comece a pedir agora</p>
+        <p className={styles.sub}>Como você quer usar o Tá Barato?</p>
+
+        {/* Escolha do tipo de conta */}
+        <div className={styles.roleTabs}>
+          <div className={`${styles.roleTab} ${styles.roleTabActive}`}>
+            <span className={styles.roleIcon}><ShoppingBag size={20} /></span>
+            <span className={styles.roleName}>Sou cliente</span>
+            <span className={styles.roleDesc}>Pedir comida e produtos</span>
+          </div>
+          <button
+            type="button"
+            className={styles.roleTab}
+            onClick={() => router.push('/cadastro-loja')}
+          >
+            <span className={styles.roleIcon}><Store size={20} /></span>
+            <span className={styles.roleName}>Sou lojista</span>
+            <span className={styles.roleDesc}>Vender no Tá Barato</span>
+            <span className={styles.roleGo}>Cadastrar loja <ArrowRight size={13} /></span>
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <label className={styles.label}>Nome</label>
@@ -60,7 +81,7 @@ export default function RegisterPage() {
           {error && <div className={styles.error}>{error}</div>}
 
           <button className={styles.btn} type="submit" disabled={loading}>
-            {loading ? 'Criando conta...' : 'Criar conta'}
+            {loading ? 'Criando conta...' : 'Criar conta de cliente'}
           </button>
         </form>
 

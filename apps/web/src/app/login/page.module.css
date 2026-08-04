@@ -64,3 +64,30 @@
 .footer { text-align: center; margin-top: 20px; font-size: 14px; color: var(--muted); }
 .link { color: var(--orange); font-weight: 700; }
 .link:hover { text-decoration: underline; }
+
+/* ── Seletor de tipo de conta (cliente / lojista) ── */
+.roleTabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+.roleTab {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 3px;
+  padding: 16px 12px 14px; border-radius: 14px;
+  border: 1.5px solid var(--border); background: var(--bg);
+  cursor: pointer; transition: border-color 0.14s, background 0.14s, transform 0.1s;
+  width: 100%;
+}
+.roleTab:hover { border-color: var(--orange); transform: translateY(-1px); }
+.roleTabActive {
+  border-color: var(--orange); background: var(--orange-light);
+  box-shadow: 0 4px 14px rgba(255,85,0,0.14);
+}
+.roleIcon {
+  width: 42px; height: 42px; border-radius: 12px; margin-bottom: 4px;
+  display: flex; align-items: center; justify-content: center;
+  background: #fff; color: var(--orange); border: 1px solid var(--border);
+}
+.roleTabActive .roleIcon { background: var(--orange); color: #fff; border-color: var(--orange); }
+.roleName { font-size: 14px; font-weight: 800; color: var(--text); letter-spacing: -0.01em; }
+.roleDesc { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+.roleGo {
+  display: inline-flex; align-items: center; gap: 3px; margin-top: 5px;
+  font-size: 11.5px; font-weight: 800; color: var(--orange);
+}
