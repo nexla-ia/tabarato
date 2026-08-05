@@ -45,6 +45,7 @@ export interface Store {
   name: string
   description: string | null
   logoUrl: string | null
+  documentUrl: string | null
   phone: string | null
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'
   address: string
