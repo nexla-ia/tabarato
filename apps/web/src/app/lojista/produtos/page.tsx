@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, X, Package, Camera, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Product, Store, Category, money } from '@/lib/types'
 import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
+import { CategorySelect } from '@/components/CategorySelect'
 import styles from './page.module.css'
 
 interface FormState {
@@ -163,10 +164,11 @@ export default function ProdutosPage() {
             </div>
 
             <label className={styles.label}>Categoria</label>
-            <select className={styles.input} value={form.categoryId} onChange={e => setForm({ ...form, categoryId: e.target.value })}>
-              <option value="">Sem categoria</option>
-              {(catsQ.data ?? []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <CategorySelect
+              options={catsQ.data ?? []}
+              value={form.categoryId}
+              onChange={categoryId => setForm({ ...form, categoryId })}
+            />
 
             <label className={styles.label}>Foto do produto</label>
             <div className={styles.imgUploadRow}>

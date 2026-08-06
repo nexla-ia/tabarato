@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, CreditCard, ExternalLink, AlertTriangle, Loader2, Store as StoreIcon, Camera, Copy } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Store, DaySchedule } from '@/lib/types'
+import { formatPhone, onlyDigits } from '@/lib/masks'
 import styles from './page.module.css'
 
 interface MpStatus { enabled: boolean; connected: boolean; mpUserId: string | null }
@@ -61,7 +62,7 @@ export default function ConfigPage() {
     if (!s) return
     setName(s.name ?? '')
     setDescription(s.description ?? '')
-    setPhone(s.phone ?? '')
+    setPhone(formatPhone(s.phone ?? ''))
     setRadius(s.deliveryRadiusKm != null ? String(s.deliveryRadiusKm) : '')
     setLogoUrl(s.logoUrl ?? '')
     setHours(Array.isArray(s.openingHours) && s.openingHours.length === 7 ? s.openingHours : DEFAULT_HOURS)
@@ -94,7 +95,7 @@ export default function ConfigPage() {
     mutationFn: async () => (await api.patch('/stores/my', {
       name,
       description: description || undefined,
-      phone: phone || undefined,
+      phone: onlyDigits(phone) || undefined,
       deliveryRadiusKm: radius === '' ? undefined : Number(radius),
       logoUrl: logoUrl || undefined,
       openingHours: hours,
@@ -140,7 +141,7 @@ export default function ConfigPage() {
         <textarea className={styles.input} rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="Conte sobre sua loja…" />
 
         <label className={styles.label}>Telefone / WhatsApp</label>
-        <input className={styles.input} value={phone} onChange={e => setPhone(e.target.value)} placeholder="(69) 99999-9999" />
+        <input className={styles.input} value={phone} onChange={e => setPhone(formatPhone(e.target.value))} placeholder="(69) 99999-9999" />
 
         <label className={styles.label}>Raio de entrega (km)</label>
         <input className={styles.input} type="number" step="0.5" value={radius} onChange={e => setRadius(e.target.value)} placeholder="Ex.: 8" />

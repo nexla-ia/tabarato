@@ -1,0 +1,39 @@
+.wrap { position: relative; }
+
+.trigger {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; font-size: 14px; background: var(--bg); color: var(--text);
+  transition: border-color 0.15s;
+}
+.trigger:hover { border-color: var(--orange); }
+.triggerContent { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.triggerEmoji { font-size: 16px; flex-shrink: 0; }
+.triggerText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.triggerPlaceholder { color: var(--faint); }
+.chev { color: var(--faint); flex-shrink: 0; transition: transform 0.15s; }
+.chevOpen { transform: rotate(180deg); }
+
+.panel {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30;
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow-md); overflow: hidden;
+}
+.searchRow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+}
+.searchIcon { color: var(--faint); flex-shrink: 0; }
+.searchInput { flex: 1; border: none; outline: none; background: none; font-size: 13.5px; color: var(--text); }
+.searchInput::placeholder { color: var(--faint); }
+
+.list { max-height: 220px; overflow-y: auto; padding: 6px; }
+.option {
+  width: 100%; display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px; border-radius: 8px; font-size: 13.5px; color: var(--text);
+  text-align: left; transition: background 0.12s;
+}
+.option:hover { background: var(--orange-light); }
+.optEmoji { font-size: 15px; flex-shrink: 0; width: 20px; text-align: center; }
+.optCheck { margin-left: auto; color: var(--orange); flex-shrink: 0; }
+.empty { padding: 16px; text-align: center; color: var(--muted); font-size: 12.5px; }

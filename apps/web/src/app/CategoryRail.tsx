@@ -1,22 +1,10 @@
 import Link from 'next/link'
 import { BASE } from '@/lib/api'
+import { emojiFor } from '@/lib/categoryIcons'
 import { ScrollRail } from './ScrollRail'
 import styles from './CategoryRail.module.css'
 
 interface Category { id: string; name: string; icon?: string | null }
-
-// Ionicon name (vindo do backend) → emoji apetitoso pra web
-const ICONS: Record<string, string> = {
-  restaurant: '🍽️', 'fast-food': '🍔', pizza: '🍕', cafe: '☕', wine: '🍷',
-  beer: '🍺', 'ice-cream': '🍦', nutrition: '🥗', fish: '🐟', basket: '🛒',
-  cart: '🛒', bag: '🛍️', medkit: '💊', medical: '💊', flower: '💐',
-  paw: '🐾', shirt: '👕', hardware: '🔧', book: '📚', gift: '🎁',
-  storefront: '🏪', pharmacy: '💊', market: '🛒', bakery: '🥐',
-}
-function emojiFor(icon?: string | null): string {
-  if (!icon) return '🏪'
-  return ICONS[icon] ?? '🏪'
-}
 
 async function getCategories(): Promise<Category[]> {
   try {
