@@ -232,20 +232,47 @@ export function Stores() {
                 {confirmTarget.status === 'APPROVED' ? 'APROVAR LOJA' : 'REJEITAR LOJA'}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8, marginBottom: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8, marginBottom: 14 }}>
                 {[
+                  ['Responsável', confirmTarget.store.user.name],
                   ['CNPJ', fmtCNPJ(confirmTarget.store.cnpj)],
                   ['Endereço', confirmTarget.store.address || '—'],
                   ['Telefone', confirmTarget.store.phone || '—'],
                   ['Categorias', confirmTarget.store.categories.length ? confirmTarget.store.categories.map(c => c.name).join(', ') : '—'],
-                  ['Documento', confirmTarget.store.documentUrl ? '📄 enviado' : 'não enviado'],
+                  ['Documento', confirmTarget.store.documentUrl
+                    ? '📄 enviado'
+                    : 'não enviado'],
                 ].map(([k, v]) => (
                   <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12.5, fontFamily: SANS }}>
                     <span style={{ color: LIGHT, fontWeight: 700, flexShrink: 0 }}>{k}</span>
                     <span style={{ color: TEXT, textAlign: 'right' as const }}>{v}</span>
                   </div>
                 ))}
+                {confirmTarget.store.documentUrl && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' as const, marginTop: -4 }}>
+                    <a
+                      href={confirmTarget.store.documentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 11.5, color: O, fontWeight: 700, fontFamily: SANS, textDecoration: 'none' }}
+                    >
+                      Ver documento →
+                    </a>
+                  </div>
+                )}
               </div>
+
+              {confirmTarget.store.description && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: LIGHT, letterSpacing: '0.03em', marginBottom: 4, fontFamily: SANS }}>DESCRIÇÃO</div>
+                  <div style={{
+                    fontSize: 12.5, color: TEXT, fontFamily: SANS, lineHeight: 1.5,
+                    background: '#FDF8F3', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '10px 12px',
+                  }}>
+                    {confirmTarget.store.description}
+                  </div>
+                </div>
+              )}
 
               <div style={{
                 padding: '11px 13px', borderRadius: 10, fontSize: 12.5, lineHeight: 1.5, fontFamily: SANS,
