@@ -32,6 +32,11 @@ export function Stores() {
   const [refresh, setRefresh] = useState(0)
   const { showToast } = useToast()
 
+  // Confirmação com resumo antes de aprovar/rejeitar — evita clique acidental
+  // numa ação que já impacta o lojista na hora.
+  const [confirmTarget, setConfirmTarget] = useState<{ store: Store; status: 'APPROVED' | 'REJECTED' } | null>(null)
+  const [confirming, setConfirming] = useState(false)
+
   useEffect(() => {
     let active = true
     setLoading(true)
@@ -42,15 +47,21 @@ export function Stores() {
     return () => { active = false }
   }, [filter, refresh]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAction = async (id: string, status: 'APPROVED' | 'REJECTED') => {
-    // Confirma ações destrutivas (rejeitar remove a loja do marketplace).
-    if (status === 'REJECTED' && !window.confirm('Rejeitar esta loja? Ela não poderá receber pedidos.')) return
+  const closeConfirm = () => { if (!confirming) setConfirmTarget(null) }
+
+  const runAction = async () => {
+    if (!confirmTarget) return
+    const { store, status } = confirmTarget
+    setConfirming(true)
     try {
-      await api.updateStoreStatus(id, status)
+      await api.updateStoreStatus(store.id, status)
       showToast(status === 'APPROVED' ? 'Loja aprovada!' : 'Loja rejeitada.', status === 'APPROVED' ? 'success' : 'error')
       setRefresh(r => r + 1)
+      setConfirmTarget(null)
     } catch (err: unknown) {
       showToast((err as Error).message || 'Erro', 'error')
+    } finally {
+      setConfirming(false)
     }
   }
 
@@ -158,7 +169,7 @@ export function Stores() {
                   <div style={{ display: 'flex', gap: 5 }}>
                     {s.status !== 'APPROVED' && (
                       <button
-                        onClick={() => handleAction(s.id, 'APPROVED')}
+                        onClick={() => setConfirmTarget({ store: s, status: 'APPROVED' })}
                         style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#DCFCE7', color: '#15803D', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: SANS, transition: 'opacity 0.1s' }}
                         onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
                         onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
@@ -168,7 +179,7 @@ export function Stores() {
                     )}
                     {s.status !== 'REJECTED' && (
                       <button
-                        onClick={() => handleAction(s.id, 'REJECTED')}
+                        onClick={() => setConfirmTarget({ store: s, status: 'REJECTED' })}
                         style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#FEE2E2', color: '#B91C1C', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: SANS, transition: 'opacity 0.1s' }}
                         onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
                         onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
@@ -183,6 +194,95 @@ export function Stores() {
           </tbody>
         </table>
       </div>
+
+      {/* Modal de confirmação — resumo antes de aprovar/rejeitar */}
+      {confirmTarget && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) closeConfirm() }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(26,10,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, backdropFilter: 'blur(4px)', padding: 24,
+          }}
+        >
+          <div style={{
+            background: '#fff', borderRadius: 16, width: '100%', maxWidth: 440,
+            boxShadow: '0 32px 80px rgba(26,10,0,0.3)', border: `1px solid ${BORDER}`,
+            overflow: 'hidden',
+          }}>
+            <div style={{ padding: '18px 22px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+              {confirmTarget.store.logoUrl ? (
+                <img src={confirmTarget.store.logoUrl} alt={confirmTarget.store.name} style={{ width: 38, height: 38, borderRadius: 10, objectFit: 'cover', border: `1px solid ${BORDER}`, flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#FFF3EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>🏪</div>
+              )}
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: TEXT, fontFamily: SANS }}>{confirmTarget.store.name}</div>
+                <div style={{ fontSize: 11.5, color: LIGHT, fontFamily: SANS }}>{confirmTarget.store.user.email}</div>
+              </div>
+            </div>
+
+            <div style={{ padding: '18px 22px' }}>
+              <div style={{
+                display: 'inline-block', padding: '3px 10px', borderRadius: 6, marginBottom: 14,
+                background: confirmTarget.status === 'APPROVED' ? '#DCFCE7' : '#FEE2E2',
+                color: confirmTarget.status === 'APPROVED' ? '#15803D' : '#B91C1C',
+                fontSize: 11.5, fontWeight: 800, fontFamily: SANS, letterSpacing: '0.03em',
+              }}>
+                {confirmTarget.status === 'APPROVED' ? 'APROVAR LOJA' : 'REJEITAR LOJA'}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8, marginBottom: 16 }}>
+                {[
+                  ['CNPJ', fmtCNPJ(confirmTarget.store.cnpj)],
+                  ['Endereço', confirmTarget.store.address || '—'],
+                  ['Telefone', confirmTarget.store.phone || '—'],
+                  ['Categorias', confirmTarget.store.categories.length ? confirmTarget.store.categories.map(c => c.name).join(', ') : '—'],
+                  ['Documento', confirmTarget.store.documentUrl ? '📄 enviado' : 'não enviado'],
+                ].map(([k, v]) => (
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12.5, fontFamily: SANS }}>
+                    <span style={{ color: LIGHT, fontWeight: 700, flexShrink: 0 }}>{k}</span>
+                    <span style={{ color: TEXT, textAlign: 'right' as const }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{
+                padding: '11px 13px', borderRadius: 10, fontSize: 12.5, lineHeight: 1.5, fontFamily: SANS,
+                background: confirmTarget.status === 'APPROVED' ? '#ECFDF5' : '#FFFBEB',
+                color: confirmTarget.status === 'APPROVED' ? '#047857' : '#92620A',
+                border: `1px solid ${confirmTarget.status === 'APPROVED' ? '#A7F3D0' : '#FDE68A'}`,
+              }}>
+                {confirmTarget.status === 'APPROVED'
+                  ? 'A loja vai aparecer no marketplace pros clientes e já pode começar a receber pedidos.'
+                  : 'A loja não vai aparecer no marketplace. O lojista vai ver o cadastro como rejeitado no painel dele.'}
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 22px', borderTop: `1px solid ${BORDER}`, display: 'flex', gap: 10 }}>
+              <button
+                onClick={closeConfirm}
+                disabled={confirming}
+                style={{ flex: 1, padding: 11, borderRadius: 10, border: `1px solid ${BORDER}`, background: '#fff', color: MUTED, fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: SANS }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={runAction}
+                disabled={confirming}
+                style={{
+                  flex: 1, padding: 11, borderRadius: 10, border: 'none',
+                  background: confirmTarget.status === 'APPROVED' ? '#15803D' : '#B91C1C',
+                  color: '#fff', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: SANS,
+                  opacity: confirming ? 0.7 : 1,
+                }}
+              >
+                {confirming ? 'Confirmando...' : confirmTarget.status === 'APPROVED' ? 'Confirmar aprovação' : 'Confirmar rejeição'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
