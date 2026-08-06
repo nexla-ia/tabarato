@@ -3,9 +3,10 @@ import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { ArrowLeft, ShoppingBag, Store, ArrowRight } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, Store, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { formatPhone, onlyDigits } from '@/lib/masks'
 import styles from '../login/page.module.css'
 
 export default function RegisterPage() {
@@ -14,6 +15,7 @@ export default function RegisterPage() {
   const [name, setName]         = useState('')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
   const [phone, setPhone]       = useState('')
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
@@ -23,7 +25,7 @@ export default function RegisterPage() {
     setError(''); setLoading(true)
     try {
       const { data } = await api.post('/auth/register', {
-        name, email, password, phone: phone || undefined, role: 'CONSUMER',
+        name, email, password, phone: onlyDigits(phone) || undefined, role: 'CONSUMER',
       })
       login(data.accessToken, data.user)
       router.push('/')
@@ -73,10 +75,18 @@ export default function RegisterPage() {
           <input className={styles.input} type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" />
 
           <label className={styles.label}>Telefone (opcional)</label>
-          <input className={styles.input} type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(69) 99999-9999" />
+          <input className={styles.input} type="tel" value={phone} onChange={e => setPhone(formatPhone(e.target.value))} placeholder="(69) 99999-9999" />
 
           <label className={styles.label}>Senha</label>
-          <input className={styles.input} type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+          <div className={styles.passField}>
+            <input
+              className={styles.input} type={showPass ? 'text' : 'password'} required
+              value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres"
+            />
+            <button type="button" className={styles.eye} onClick={() => setShowPass(v => !v)}>
+              {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </div>
 
           {error && <div className={styles.error}>{error}</div>}
 

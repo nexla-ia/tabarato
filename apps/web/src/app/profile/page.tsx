@@ -2,10 +2,11 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ShoppingBag, LayoutDashboard, Store as StoreIcon, ChevronRight } from 'lucide-react'
+import { ShoppingBag, LayoutDashboard, Store as StoreIcon, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { formatPhone, onlyDigits } from '@/lib/masks'
 import styles from './page.module.css'
 
 const ADDR_ICONS: Record<string, string> = {
@@ -36,6 +37,14 @@ export default function ProfilePage() {
 
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showCurrentPass, setShowCurrentPass] = useState(false)
+  const [showNewPass, setShowNewPass] = useState(false)
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwMsg, setPwMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
   useEffect(() => {
     if (!ready) return
     if (!user) { router.push('/login'); return }
@@ -45,7 +54,7 @@ export default function ProfilePage() {
       .then((p) => {
         setProfile(p.data)
         setName(p.data.name)
-        setPhone(p.data.phone ?? '')
+        setPhone(formatPhone(p.data.phone ?? ''))
       })
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
@@ -62,7 +71,7 @@ export default function ProfilePage() {
     try {
       const { data } = await api.patch<UserProfile>('/users/me', {
         name: name.trim(),
-        phone: phone.trim() || undefined,
+        phone: onlyDigits(phone) || undefined,
       })
       setProfile(data)
       setSaveMsg({ type: 'ok', text: 'Perfil atualizado com sucesso!' })
@@ -71,6 +80,25 @@ export default function ProfilePage() {
     } finally {
       setSaving(false)
       setTimeout(() => setSaveMsg(null), 4000)
+    }
+  }
+
+  async function handleChangePassword(e: FormEvent) {
+    e.preventDefault()
+    setPwMsg(null)
+    if (newPassword.length < 6) { setPwMsg({ type: 'err', text: 'A nova senha deve ter ao menos 6 caracteres.' }); return }
+    if (newPassword !== confirmPassword) { setPwMsg({ type: 'err', text: 'As senhas não coincidem.' }); return }
+
+    setPwSaving(true)
+    try {
+      await api.patch('/users/me/password', { currentPassword, newPassword })
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('')
+      setPwMsg({ type: 'ok', text: 'Senha alterada com sucesso!' })
+    } catch (err: any) {
+      setPwMsg({ type: 'err', text: err.response?.data?.message ?? 'Não foi possível trocar a senha.' })
+    } finally {
+      setPwSaving(false)
+      setTimeout(() => setPwMsg(null), 5000)
     }
   }
 
@@ -186,7 +214,7 @@ export default function ProfilePage() {
                     <div className={styles.label}>Telefone</div>
                     <input
                       className={styles.input} value={phone} type="tel"
-                      onChange={e => setPhone(e.target.value)}
+                      onChange={e => setPhone(formatPhone(e.target.value))}
                       placeholder="(69) 99999-9999"
                     />
                   </div>
@@ -202,6 +230,57 @@ export default function ProfilePage() {
                 )}
                 <button className={styles.saveBtn} type="submit" disabled={saving}>
                   {saving ? 'Salvando...' : 'Salvar alterações'}
+                </button>
+              </form>
+            </div>
+
+            {/* Trocar senha */}
+            <div className={styles.card}>
+              <div className={styles.sectionTitle}>Trocar senha</div>
+              <form onSubmit={handleChangePassword}>
+                <div className={styles.label}>Senha atual</div>
+                <div className={styles.passField}>
+                  <input
+                    className={styles.input} type={showCurrentPass ? 'text' : 'password'}
+                    value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}
+                    placeholder="Sua senha atual" required
+                  />
+                  <button type="button" className={styles.eye} onClick={() => setShowCurrentPass(v => !v)}>
+                    {showCurrentPass ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
+
+                <div className={styles.formRow} style={{ marginTop: 14 }}>
+                  <div>
+                    <div className={styles.label}>Nova senha</div>
+                    <div className={styles.passField}>
+                      <input
+                        className={styles.input} type={showNewPass ? 'text' : 'password'}
+                        value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                        placeholder="Mínimo 6 caracteres" required
+                      />
+                      <button type="button" className={styles.eye} onClick={() => setShowNewPass(v => !v)}>
+                        {showNewPass ? <EyeOff size={17} /> : <Eye size={17} />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <div className={styles.label}>Confirmar nova senha</div>
+                    <input
+                      className={styles.input} type={showNewPass ? 'text' : 'password'}
+                      value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                      placeholder="Repita a nova senha" required
+                    />
+                  </div>
+                </div>
+
+                {pwMsg && (
+                  <div className={pwMsg.type === 'ok' ? styles.successMsg : styles.errorMsg}>
+                    {pwMsg.text}
+                  </div>
+                )}
+                <button className={styles.saveBtn} type="submit" disabled={pwSaving}>
+                  {pwSaving ? 'Trocando...' : 'Trocar senha'}
                 </button>
               </form>
             </div>

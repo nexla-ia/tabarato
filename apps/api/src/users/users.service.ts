@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { randomBytes } from 'crypto'
+import * as bcrypt from 'bcryptjs'
 import { PrismaService } from '../prisma/prisma.service'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { CreateAddressDto } from './dto/create-address.dto'
+import { ChangePasswordDto } from './dto/change-password.dto'
 
 @Injectable()
 export class UsersService {
@@ -66,6 +68,18 @@ export class UsersService {
         updatedAt: true,
       },
     })
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true } })
+    if (!user) throw new NotFoundException('User not found')
+
+    const valid = await bcrypt.compare(dto.currentPassword, user.passwordHash)
+    if (!valid) throw new BadRequestException('Senha atual incorreta.')
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10)
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } })
+    return { ok: true }
   }
 
   async updatePushToken(userId: string, token: string) {

@@ -1,9 +1,26 @@
 .section { margin: 6px 0 4px; }
+.railWrap { position: relative; }
 .rail {
   display: flex;
   gap: 10px;
   overflow-x: auto;
+  scroll-behavior: smooth;
   padding: 4px 2px 8px;
+}
+
+.railArrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--card); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text); box-shadow: var(--shadow-md);
+  z-index: 2; transition: border-color 0.14s, color 0.14s;
+}
+.railArrow:hover { border-color: var(--orange); color: var(--orange); }
+.railArrowLeft { left: -4px; }
+.railArrowRight { right: -4px; }
+@media (max-width: 640px) {
+  .railArrow { display: none; }
 }
 .chip {
   display: inline-flex;

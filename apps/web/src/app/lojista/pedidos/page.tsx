@@ -34,15 +34,30 @@ export default function PedidosPage() {
   const advance = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) =>
       (await api.patch(`/orders/${id}/status`, { status })).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['store-orders'] }),
+    // Atualiza a tela na hora do clique — não espera o round-trip do servidor.
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ['store-orders'] })
+      const prev = qc.getQueryData<Order[]>(['store-orders'])
+      qc.setQueryData<Order[]>(['store-orders'], (old) =>
+        old?.map((o) => (o.id === id ? { ...o, status: status as OrderStatus } : o)))
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => { if (ctx?.prev) qc.setQueryData(['store-orders'], ctx.prev) },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['store-orders'] }),
   })
   const cancel = useMutation({
     mutationFn: async ({ id, note }: { id: string; note: string }) =>
       (await api.patch(`/orders/${id}/cancel-store`, { note: note || undefined })).data,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['store-orders'] })
-      setCancelId(null); setNote('')
+    onMutate: async ({ id }) => {
+      await qc.cancelQueries({ queryKey: ['store-orders'] })
+      const prev = qc.getQueryData<Order[]>(['store-orders'])
+      qc.setQueryData<Order[]>(['store-orders'], (old) =>
+        old?.map((o) => (o.id === id ? { ...o, status: 'CANCELLED' as OrderStatus } : o)))
+      return { prev }
     },
+    onError: (_err, _vars, ctx) => { if (ctx?.prev) qc.setQueryData(['store-orders'], ctx.prev) },
+    onSuccess: () => { setCancelId(null); setNote('') },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['store-orders'] }),
   })
 
   const orders = ordersQ.data ?? []

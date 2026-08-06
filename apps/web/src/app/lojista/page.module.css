@@ -1,3 +1,13 @@
+.statusBanner {
+  display: flex; align-items: flex-start; gap: 11px;
+  border-radius: var(--radius); padding: 14px 16px;
+  font-size: 13.5px; line-height: 1.5; margin-bottom: 20px;
+}
+.statusBanner svg { flex-shrink: 0; margin-top: 1px; }
+.statusBannerPENDING { background: #FFFBEB; border: 1px solid #FDE68A; color: #92620A; }
+.statusBannerREJECTED { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; }
+.statusBannerSUSPENDED { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; }
+
 .headerRow {
   display: flex;
   align-items: flex-start;

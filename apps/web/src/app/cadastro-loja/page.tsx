@@ -10,26 +10,12 @@ import {
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { onlyDigits, formatCnpj, formatPhone, validateCnpj, joinList } from '@/lib/masks'
+import { lookupCnpj } from '@/lib/cnpjLookup'
+import { reverseGeocode } from '@/lib/geocoding'
 import styles from './page.module.css'
 
 interface Category { id: string; name: string; icon?: string | null }
-
-/* ── máscaras (iguais às do app) ───────────────────────────────────────── */
-function onlyDigits(v: string) { return v.replace(/\D/g, '') }
-function formatCnpj(v: string) {
-  const d = onlyDigits(v).slice(0, 14)
-  if (d.length <= 2) return d
-  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`
-  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`
-  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
-}
-function formatPhone(v: string) {
-  const d = onlyDigits(v).slice(0, 11)
-  if (d.length <= 2) return d ? `(${d}` : ''
-  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`
-  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
-}
 
 const STEPS = [
   { label: 'Seus dados', Icon: User },
@@ -65,6 +51,8 @@ export default function CadastroLojaPage() {
   const [locating, setLocating] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [selectedCats, setSelectedCats] = useState<string[]>([])
+  const [customCategory, setCustomCategory] = useState('')
+  const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle')
 
   // pagamento / entrega
   const [deliveryRadius, setDeliveryRadius] = useState('5')
@@ -93,20 +81,55 @@ export default function CadastroLojaPage() {
     setSelectedCats((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id])
   }
 
+  // "Outros" sempre por último — e some junto com o campo de texto quando desmarcada.
+  const sortedCategories = [...categories].sort((a, b) => {
+    const aOutros = a.name.trim().toLowerCase() === 'outros'
+    const bOutros = b.name.trim().toLowerCase() === 'outros'
+    if (aOutros === bOutros) return 0
+    return aOutros ? 1 : -1
+  })
+  const outrosCategory = categories.find((c) => c.name.trim().toLowerCase() === 'outros')
+  const outrosSelected = !!outrosCategory && selectedCats.includes(outrosCategory.id)
+
   function getLocation() {
     if (!navigator.geolocation) { setError('Seu navegador não suporta localização.'); return }
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
-      (pos) => { setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false) },
+      async (pos) => {
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        setCoords({ lat, lng })
+        const addr = await reverseGeocode(lat, lng)
+        if (addr) setAddress(addr)
+        setLocating(false)
+      },
       () => { setLocating(false); setError('Não foi possível obter a localização. Você pode ajustar depois nas configurações da loja.') },
       { enableHighAccuracy: true, timeout: 10000 },
     )
   }
 
+  /* Ao sair do campo CNPJ: valida o dígito verificador e, se válido, busca os
+     dados públicos da empresa pra auto-preencher nome/endereço (só se vazios). */
+  async function handleCnpjBlur() {
+    if (onlyDigits(cnpj).length !== 14) { setCnpjStatus('idle'); return }
+    if (!validateCnpj(cnpj)) { setCnpjStatus('invalid'); return }
+    setCnpjStatus('checking')
+    const data = await lookupCnpj(onlyDigits(cnpj))
+    setCnpjStatus('valid')
+    if (data) {
+      if (!storeName.trim() && data.name) setStoreName(data.name)
+      if (!address.trim() && data.address) setAddress(data.address)
+    }
+  }
+
   /* Passo 0 — cria a CONTA (uma única vez). */
   async function submitAccount() {
     setError('')
-    if (!name.trim() || !email.trim() || !password) { setError('Preencha nome, e-mail e senha.'); return }
+    const missing: string[] = []
+    if (!name.trim()) missing.push('nome')
+    if (!email.trim()) missing.push('e-mail')
+    if (!password) missing.push('senha')
+    if (missing.length) { setError(`Preencha ${joinList(missing)}.`); return }
     if (password.length < 6) { setError('A senha deve ter ao menos 6 caracteres.'); return }
     if (password !== confirm) { setError('As senhas não coincidem.'); return }
 
@@ -136,9 +159,14 @@ export default function CadastroLojaPage() {
   /* Passo 1 — valida dados da loja (sem chamada de API). */
   function submitStoreInfo() {
     setError('')
-    if (!storeName.trim() || !cnpj || !address.trim()) { setError('Preencha nome da loja, CNPJ e endereço.'); return }
-    if (onlyDigits(cnpj).length !== 14) { setError('CNPJ inválido — digite os 14 dígitos.'); return }
+    const missing: string[] = []
+    if (!storeName.trim()) missing.push('nome da loja')
+    if (!cnpj) missing.push('CNPJ')
+    if (!address.trim()) missing.push('endereço')
+    if (missing.length) { setError(`Preencha ${joinList(missing)}.`); return }
+    if (!validateCnpj(cnpj)) { setCnpjStatus('invalid'); setError('CNPJ inválido — confira os números digitados.'); return }
     if (selectedCats.length === 0) { setError('Selecione ao menos uma categoria para sua loja.'); return }
+    if (outrosSelected && !customCategory.trim()) { setError('Escreva qual é a categoria da sua loja.'); return }
     setStep(2)
   }
 
@@ -149,10 +177,16 @@ export default function CadastroLojaPage() {
 
     setLoading(true)
     try {
+      // Não há campo próprio pra categoria personalizada — anota na descrição
+      // pra aparecer pro admin na hora de aprovar a loja.
+      const fullDescription = outrosSelected && customCategory.trim()
+        ? `Categoria personalizada: ${customCategory.trim()}${description.trim() ? `\n\n${description.trim()}` : ''}`
+        : description.trim() || undefined
+
       await api.post('/stores', {
         name: storeName.trim(),
         cnpj: onlyDigits(cnpj),
-        description: description.trim() || undefined,
+        description: fullDescription,
         phone: onlyDigits(storePhone) || undefined,
         address: address.trim(),
         lat: coords?.lat ?? -12.7410,
@@ -274,14 +308,25 @@ export default function CadastroLojaPage() {
             <div className={styles.stepBody} key="s1">
               <StepHead Icon={Store} title="Dados da sua loja" desc="Como os clientes vão te encontrar" />
               <Field label="Nome da loja *" Icon={Store} value={storeName} onChange={setStoreName} placeholder="Ex: Burguer do Zé" />
-              <Field label="CNPJ *" Icon={FileText} value={cnpj} onChange={(v) => setCnpj(formatCnpj(v))} placeholder="00.000.000/0000-00" />
+              <Field
+                label="CNPJ *" Icon={FileText} value={cnpj}
+                onChange={(v) => { setCnpj(formatCnpj(v)); setCnpjStatus('idle') }}
+                onBlur={handleCnpjBlur}
+                placeholder="00.000.000/0000-00"
+                hint={
+                  cnpjStatus === 'checking' ? <span className={styles.hint}><Loader2 size={12} className={styles.spin} /> Verificando CNPJ…</span> :
+                  cnpjStatus === 'valid' ? <span className={styles.hintOk}><Check size={12} /> CNPJ válido</span> :
+                  cnpjStatus === 'invalid' ? <span className={styles.hintErr}>CNPJ inválido — confira os números.</span> :
+                  null
+                }
+              />
               <Field label="Descrição da loja" Icon={MessageSquare} value={description} onChange={setDescription} placeholder="Conte um pouco sobre seu estabelecimento..." multiline />
 
               {/* Categorias — sem ao menos uma, a loja não aparece nos filtros/aba */}
               <div className={styles.field}>
                 <span className={styles.fieldLabel}><Tag size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Categoria da loja *</span>
                 <div className={styles.catGrid}>
-                  {categories.map((c) => {
+                  {sortedCategories.map((c) => {
                     const active = selectedCats.includes(c.id)
                     return (
                       <button
@@ -295,6 +340,15 @@ export default function CadastroLojaPage() {
                   })}
                 </div>
                 <p className={styles.hint}>Escolha uma ou mais — é assim que sua loja aparece nas buscas e na aba Categorias.</p>
+                {outrosSelected && (
+                  <input
+                    className={styles.customCatInput}
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    placeholder="Qual? Ex: Livraria, Pet café…"
+                    maxLength={60}
+                  />
+                )}
               </div>
 
               <Field label="Telefone da loja" Icon={Phone} value={storePhone} onChange={(v) => setStorePhone(formatPhone(v))} placeholder="(69) 99999-0000" />
@@ -392,10 +446,11 @@ function StepHead({ Icon, title, desc }: { Icon: Ic; title: string; desc: string
 }
 
 function Field({
-  label, Icon, value, onChange, placeholder, type = 'text', multiline, right,
+  label, Icon, value, onChange, placeholder, type = 'text', multiline, right, hint, onBlur,
 }: {
   label: string; Icon: Ic; value: string; onChange: (v: string) => void
   placeholder?: string; type?: string; multiline?: boolean; right?: React.ReactNode
+  hint?: React.ReactNode; onBlur?: () => void
 }) {
   return (
     <label className={styles.field}>
@@ -407,6 +462,7 @@ function Field({
         ) : (
           <input
             className={styles.input} value={value} onChange={e => onChange(e.target.value)}
+            onBlur={onBlur}
             placeholder={placeholder} type={type}
             inputMode={type === 'number' ? 'numeric' : undefined}
             autoCapitalize={type === 'email' ? 'none' : undefined}
@@ -414,6 +470,7 @@ function Field({
         )}
         {right}
       </span>
+      {hint}
     </label>
   )
 }

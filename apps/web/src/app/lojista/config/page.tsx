@@ -1,12 +1,15 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, CreditCard, ExternalLink, AlertTriangle, Loader2 } from 'lucide-react'
+import { Check, CreditCard, ExternalLink, AlertTriangle, Loader2, Store as StoreIcon, Camera, Copy } from 'lucide-react'
 import { api } from '@/lib/api'
-import { Store } from '@/lib/types'
+import { Store, DaySchedule } from '@/lib/types'
 import styles from './page.module.css'
 
 interface MpStatus { enabled: boolean; connected: boolean; mpUserId: string | null }
+
+const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+const DEFAULT_HOURS: DaySchedule[] = Array.from({ length: 7 }, () => ({ open: false, from: '08:00', to: '18:00' }))
 
 export default function ConfigPage() {
   const qc = useQueryClient()
@@ -17,9 +20,14 @@ export default function ConfigPage() {
   const [description, setDescription] = useState('')
   const [phone, setPhone] = useState('')
   const [radius, setRadius] = useState('')
+  const [logoUrl, setLogoUrl] = useState('')
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoError, setLogoError] = useState('')
+  const [hours, setHours] = useState<DaySchedule[]>(DEFAULT_HOURS)
   const [saved, setSaved] = useState(false)
   const [mpMsg, setMpMsg] = useState<'ok' | 'erro' | null>(null)
   const [connecting, setConnecting] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
   // Feedback do retorno do callback do Mercado Pago (?mp=ok|erro)
   useEffect(() => {
@@ -55,7 +63,32 @@ export default function ConfigPage() {
     setDescription(s.description ?? '')
     setPhone(s.phone ?? '')
     setRadius(s.deliveryRadiusKm != null ? String(s.deliveryRadiusKm) : '')
+    setLogoUrl(s.logoUrl ?? '')
+    setHours(Array.isArray(s.openingHours) && s.openingHours.length === 7 ? s.openingHours : DEFAULT_HOURS)
   }, [storeQ.data])
+
+  async function handleLogoFile(file: File) {
+    setLogoError('')
+    setUploadingLogo(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const { data } = await api.post<{ url: string }>('/uploads/image', formData)
+      setLogoUrl(data.url)
+    } catch {
+      setLogoError('Não foi possível enviar a imagem. Use JPEG, PNG ou WEBP de até 10MB.')
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
+  function updateDay(index: number, patch: Partial<DaySchedule>) {
+    setHours((prev) => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)))
+  }
+  function applyToAllDays(index: number) {
+    const { from, to } = hours[index]
+    setHours((prev) => prev.map((d) => ({ ...d, from, to })))
+  }
 
   const save = useMutation({
     mutationFn: async () => (await api.patch('/stores/my', {
@@ -63,6 +96,8 @@ export default function ConfigPage() {
       description: description || undefined,
       phone: phone || undefined,
       deliveryRadiusKm: radius === '' ? undefined : Number(radius),
+      logoUrl: logoUrl || undefined,
+      openingHours: hours,
     })).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['store-my'] })
@@ -79,6 +114,25 @@ export default function ConfigPage() {
       <p className={styles.subtitle}>Dados que aparecem para os clientes</p>
 
       <div className={styles.card}>
+        <label className={styles.label} style={{ marginTop: 0 }}>Foto da loja</label>
+        <div className={styles.logoRow}>
+          <div className={styles.logoPreview}>
+            {logoUrl ? <img src={logoUrl} alt="Logo da loja" /> : <StoreIcon size={26} strokeWidth={1.5} />}
+          </div>
+          <div>
+            <input
+              ref={logoInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+              style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoFile(f); e.target.value = '' }}
+            />
+            <button type="button" className={styles.logoBtn} onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}>
+              {uploadingLogo ? <><Loader2 size={15} className={styles.spin} /> Enviando…</> : <><Camera size={15} /> {logoUrl ? 'Trocar foto' : 'Enviar foto'}</>}
+            </button>
+            <p className={styles.hint}>JPEG, PNG ou WEBP, até 10MB.</p>
+            {logoError && <p className={styles.logoErr}>{logoError}</p>}
+          </div>
+        </div>
+
         <label className={styles.label}>Nome da loja</label>
         <input className={styles.input} value={name} onChange={e => setName(e.target.value)} />
 
@@ -91,6 +145,45 @@ export default function ConfigPage() {
         <label className={styles.label}>Raio de entrega (km)</label>
         <input className={styles.input} type="number" step="0.5" value={radius} onChange={e => setRadius(e.target.value)} placeholder="Ex.: 8" />
         <p className={styles.hint}>Clientes fora desse raio não verão sua loja.</p>
+
+        <button className={styles.saveBtn} onClick={() => save.mutate()} disabled={save.isPending || !name}>
+          {saved ? <><Check size={17} /> Salvo!</> : save.isPending ? 'Salvando…' : 'Salvar alterações'}
+        </button>
+      </div>
+
+      {/* Horário de funcionamento — abre/fecha sozinha, sem precisar clicar todo dia */}
+      <div className={styles.card} style={{ marginTop: 16 }}>
+        <div className={styles.mpHead}>
+          <span className={styles.mpIcon} style={{ background: '#FFF0EB', color: 'var(--orange)' }}><StoreIcon size={20} /></span>
+          <div>
+            <div className={styles.mpTitle}>Horário de funcionamento</div>
+            <div className={styles.mpSub}>Defina os dias e horários — sua loja abre e fecha sozinha, sem precisar clicar todo dia.</div>
+          </div>
+        </div>
+
+        <div className={styles.hoursList}>
+          {hours.map((day, i) => (
+            <div key={i} className={styles.dayRow}>
+              <label className={styles.dayToggle}>
+                <input type="checkbox" checked={day.open} onChange={(e) => updateDay(i, { open: e.target.checked })} />
+                <span className={styles.dayName}>{DAY_LABELS[i]}</span>
+              </label>
+              {day.open ? (
+                <div className={styles.dayTimes}>
+                  <input type="time" className={styles.timeInput} value={day.from} onChange={(e) => updateDay(i, { from: e.target.value })} />
+                  <span className={styles.dayDash}>às</span>
+                  <input type="time" className={styles.timeInput} value={day.to} onChange={(e) => updateDay(i, { to: e.target.value })} />
+                  <button type="button" className={styles.copyBtn} onClick={() => applyToAllDays(i)} title="Usar esse horário todos os dias">
+                    <Copy size={13} /> Aplicar a todos
+                  </button>
+                </div>
+              ) : (
+                <span className={styles.dayClosed}>Fechado</span>
+              )}
+            </div>
+          ))}
+        </div>
+        <p className={styles.hint}>Fora desses horários sua loja aparece como fechada automaticamente. Você ainda pode pausar manualmente a qualquer momento no Painel.</p>
 
         <button className={styles.saveBtn} onClick={() => save.mutate()} disabled={save.isPending || !name}>
           {saved ? <><Check size={17} /> Salvo!</> : save.isPending ? 'Salvando…' : 'Salvar alterações'}

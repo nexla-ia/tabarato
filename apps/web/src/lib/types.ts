@@ -6,17 +6,27 @@ export interface Category {
   icon?: string | null
 }
 
+export interface DaySchedule {
+  open: boolean
+  from: string
+  to: string
+}
+
+export type StoreStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'
+
 export interface Store {
   id: string
   name: string
   description?: string | null
   logoUrl?: string | null
+  status: StoreStatus
   isOpen: boolean
   isPaused?: boolean
   deliveryRadiusKm?: number | null
-  openingHours?: unknown
+  openingHours?: DaySchedule[] | null
   address?: string | null
   phone?: string | null
+  categories?: Category[]
 }
 
 export interface ProductVariation {

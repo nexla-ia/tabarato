@@ -1,7 +1,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { Power, Pause, Play, ArrowRight, Clock } from 'lucide-react'
+import { Power, Pause, Play, ArrowRight, Clock, Hourglass, XCircle, Ban } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Store, Order, STATUS_LABEL, STATUS_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL, money, timeAgo } from '@/lib/types'
 import styles from './page.module.css'
@@ -49,6 +49,29 @@ export default function LojistaDashboard() {
 
   return (
     <div>
+      {store && store.status !== 'APPROVED' && (
+        <div className={`${styles.statusBanner} ${styles[`statusBanner${store.status}`]}`}>
+          {store.status === 'PENDING' && (
+            <>
+              <Hourglass size={18} />
+              <div><strong>Loja em análise.</strong> Assim que nosso time aprovar, ela aparece no app e você começa a receber pedidos.</div>
+            </>
+          )}
+          {store.status === 'REJECTED' && (
+            <>
+              <XCircle size={18} />
+              <div><strong>Cadastro rejeitado.</strong> Confira os dados da sua loja em Configurações ou fale com o suporte pra entender o motivo.</div>
+            </>
+          )}
+          {store.status === 'SUSPENDED' && (
+            <>
+              <Ban size={18} />
+              <div><strong>Loja suspensa.</strong> Sua loja está temporariamente indisponível no app. Fale com o suporte pra mais detalhes.</div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className={styles.headerRow}>
         <div>
           <h1 className={styles.title}>{store?.name ?? 'Minha loja'}</h1>

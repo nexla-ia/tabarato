@@ -44,6 +44,15 @@
 }
 .input:focus { border-color: var(--orange); }
 
+.passField { position: relative; display: flex; align-items: center; }
+.passField .input { width: 100%; padding-right: 42px; }
+.eye {
+  position: absolute; right: 12px;
+  display: flex; color: var(--faint); background: none; border: none; padding: 0;
+  cursor: pointer; transition: color 0.14s;
+}
+.eye:hover { color: var(--muted); }
+
 .error {
   background: #FEF2F2; color: #DC2626;
   padding: 10px 14px; border-radius: 10px;

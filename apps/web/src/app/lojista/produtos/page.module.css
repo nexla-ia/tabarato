@@ -90,6 +90,28 @@
 
 .checkRow { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13.5px; font-weight: 500; cursor: pointer; }
 
+.hint { color: var(--muted); font-size: 12px; margin-top: 5px; }
+
+.imgUploadRow { display: flex; align-items: center; gap: 12px; }
+.imgPreview {
+  width: 52px; height: 52px; border-radius: 11px; flex-shrink: 0;
+  background: var(--bg); border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--faint); overflow: hidden;
+}
+.imgPreview img { width: 100%; height: 100%; object-fit: cover; }
+.imgBtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1.5px solid var(--border); border-radius: 9px;
+  padding: 8px 13px; font-size: 13px; font-weight: 700; color: var(--text);
+  background: var(--card); transition: border-color 0.12s;
+}
+.imgBtn:hover { border-color: var(--orange); }
+.imgBtn:disabled { opacity: 0.7; }
+.imgErr { color: #DC2626; font-size: 11.5px; font-weight: 600; margin-top: 5px; }
+.spin { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .modalActions { display: flex; gap: 10px; margin-top: 20px; }
 .modalCancel { flex: 1; padding: 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); font-weight: 700; font-size: 14px; color: var(--muted); }
 .modalConfirm { flex: 1; padding: 12px; border-radius: 10px; background: var(--orange); color: #fff; font-weight: 700; font-size: 14px; }

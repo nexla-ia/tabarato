@@ -31,7 +31,7 @@
   padding: 3px 10px; border-radius: 20px; letter-spacing: 0.3px;
 }
 
-.body { margin-top: -40px; }
+.body { position: relative; z-index: 1; margin-top: -40px; }
 
 /* Atalhos rápidos */
 .quickLinks {
@@ -85,6 +85,15 @@
 }
 .input:focus { border-color: var(--orange); }
 .input:disabled { opacity: 0.55; cursor: default; }
+
+.passField { position: relative; display: flex; align-items: center; }
+.passField .input { width: 100%; padding-right: 42px; }
+.eye {
+  position: absolute; right: 12px;
+  display: flex; color: var(--faint); background: none; border: none; padding: 0;
+  cursor: pointer; transition: color 0.14s;
+}
+.eye:hover { color: var(--muted); }
 
 .saveBtn {
   background: var(--orange); color: #fff;

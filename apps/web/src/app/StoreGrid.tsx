@@ -13,7 +13,7 @@ interface Store {
 async function getStores(q?: string, cat?: string): Promise<Store[]> {
   const qs = new URLSearchParams()
   if (q) qs.set('search', q)
-  if (cat) qs.set('category', cat)
+  if (cat) qs.set('categoryId', cat)
   const url = `${BASE}/stores${qs.toString() ? `?${qs}` : ''}`
   try {
     const res = await fetch(url, { next: { revalidate: 60 } })

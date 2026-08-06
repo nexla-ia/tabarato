@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { BASE } from '@/lib/api'
+import { ScrollRail } from './ScrollRail'
 import styles from './CategoryRail.module.css'
 
 interface Category { id: string; name: string; icon?: string | null }
@@ -31,7 +32,7 @@ export async function CategoryRail({ active }: { active?: string }) {
 
   return (
     <section className={styles.section}>
-      <div className={`hideScroll ${styles.rail}`}>
+      <ScrollRail>
         <Link href="/#lojas" className={`${styles.chip} ${!active ? styles.chipActive : ''}`}>
           <span className={styles.emoji}>✨</span>
           <span>Todas</span>
@@ -46,7 +47,7 @@ export async function CategoryRail({ active }: { active?: string }) {
             <span>{c.name}</span>
           </Link>
         ))}
-      </div>
+      </ScrollRail>
     </section>
   )
 }

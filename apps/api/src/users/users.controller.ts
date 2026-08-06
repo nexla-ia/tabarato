@@ -1,10 +1,12 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { UsersService } from './users.service'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { CreateAddressDto } from './dto/create-address.dto'
 import { PushTokenDto } from './dto/push-token.dto'
+import { ChangePasswordDto } from './dto/change-password.dto'
 
 @UseGuards(JwtAuthGuard)
 @Controller('users')
@@ -33,6 +35,13 @@ export class UsersController {
   @Put('me/push-token')
   updatePushToken(@CurrentUser() user: any, @Body() dto: PushTokenDto) {
     return this.usersService.updatePushToken(user.sub, dto.token)
+  }
+
+  // Limite contra brute-force de senha atual: 8 tentativas por minuto por usuário.
+  @Throttle({ default: { ttl: 60_000, limit: 8 } })
+  @Patch('me/password')
+  changePassword(@CurrentUser() user: any, @Body() dto: ChangePasswordDto) {
+    return this.usersService.changePassword(user.sub, dto)
   }
 
   @Get('me/addresses')

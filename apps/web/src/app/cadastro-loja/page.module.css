@@ -187,6 +187,16 @@
 .catChip:hover { border-color: var(--orange); }
 .catChipActive { border-color: var(--orange); background: var(--orange-light); color: var(--orange-dark, var(--orange)); }
 .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.customCatInput {
+  width: 100%; margin-top: 10px;
+  border: 1.5px solid var(--border); border-radius: 10px;
+  background: var(--bg-warm); padding: 11px 13px; font-size: 14px; color: var(--text);
+  outline: none; transition: border-color 0.15s;
+}
+.customCatInput:focus { border-color: var(--orange); }
+.customCatInput::placeholder { color: var(--faint); }
+.hintOk { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: #16A34A; margin-top: 6px; }
+.hintErr { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: #DC2626; margin-top: 6px; }
 
 .error {
   background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA;

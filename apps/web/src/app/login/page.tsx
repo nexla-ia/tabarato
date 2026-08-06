@@ -3,7 +3,7 @@ import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import styles from './page.module.css'
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const { login } = useAuth()
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
 
@@ -61,12 +62,17 @@ export default function LoginPage() {
           />
 
           <label className={styles.label}>Senha</label>
-          <input
-            className={styles.input}
-            type="password" required
-            value={password} onChange={e => setPassword(e.target.value)}
-            placeholder="••••••••"
-          />
+          <div className={styles.passField}>
+            <input
+              className={styles.input}
+              type={showPass ? 'text' : 'password'} required
+              value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+            <button type="button" className={styles.eye} onClick={() => setShowPass(v => !v)}>
+              {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </div>
 
           {error && <div className={styles.error}>{error}</div>}
 

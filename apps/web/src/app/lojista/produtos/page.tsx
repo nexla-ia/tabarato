@@ -1,16 +1,17 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, X, Package } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Package, Camera, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Product, Store, Category, money } from '@/lib/types'
+import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
 import styles from './page.module.css'
 
 interface FormState {
   id?: string
   name: string
   description: string
-  basePrice: string
+  basePrice: string // dígitos crus em centavos (máscara "de trás pra frente")
   stock: string
   categoryId: string
   imageUrl: string
@@ -22,6 +23,9 @@ const EMPTY: FormState = { name: '', description: '', basePrice: '', stock: '', 
 export default function ProdutosPage() {
   const qc = useQueryClient()
   const [form, setForm] = useState<FormState | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [imageError, setImageError] = useState('')
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   const storeQ = useQuery<Store>({ queryKey: ['store-my'], queryFn: async () => (await api.get('/stores/my')).data })
   const productsQ = useQuery<Product[]>({ queryKey: ['products-my'], queryFn: async () => (await api.get('/products/my')).data })
@@ -32,7 +36,7 @@ export default function ProdutosPage() {
       const payload = {
         name: f.name,
         description: f.description || undefined,
-        basePrice: Number(f.basePrice),
+        basePrice: moneyInputToNumber(f.basePrice),
         stock: f.stock === '' ? null : Number(f.stock),
         categoryId: f.categoryId || undefined,
         imageUrl: f.imageUrl || undefined,
@@ -43,6 +47,21 @@ export default function ProdutosPage() {
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['products-my'] }); setForm(null) },
   })
+
+  async function handleImageFile(file: File) {
+    setImageError('')
+    setUploadingImage(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const { data } = await api.post<{ url: string }>('/uploads/image', formData)
+      setForm((f) => f && { ...f, imageUrl: data.url })
+    } catch {
+      setImageError('Não foi possível enviar a imagem. Use JPEG, PNG ou WEBP de até 10MB.')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
   const toggle = useMutation({
     mutationFn: async (id: string) => (await api.patch(`/products/${id}/toggle`)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products-my'] }),
@@ -57,7 +76,7 @@ export default function ProdutosPage() {
   function edit(p: Product) {
     setForm({
       id: p.id, name: p.name, description: p.description ?? '',
-      basePrice: String(Number(p.basePrice)), stock: p.stock == null ? '' : String(p.stock),
+      basePrice: String(Math.round(Number(p.basePrice) * 100)), stock: p.stock == null ? '' : String(p.stock),
       categoryId: p.categoryId ?? '', imageUrl: p.imageUrl ?? '', isActive: p.isActive,
     })
   }
@@ -130,7 +149,12 @@ export default function ProdutosPage() {
             <div className={styles.row}>
               <div style={{ flex: 1 }}>
                 <label className={styles.label}>Preço (R$) *</label>
-                <input className={styles.input} type="number" step="0.01" value={form.basePrice} onChange={e => setForm({ ...form, basePrice: e.target.value })} placeholder="0,00" />
+                <input
+                  className={styles.input} inputMode="numeric"
+                  value={formatMoneyInput(form.basePrice)}
+                  onChange={e => setForm({ ...form, basePrice: onlyDigits(e.target.value) })}
+                  placeholder="0,00"
+                />
               </div>
               <div style={{ flex: 1 }}>
                 <label className={styles.label}>Estoque</label>
@@ -144,8 +168,23 @@ export default function ProdutosPage() {
               {(catsQ.data ?? []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
 
-            <label className={styles.label}>URL da imagem</label>
-            <input className={styles.input} value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://…" />
+            <label className={styles.label}>Foto do produto</label>
+            <div className={styles.imgUploadRow}>
+              <div className={styles.imgPreview}>
+                {form.imageUrl ? <img src={form.imageUrl} alt="" /> : <Package size={22} strokeWidth={1.5} />}
+              </div>
+              <div>
+                <input
+                  ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageFile(f); e.target.value = '' }}
+                />
+                <button type="button" className={styles.imgBtn} onClick={() => imageInputRef.current?.click()} disabled={uploadingImage}>
+                  {uploadingImage ? <><Loader2 size={14} className={styles.spin} /> Enviando…</> : <><Camera size={14} /> {form.imageUrl ? 'Trocar foto' : 'Enviar foto'}</>}
+                </button>
+                {imageError && <p className={styles.imgErr}>{imageError}</p>}
+              </div>
+            </div>
 
             <label className={styles.checkRow}>
               <input type="checkbox" checked={form.isActive} onChange={e => setForm({ ...form, isActive: e.target.checked })} />
