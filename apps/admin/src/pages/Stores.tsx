@@ -123,7 +123,21 @@ export function Stores() {
                     </div>
                   </div>
                 </td>
-                <td style={{ ...TD, fontSize: 12.5, color: MUTED, fontFamily: MONO, whiteSpace: 'nowrap' as const }}>{fmtCNPJ(s.cnpj)}</td>
+                <td style={{ ...TD, whiteSpace: 'nowrap' as const }}>
+                  <div style={{ fontSize: 12.5, color: MUTED, fontFamily: MONO }}>{fmtCNPJ(s.cnpj)}</div>
+                  {s.documentUrl ? (
+                    <a
+                      href={s.documentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 11.5, color: O, fontWeight: 700, fontFamily: SANS, textDecoration: 'none' }}
+                    >
+                      📄 Ver documento
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: 11, color: LIGHT, fontFamily: SANS }}>sem documento</span>
+                  )}
+                </td>
                 <td style={{ ...TD, fontSize: 12, color: MUTED, fontFamily: SANS, maxWidth: 160 }}>
                   <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{s.address}</div>
                 </td>

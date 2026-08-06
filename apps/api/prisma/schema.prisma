@@ -171,6 +171,9 @@ model Store {
   address          String
   pixKey           String?     @map("pix_key")
   photos           String[]    @default([])
+  // Documento da empresa (Cartão CNPJ ou CCMEI do MEI) — enviado pelo lojista
+  // e conferido pelo admin antes de aprovar a loja.
+  documentUrl      String?     @map("document_url")
   openingHours         Json?    @map("opening_hours")
   scheduleExceptions   Json?    @map("schedule_exceptions")
   isOpen               Boolean  @default(false) @map("is_open")

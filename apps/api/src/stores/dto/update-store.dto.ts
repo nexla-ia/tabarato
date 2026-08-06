@@ -55,6 +55,12 @@ export class UpdateStoreDto {
   @MaxLength(500)
   logoUrl?: string
 
+  // Documento da empresa (Cartão CNPJ / CCMEI) — URL do arquivo enviado.
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  documentUrl?: string
+
   @IsArray()
   @ArrayMaxSize(20)
   @IsUrl({}, { each: true })
