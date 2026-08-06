@@ -14,3 +14,13 @@ export function emojiFor(icon?: string | null): string {
   if (!icon) return '🏪'
   return ICONS[icon] ?? '🏪'
 }
+
+// "Outros" é o catch-all — sempre por último em qualquer lista de categorias.
+export function sortCategoriesOutrosLast<T extends { name: string }>(categories: T[]): T[] {
+  return [...categories].sort((a, b) => {
+    const aOutros = a.name.trim().toLowerCase() === 'outros'
+    const bOutros = b.name.trim().toLowerCase() === 'outros'
+    if (aOutros === bOutros) return 0
+    return aOutros ? 1 : -1
+  })
+}

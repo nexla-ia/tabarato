@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { BASE } from '@/lib/api'
-import { emojiFor } from '@/lib/categoryIcons'
+import { emojiFor, sortCategoriesOutrosLast } from '@/lib/categoryIcons'
 import { ScrollRail } from './ScrollRail'
 import styles from './CategoryRail.module.css'
 
@@ -15,7 +15,7 @@ async function getCategories(): Promise<Category[]> {
 }
 
 export async function CategoryRail({ active }: { active?: string }) {
-  const cats = await getCategories()
+  const cats = sortCategoriesOutrosLast(await getCategories())
   if (!cats.length) return null
 
   return (

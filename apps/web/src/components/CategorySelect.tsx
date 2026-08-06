@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Search, Check } from 'lucide-react'
-import { emojiFor } from '@/lib/categoryIcons'
+import { emojiFor, sortCategoriesOutrosLast } from '@/lib/categoryIcons'
 import styles from './CategorySelect.module.css'
 
 interface Option { id: string; name: string; icon?: string | null }
@@ -19,8 +19,9 @@ export function CategorySelect({
   const wrapRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const selected = options.find(o => o.id === value)
-  const filtered = options.filter(o => o.name.toLowerCase().includes(query.trim().toLowerCase()))
+  const sortedOptions = sortCategoriesOutrosLast(options)
+  const selected = sortedOptions.find(o => o.id === value)
+  const filtered = sortedOptions.filter(o => o.name.toLowerCase().includes(query.trim().toLowerCase()))
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {

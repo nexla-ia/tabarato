@@ -11,6 +11,7 @@ import {
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { onlyDigits, formatCnpj, formatPhone, validateCnpj, joinList } from '@/lib/masks'
+import { sortCategoriesOutrosLast } from '@/lib/categoryIcons'
 import { lookupCnpj } from '@/lib/cnpjLookup'
 import { reverseGeocode } from '@/lib/geocoding'
 import styles from './page.module.css'
@@ -82,12 +83,7 @@ export default function CadastroLojaPage() {
   }
 
   // "Outros" sempre por último — e some junto com o campo de texto quando desmarcada.
-  const sortedCategories = [...categories].sort((a, b) => {
-    const aOutros = a.name.trim().toLowerCase() === 'outros'
-    const bOutros = b.name.trim().toLowerCase() === 'outros'
-    if (aOutros === bOutros) return 0
-    return aOutros ? 1 : -1
-  })
+  const sortedCategories = sortCategoriesOutrosLast(categories)
   const outrosCategory = categories.find((c) => c.name.trim().toLowerCase() === 'outros')
   const outrosSelected = !!outrosCategory && selectedCats.includes(outrosCategory.id)
 
