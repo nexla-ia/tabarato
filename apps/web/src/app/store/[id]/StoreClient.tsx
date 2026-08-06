@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Phone, Store as StoreIcon } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
+import { formatPhone } from '@/lib/masks'
 import styles from './StoreClient.module.css'
 
 interface Variation { id: string; name: string; price: number | string; stock?: number | null }
@@ -146,7 +147,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
                 <Phone size={16} />
                 <div>
                   <div className={styles.infoLabel}>Contato</div>
-                  <div className={`${styles.infoValue} ${styles.infoLink}`}>{store.phone}</div>
+                  <div className={`${styles.infoValue} ${styles.infoLink}`}>{formatPhone(store.phone)}</div>
                 </div>
               </a>
             )}
