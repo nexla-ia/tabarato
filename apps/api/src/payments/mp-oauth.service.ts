@@ -136,6 +136,13 @@ export class MpOauthService {
       this.logger.error(`MP OAuth exchange failed: ${JSON.stringify(data)}`)
       throw new BadRequestException('Não foi possível conectar a conta Mercado Pago.')
     }
+    // Conta de TESTE do MP (live_mode: false) não recebe application_fee — se
+    // conectada aqui, o split só falha depois, na hora de cobrar (erro genérico
+    // "cannot use application_fee"). Barra na conexão, com mensagem clara.
+    if (data.live_mode === false) {
+      this.logger.warn(`${type} ${id.slice(0, 8)} tentou conectar conta MP de TESTE (live_mode=false)`)
+      throw new BadRequestException('Essa é uma conta de teste do Mercado Pago. Conecte com sua conta real (de produção) para receber pagamentos de verdade.')
+    }
     await this.persist(type, id, {
       mpUserId: String(data.user_id),
       mpAccessToken: this.encrypt(data.access_token),

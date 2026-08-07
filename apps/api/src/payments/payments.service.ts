@@ -74,8 +74,14 @@ export class PaymentsService {
         } as any,
       })
     } catch (err: any) {
-      const detail = this.extractMpError(err)
+      let detail = this.extractMpError(err)
       this.logger.error(`PIX create falhou (pedido ${orderId.slice(0, 8)}): ${detail}`, JSON.stringify(err?.cause ?? err?.message ?? err ?? ''))
+      // "cannot use application_fee": a conta MP conectada pela loja não aceita
+      // split (ex.: conta de teste, ou tipo de conta não elegível pra marketplace).
+      // Mensagem genérica do MP não ajuda o lojista — troca por uma acionável.
+      if (opts?.sellerToken && /application_fee/i.test(detail)) {
+        detail = 'a conta Mercado Pago conectada pela loja não aceita repasse automático (comissão). Peça ao lojista para desconectar e reconectar com a conta real (de produção) em Configurações → Recebimentos.'
+      }
       // Repassa o motivo pra camada de cima incluir na resposta ao app (diagnóstico).
       throw new Error(detail)
     }
