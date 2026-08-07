@@ -1,7 +1,8 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { WalletService } from '../wallet/wallet.service'
+import { MpOauthService } from '../payments/mp-oauth.service'
 import { CreateStoreDto } from './dto/create-store.dto'
 import { UpdateStoreDto } from './dto/update-store.dto'
 
@@ -50,7 +51,11 @@ function computeIsOpen(openingHours: any): boolean | null {
 @Injectable()
 export class StoresService {
   private readonly logger = new Logger(StoresService.name)
-  constructor(private prisma: PrismaService, private wallet: WalletService) {}
+  constructor(
+    private prisma: PrismaService,
+    private wallet: WalletService,
+    private mpOauth: MpOauthService,
+  ) {}
 
   // isOpen (mostrado ao cliente) = aberto pelo horário E não pausado manualmente.
   private async syncIsOpen(storeId: string, openingHours: any, currentIsOpen: boolean, isPaused = false): Promise<void> {
@@ -205,6 +210,18 @@ export class StoresService {
     if (!store) throw new NotFoundException('Store not found')
 
     const nextPaused = !store.isPaused
+
+    // Trava: a loja só pode ABRIR (nextPaused = false) depois de conectar o
+    // Mercado Pago — sem isso ela não recebe pagamento (PIX/cartão) e o pedido
+    // seria barrado no checkout de qualquer forma. Só vale quando o marketplace
+    // está configurado (feature flag).
+    if (!nextPaused && this.mpOauth.isEnabled() && !(store as any).mpConnected) {
+      throw new BadRequestException(
+        'Conecte sua conta Mercado Pago em Configurações antes de abrir a loja. ' +
+        'Lembre de ter uma chave PIX cadastrada na conta MP para receber por PIX.',
+      )
+    }
+
     const scheduleOpen = computeIsOpen(store.openingHours)
     const effectiveOpen = scheduleOpen === null ? !nextPaused : (scheduleOpen && !nextPaused)
 
