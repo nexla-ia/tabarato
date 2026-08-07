@@ -382,10 +382,16 @@ export class OrdersService {
     // PIX — await so the QR code is available when the response returns
     if (dto.paymentMethod === 'PIX') {
       try {
-        await this.payments.createPixPayment(
+        const pixResult = await this.payments.createPixPayment(
           payment.id, total, order.id, payer?.email ?? 'cliente@tabarato.com.br',
           splitOpts,
         )
+        // O split foi recusado pelo MP e caiu pro modo centralizado — o dinheiro
+        // não está na conta da loja, então reembolso futuro não pode usar o token
+        // dela (ver refundPayment). Comissão precisa ser retida manualmente aqui.
+        if (pixResult.splitFellBack) {
+          await this.prisma.order.update({ where: { id: order.id }, data: { paidViaSplit: false } }).catch(() => {})
+        }
       } catch (err: any) {
         this.logger.error('PIX payment creation failed after order was saved', err)
         // Pedido já gravado mas o PIX não foi gerado: cancela e devolve estoque/cupom/pontos.
@@ -409,6 +415,9 @@ export class OrdersService {
           dto.payerCpf,
           splitOpts,
         )
+        if (result.splitFellBack) {
+          await this.prisma.order.update({ where: { id: order.id }, data: { paidViaSplit: false } }).catch(() => {})
+        }
         if (result.status === 'PAID') {
           await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } })
           if (store.user?.pushToken) {

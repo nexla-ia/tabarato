@@ -46,6 +46,14 @@ export class PaymentsService {
     return (typeof msg === 'string' ? msg : JSON.stringify(msg ?? 'erro desconhecido')).slice(0, 200)
   }
 
+  /** Códigos MP crus (cause[].code), separado da descrição — pra diagnosticar no log sem
+   *  depender só do texto em inglês (que às vezes é genérico pra várias causas diferentes). */
+  private extractMpErrorCodes(err: any): string {
+    const cause = err?.cause ?? err?.error?.cause ?? err?.response?.cause
+    if (!Array.isArray(cause)) return ''
+    return cause.map((c: any) => c?.code).filter(Boolean).join(',')
+  }
+
   // ── PIX ──────────────────────────────────────────────────────────────────────
 
   async createPixPayment(
@@ -56,34 +64,52 @@ export class PaymentsService {
     const webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
       ?? `${apiUrl}/api/webhooks/mercadopago`
 
+    const buildBody = (useSplit: boolean) => ({
+      transaction_amount: amount,
+      description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
+      payment_method_id: 'pix',
+      payer: { email: payerEmail },
+      notification_url: webhookUrl,
+      external_reference: orderId,
+      date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      // Split: comissão da plataforma vai pra conta da Tá Barato
+      ...(useSplit && opts?.sellerToken && opts?.applicationFee
+        ? { application_fee: Math.round(opts.applicationFee * 100) / 100 }
+        : {}),
+    } as any)
+
     let response: any
+    let splitFellBack = false
     try {
-      response = await this.clientFor(opts?.sellerToken).create({
-        body: {
-          transaction_amount: amount,
-          description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
-          payment_method_id: 'pix',
-          payer: { email: payerEmail },
-          notification_url: webhookUrl,
-          external_reference: orderId,
-          date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-          // Split: comissão da plataforma vai pra conta da Tá Barato
-          ...(opts?.sellerToken && opts?.applicationFee
-            ? { application_fee: Math.round(opts.applicationFee * 100) / 100 }
-            : {}),
-        } as any,
-      })
+      response = await this.clientFor(opts?.sellerToken).create({ body: buildBody(true) })
     } catch (err: any) {
-      let detail = this.extractMpError(err)
-      this.logger.error(`PIX create falhou (pedido ${orderId.slice(0, 8)}): ${detail}`, JSON.stringify(err?.cause ?? err?.message ?? err ?? ''))
-      // "cannot use application_fee": a conta MP conectada pela loja não aceita
-      // split (ex.: conta de teste, ou tipo de conta não elegível pra marketplace).
-      // Mensagem genérica do MP não ajuda o lojista — troca por uma acionável.
-      if (opts?.sellerToken && /application_fee/i.test(detail)) {
-        detail = 'a conta Mercado Pago conectada pela loja não aceita repasse automático (comissão). Peça ao lojista para desconectar e reconectar com a conta real (de produção) em Configurações → Recebimentos.'
+      const detail = this.extractMpError(err)
+      const codes = this.extractMpErrorCodes(err)
+      this.logger.error(
+        `PIX create falhou (pedido ${orderId.slice(0, 8)}, sellerToken=${opts?.sellerToken ? 'sim' : 'não'}, fee=${opts?.applicationFee ?? 0}, codes=${codes || 'n/a'}): ${detail}`,
+        JSON.stringify(err?.cause ?? err?.message ?? err ?? ''),
+      )
+      // "cannot use application_fee": o MP recusou o split nessa cobrança. Causas
+      // possíveis (nenhuma diagnosticável só pelo texto genérico do erro — exigem
+      // olhar o painel do MP): 1) o App (client_id) não está configurado como
+      // "Marketplace" nas integrações do MP; 2) a conta conectada não é elegível
+      // pra receber application_fee via PIX (restrição por tipo/nível de conta,
+      // mesmo em produção); 3) conta de teste (já bloqueado na conexão).
+      // Fallback: cobra centralizado (conta da plataforma, sem comissão embutida)
+      // pra não travar a venda enquanto a config do split não é resolvida no MP.
+      // O caller marca o pedido como NÃO pago via split (paidViaSplit=false), pra
+      // reembolso futuro usar o token certo e a comissão ser retida manualmente.
+      if (!opts?.sellerToken || !/application_fee/i.test(detail)) throw new Error(detail)
+
+      this.logger.warn(`PIX pedido ${orderId.slice(0, 8)}: caindo pro modo centralizado (split recusado pelo MP)`)
+      try {
+        response = await this.clientFor(null).create({ body: buildBody(false) })
+        splitFellBack = true
+      } catch (err2: any) {
+        const detail2 = this.extractMpError(err2)
+        this.logger.error(`PIX create (fallback centralizado) também falhou (pedido ${orderId.slice(0, 8)}): ${detail2}`)
+        throw new Error(detail2)
       }
-      // Repassa o motivo pra camada de cima incluir na resposta ao app (diagnóstico).
-      throw new Error(detail)
     }
 
     const pixCode     = response.point_of_interaction?.transaction_data?.qr_code ?? null
@@ -107,7 +133,7 @@ export class PaymentsService {
       },
     })
 
-    return { gatewayId, pixCode, pixQrBase64 }
+    return { gatewayId, pixCode, pixQrBase64, splitFellBack }
   }
 
   // ── Cartão de crédito/débito ──────────────────────────────────────────────────
@@ -125,25 +151,36 @@ export class PaymentsService {
     const webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
       ?? `${this.config.get<string>('API_URL') ?? ''}/api/webhooks/mercadopago`
 
-    const response = await this.clientFor(opts?.sellerToken).create({
-      body: {
-        transaction_amount: amount,
-        token: cardToken,
-        description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
-        installments,
-        payer: {
-          email: payerEmail,
-          ...(payerCpf
-            ? { identification: { type: 'CPF', number: payerCpf.replace(/\D/g, '') } }
-            : {}),
-        },
-        notification_url: webhookUrl,
-        external_reference: orderId,
-        ...(opts?.sellerToken && opts?.applicationFee
-          ? { application_fee: Math.round(opts.applicationFee * 100) / 100 }
+    const buildBody = (useSplit: boolean) => ({
+      transaction_amount: amount,
+      token: cardToken,
+      description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
+      installments,
+      payer: {
+        email: payerEmail,
+        ...(payerCpf
+          ? { identification: { type: 'CPF', number: payerCpf.replace(/\D/g, '') } }
           : {}),
-      } as any,
-    })
+      },
+      notification_url: webhookUrl,
+      external_reference: orderId,
+      ...(useSplit && opts?.sellerToken && opts?.applicationFee
+        ? { application_fee: Math.round(opts.applicationFee * 100) / 100 }
+        : {}),
+    } as any)
+
+    let response: any
+    let splitFellBack = false
+    try {
+      response = await this.clientFor(opts?.sellerToken).create({ body: buildBody(true) })
+    } catch (err: any) {
+      const detail = this.extractMpError(err)
+      if (!opts?.sellerToken || !/application_fee/i.test(detail)) throw err
+
+      this.logger.warn(`Cartão pedido ${orderId.slice(0, 8)}: caindo pro modo centralizado (split recusado pelo MP): ${detail}`)
+      response = await this.clientFor(null).create({ body: buildBody(false) })
+      splitFellBack = true
+    }
 
     const mpStatus  = response.status
     const gatewayId = String(response.id)
@@ -157,7 +194,7 @@ export class PaymentsService {
       data: { gatewayId, status, paidAt: status === 'PAID' ? new Date() : undefined },
     })
 
-    return { gatewayId, status, mpStatus, statusDetail: (response as any).status_detail }
+    return { gatewayId, status, mpStatus, statusDetail: (response as any).status_detail, splitFellBack }
   }
 
   // ── Webhook ───────────────────────────────────────────────────────────────────
