@@ -69,9 +69,11 @@ export function SearchBar() {
           value={q}
           onChange={e => setQ(e.target.value)}
           onFocus={() => setOpen(true)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); runSearch(q) } }}
           placeholder="Busque por loja ou produto…"
           aria-label="Buscar"
           autoComplete="off"
+          enterKeyHint="search"
         />
         {q && (
           <button type="button" className={styles.clear} onClick={clear} aria-label="Limpar">

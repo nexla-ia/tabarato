@@ -21,34 +21,42 @@ export default async function HomePage({
       <Navbar />
       <main>
         {/* ── Hero ── */}
-        <section className={styles.hero}>
-          <div className={styles.heroGlow} />
-          <div className={styles.heroBlob1} />
-          <div className={styles.heroBlob2} />
+        <section className={`${styles.hero} ${filtering ? styles.heroCompact : ''}`}>
+          {!filtering && <div className={styles.heroGlow} />}
+          {!filtering && <div className={styles.heroBlob1} />}
+          {!filtering && <div className={styles.heroBlob2} />}
           <div className={`container ${styles.heroInner}`}>
             <div className={styles.heroCopy}>
-              <span className={styles.heroBadge}>🛵 Entrega no mesmo dia · Vilhena-RO</span>
-              <h1 className={styles.heroTitle}>
-                O comércio local<br />na palma da<span className={styles.heroTitleAccent}> sua mão</span>
-              </h1>
-              <p className={styles.heroSub}>
-                Peça de restaurantes, lanchonetes e lojas da cidade e receba rapidinho em casa.
-              </p>
+              {!filtering && (
+                <>
+                  <span className={styles.heroBadge}>🛵 Entrega no mesmo dia · Vilhena-RO</span>
+                  <h1 className={styles.heroTitle}>
+                    O comércio local<br />na palma da<span className={styles.heroTitleAccent}> sua mão</span>
+                  </h1>
+                  <p className={styles.heroSub}>
+                    Peça de restaurantes, lanchonetes e lojas da cidade e receba rapidinho em casa.
+                  </p>
+                </>
+              )}
               <Suspense fallback={<div className={styles.searchFallback} />}>
                 <SearchBar />
               </Suspense>
             </div>
-            <div className={styles.heroArt}>
-              <Image src="/logo.png" alt="Tá Barato" width={280} height={280} priority className={styles.heroLogo} style={{ objectFit: 'contain' }} />
-            </div>
+            {!filtering && (
+              <div className={styles.heroArt}>
+                <Image src="/logo.png" alt="Tá Barato" width={280} height={280} priority className={styles.heroLogo} style={{ objectFit: 'contain' }} />
+              </div>
+            )}
           </div>
-          <div className={styles.heroWave} />
+          {!filtering && <div className={styles.heroWave} />}
         </section>
 
         <div className="container">
-          <Suspense fallback={null}>
-            <CategoryRail active={cat} />
-          </Suspense>
+          {!filtering && (
+            <Suspense fallback={null}>
+              <CategoryRail active={cat} />
+            </Suspense>
+          )}
 
           {!filtering && (
             <>

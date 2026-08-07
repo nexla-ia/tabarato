@@ -8,6 +8,12 @@
   padding: 56px 0 96px;
   margin-bottom: 20px;
 }
+.heroCompact {
+  padding: 20px 0;
+  margin-bottom: 8px;
+}
+.heroCompact .heroInner { justify-content: center; }
+.heroCompact .heroCopy { max-width: 560px; animation: none; }
 .heroGlow {
   position: absolute; inset: 0;
   background: radial-gradient(600px 300px at 15% 120%, rgba(26,10,0,0.28), transparent 70%);
