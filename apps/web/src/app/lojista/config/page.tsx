@@ -43,9 +43,13 @@ export default function ConfigPage() {
 
   async function connectMp() {
     setConnecting(true)
+    // Reserva a mesma aba já no clique (gesto do usuário), antes do await —
+    // senão alguns navegadores (Safari/iOS) tratam o redirect pós-fetch como
+    // popup não confiável e abrem em aba nova.
+    const tab = window.open('', '_self')
     try {
       const { data } = await api.get<{ url: string }>('/stores/mp/connect')
-      window.location.href = data.url
+      ;(tab ?? window).location.href = data.url
     } catch {
       setConnecting(false)
       setMpMsg('erro')
