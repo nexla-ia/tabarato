@@ -41,16 +41,27 @@ export default function ConfigPage() {
     }
   }, [qc])
 
+  // O Mercado Pago abre em aba nova — ao voltar o foco pra essa aba,
+  // reconsulta o status pra refletir se a conexão foi concluída lá.
+  useEffect(() => {
+    function onFocus() { qc.invalidateQueries({ queryKey: ['mp-status'] }) }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [qc])
+
   async function connectMp() {
     setConnecting(true)
-    // Reserva a mesma aba já no clique (gesto do usuário), antes do await —
-    // senão alguns navegadores (Safari/iOS) tratam o redirect pós-fetch como
-    // popup não confiável e abrem em aba nova.
-    const tab = window.open('', '_self')
+    // Reserva a aba nova já no clique (gesto do usuário), antes do await —
+    // senão o navegador pode bloquear a abertura por não considerar o
+    // redirect pós-fetch um popup confiável.
+    const tab = window.open('', '_blank')
     try {
       const { data } = await api.get<{ url: string }>('/stores/mp/connect')
-      ;(tab ?? window).location.href = data.url
+      if (tab) tab.location.href = data.url
+      else window.open(data.url, '_blank')
+      setConnecting(false)
     } catch {
+      tab?.close()
       setConnecting(false)
       setMpMsg('erro')
     }
