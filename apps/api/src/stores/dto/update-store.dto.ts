@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsInt, IsNumber, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
 
 export class UpdateStoreDto {
   @IsString()
@@ -63,7 +63,8 @@ export class UpdateStoreDto {
 
   @IsArray()
   @ArrayMaxSize(20)
-  @IsUrl({}, { each: true })
+  @IsString({ each: true })
+  @MaxLength(500, { each: true })
   @IsOptional()
   photos?: string[]
 
