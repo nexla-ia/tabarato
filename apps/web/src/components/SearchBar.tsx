@@ -38,13 +38,12 @@ export function SearchBar() {
     return () => document.removeEventListener('mousedown', onOutside)
   }, [])
 
-  // Pesquisa abre em aba nova — mantém a home (com o histórico) aberta atrás.
   function runSearch(term: string) {
     const clean = term.trim()
     if (!clean) return
     setRecent(saveRecent(clean))
     setOpen(false)
-    window.open(`/?q=${encodeURIComponent(clean)}#lojas`, '_blank')
+    router.push(`/?q=${encodeURIComponent(clean)}#lojas`)
   }
 
   function submit(e: FormEvent) {
