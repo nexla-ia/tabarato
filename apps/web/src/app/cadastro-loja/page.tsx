@@ -305,7 +305,7 @@ export default function CadastroLojaPage() {
               <StepHead Icon={Store} title="Dados da sua loja" desc="Como os clientes vão te encontrar" />
               <Field label="Nome da loja *" Icon={Store} value={storeName} onChange={setStoreName} placeholder="Ex: Burguer do Zé" />
               <Field
-                label="CNPJ *" Icon={FileText} value={cnpj}
+                label="CNPJ / MEI *" Icon={FileText} value={cnpj}
                 onChange={(v) => { setCnpj(formatCnpj(v)); setCnpjStatus('idle') }}
                 onBlur={handleCnpjBlur}
                 placeholder="00.000.000/0000-00"
@@ -313,9 +313,27 @@ export default function CadastroLojaPage() {
                   cnpjStatus === 'checking' ? <span className={styles.hint}><Loader2 size={12} className={styles.spin} /> Verificando CNPJ…</span> :
                   cnpjStatus === 'valid' ? <span className={styles.hintOk}><Check size={12} /> CNPJ válido</span> :
                   cnpjStatus === 'invalid' ? <span className={styles.hintErr}>CNPJ inválido — confira os números.</span> :
-                  null
+                  <span className={styles.hint}>Se você é MEI, use o mesmo número — sua inscrição de MEI é o seu CNPJ.</span>
                 }
               />
+              <Field label="Endereço completo *" Icon={MapPin} value={address} onChange={setAddress} placeholder="Rua, número, bairro — Vilhena, RO" />
+
+              {coords ? (
+                <div className={styles.locOk}>
+                  <Check size={17} />
+                  <div>
+                    <strong>Localização definida</strong>
+                    <span>{coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}</span>
+                  </div>
+                  <button type="button" onClick={getLocation} disabled={locating} className={styles.locRetry}>Atualizar</button>
+                </div>
+              ) : (
+                <button type="button" className={styles.locBtn} onClick={getLocation} disabled={locating}>
+                  {locating ? <Loader2 size={16} className={styles.spin} /> : <MapPin size={16} />}
+                  Usar minha localização (estou na loja)
+                </button>
+              )}
+
               <Field label="Descrição da loja" Icon={MessageSquare} value={description} onChange={setDescription} placeholder="Conte um pouco sobre seu estabelecimento..." multiline />
 
               {/* Categorias — sem ao menos uma, a loja não aparece nos filtros/aba */}
@@ -348,23 +366,6 @@ export default function CadastroLojaPage() {
               </div>
 
               <Field label="Telefone da loja" Icon={Phone} value={storePhone} onChange={(v) => setStorePhone(formatPhone(v))} placeholder="(69) 99999-0000" />
-              <Field label="Endereço completo *" Icon={MapPin} value={address} onChange={setAddress} placeholder="Rua, número, bairro — Vilhena, RO" />
-
-              {coords ? (
-                <div className={styles.locOk}>
-                  <Check size={17} />
-                  <div>
-                    <strong>Localização definida</strong>
-                    <span>{coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}</span>
-                  </div>
-                  <button type="button" onClick={getLocation} disabled={locating} className={styles.locRetry}>Atualizar</button>
-                </div>
-              ) : (
-                <button type="button" className={styles.locBtn} onClick={getLocation} disabled={locating}>
-                  {locating ? <Loader2 size={16} className={styles.spin} /> : <MapPin size={16} />}
-                  Usar minha localização (estou na loja)
-                </button>
-              )}
 
               {error && <div className={styles.error}>{error}</div>}
               <button className={styles.cta} onClick={submitStoreInfo}>Continuar <ArrowRight size={18} /></button>

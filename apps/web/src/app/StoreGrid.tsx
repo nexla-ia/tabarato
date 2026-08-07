@@ -7,7 +7,7 @@ import styles from './StoreGrid.module.css'
 interface Store {
   id: string; name: string; description?: string; logoUrl?: string
   deliveryRadiusKm: number; prepTimeMin: number; isOpen: boolean
-  rating?: number | null
+  rating?: number | null; mpConnected?: boolean
 }
 
 async function getStores(q?: string, cat?: string): Promise<Store[]> {
@@ -18,7 +18,19 @@ async function getStores(q?: string, cat?: string): Promise<Store[]> {
   try {
     const res = await fetch(url, { next: { revalidate: 60 } })
     if (!res.ok) return []
-    return res.json()
+    const stores: Store[] = await res.json()
+    // Verificada (conectada ao Mercado Pago, recebe pedido de verdade) primeiro,
+    // depois aberta antes de fechada — mantém a ordem alfabética dentro de cada grupo.
+    return stores
+      .map((s, i) => ({ s, i }))
+      .sort((a, b) => {
+        const verified = Number(!!b.s.mpConnected) - Number(!!a.s.mpConnected)
+        if (verified) return verified
+        const open = Number(b.s.isOpen) - Number(a.s.isOpen)
+        if (open) return open
+        return a.i - b.i
+      })
+      .map(({ s }) => s)
   } catch { return [] }
 }
 
