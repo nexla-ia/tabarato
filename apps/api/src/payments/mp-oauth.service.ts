@@ -83,29 +83,31 @@ export class MpOauthService {
     return Buffer.from(`${payload}.${sig}`).toString('base64url')
   }
 
-  verifyState(state: string): { type: 'store' | 'courier'; id: string } | null {
+  verifyState(state: string): { type: 'store' | 'courier'; id: string; origin?: string } | null {
     try {
       const decoded = Buffer.from(state, 'base64url').toString('utf8')
       const [subject, ts, sig] = decoded.split('.')
       const expected = crypto.createHmac('sha256', this.stateSecret()).update(`${subject}.${ts}`).digest('hex').slice(0, 32)
       if (sig !== expected) return null
       if (Date.now() - Number(ts) > 30 * 60 * 1000) return null
-      const [type, id] = subject.split(':')
+      // subject = "store:<id>" ou "store:<id>:app" (origin opcional). id é UUID (sem ':').
+      const [type, id, origin] = subject.split(':')
       if ((type !== 'store' && type !== 'courier') || !id) return null
-      return { type, id }
+      return { type, id, origin }
     } catch {
       return null
     }
   }
 
   /** URL de autorização pra conectar a conta MP (loja ou entregador). */
-  getAuthUrl(type: 'store' | 'courier', id: string): string {
+  getAuthUrl(type: 'store' | 'courier', id: string, origin?: string): string {
     if (!this.isEnabled()) throw new BadRequestException('Integração Mercado Pago não configurada.')
+    const subject = `${type}:${id}${origin ? `:${origin}` : ''}`
     const params = new URLSearchParams({
       client_id: this.clientId(),
       response_type: 'code',
       platform_id: 'mp',
-      state: this.signState(`${type}:${id}`),
+      state: this.signState(subject),
       redirect_uri: this.redirectUri(),
     })
     return `https://auth.mercadopago.com.br/authorization?${params.toString()}`
