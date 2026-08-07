@@ -31,6 +31,21 @@ export class PaymentsService {
     return new MPPayment(new MercadoPagoConfig({ accessToken: sellerToken }))
   }
 
+  /**
+   * Extrai uma descrição legível do erro do SDK do Mercado Pago (o QR PIX falhar
+   * quase sempre traz o motivo em `cause[].description` — ex.: conta do lojista
+   * sem chave PIX cadastrada). Usado pra diagnóstico no log e na mensagem ao app.
+   */
+  private extractMpError(err: any): string {
+    const cause = err?.cause ?? err?.error?.cause ?? err?.response?.cause
+    if (Array.isArray(cause) && cause.length) {
+      const parts = cause.map((c: any) => c?.description ?? c?.message ?? c?.code).filter(Boolean)
+      if (parts.length) return parts.join('; ').slice(0, 200)
+    }
+    const msg = err?.message ?? err?.error ?? err?.response?.message
+    return (typeof msg === 'string' ? msg : JSON.stringify(msg ?? 'erro desconhecido')).slice(0, 200)
+  }
+
   // ── PIX ──────────────────────────────────────────────────────────────────────
 
   async createPixPayment(
@@ -41,25 +56,40 @@ export class PaymentsService {
     const webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
       ?? `${apiUrl}/api/webhooks/mercadopago`
 
-    const response = await this.clientFor(opts?.sellerToken).create({
-      body: {
-        transaction_amount: amount,
-        description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
-        payment_method_id: 'pix',
-        payer: { email: payerEmail },
-        notification_url: webhookUrl,
-        external_reference: orderId,
-        date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        // Split: comissão da plataforma vai pra conta da Tá Barato
-        ...(opts?.sellerToken && opts?.applicationFee
-          ? { application_fee: Math.round(opts.applicationFee * 100) / 100 }
-          : {}),
-      } as any,
-    })
+    let response: any
+    try {
+      response = await this.clientFor(opts?.sellerToken).create({
+        body: {
+          transaction_amount: amount,
+          description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
+          payment_method_id: 'pix',
+          payer: { email: payerEmail },
+          notification_url: webhookUrl,
+          external_reference: orderId,
+          date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          // Split: comissão da plataforma vai pra conta da Tá Barato
+          ...(opts?.sellerToken && opts?.applicationFee
+            ? { application_fee: Math.round(opts.applicationFee * 100) / 100 }
+            : {}),
+        } as any,
+      })
+    } catch (err: any) {
+      const detail = this.extractMpError(err)
+      this.logger.error(`PIX create falhou (pedido ${orderId.slice(0, 8)}): ${detail}`, JSON.stringify(err?.cause ?? err?.message ?? err ?? ''))
+      // Repassa o motivo pra camada de cima incluir na resposta ao app (diagnóstico).
+      throw new Error(detail)
+    }
 
     const pixCode     = response.point_of_interaction?.transaction_data?.qr_code ?? null
     const pixQrBase64 = response.point_of_interaction?.transaction_data?.qr_code_base64 ?? null
     const gatewayId   = String(response.id)
+
+    // Sem QR (conta do lojista sem chave PIX / não habilitada a receber PIX):
+    // o MP responde 200 mas sem transaction_data. Trata como falha explícita.
+    if (!pixCode) {
+      this.logger.error(`PIX sem QR (pedido ${orderId.slice(0, 8)}): status=${response?.status} detail=${response?.status_detail}`)
+      throw new Error('a conta Mercado Pago do lojista não gerou o QR Code (verifique se há uma chave PIX cadastrada nela)')
+    }
 
     await this.prisma.payment.update({
       where: { id: paymentId },

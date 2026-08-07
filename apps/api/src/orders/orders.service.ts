@@ -89,7 +89,18 @@ export class OrdersService {
           },
         },
       })
-      if (existing?.orders?.[0]) return existing.orders[0]
+      const prev = existing?.orders?.[0]
+      if (prev) {
+        // Só devolve o pedido anterior se ele ainda estiver VIVO. Se a tentativa
+        // anterior morreu (PIX não gerou o QR ou cartão recusado → pedido CANCELLED
+        // e pagamento FAILED), NÃO devolver o pedido morto como se fosse sucesso —
+        // senão o app troca de método, reenvia a MESMA chave e recebe de volta o
+        // pedido cancelado (mostrando "pago" sem nunca cobrar). Exige nova tentativa
+        // (o app gera uma idempotencyKey nova ao trocar de método / após erro).
+        const dead = prev.status === 'CANCELLED' || (existing as any).status === 'FAILED'
+        if (!dead) return prev
+        throw new BadRequestException('A tentativa de pagamento anterior não foi concluída. Refaça o pedido.')
+      }
     }
 
     const [store, payer] = await Promise.all([
@@ -375,13 +386,15 @@ export class OrdersService {
           payment.id, total, order.id, payer?.email ?? 'cliente@tabarato.com.br',
           splitOpts,
         )
-      } catch (err) {
+      } catch (err: any) {
         this.logger.error('PIX payment creation failed after order was saved', err)
         // Pedido já gravado mas o PIX não foi gerado: cancela e devolve estoque/cupom/pontos.
         await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } }).catch(() => {})
         await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } }).catch(() => {})
         await this.restoreOrderConsumption(order.id)
-        throw new BadRequestException('Não foi possível gerar o QR Code PIX. Tente outro método de pagamento.')
+        // Inclui o motivo real do MP (ex.: "conta sem chave PIX") pra facilitar o diagnóstico.
+        const reason = typeof err?.message === 'string' && err.message ? ` Motivo: ${err.message}.` : ''
+        throw new BadRequestException(`Não foi possível gerar o QR Code PIX.${reason} Tente outro método de pagamento.`)
       }
     }
 
