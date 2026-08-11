@@ -398,9 +398,16 @@ export class OrdersService {
         await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } }).catch(() => {})
         await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } }).catch(() => {})
         await this.restoreOrderConsumption(order.id)
-        // Inclui o motivo real do MP (ex.: "conta sem chave PIX") pra facilitar o diagnóstico.
-        const reason = typeof err?.message === 'string' && err.message ? ` Motivo: ${err.message}.` : ''
-        throw new BadRequestException(`Não foi possível gerar o QR Code PIX.${reason} Tente outro método de pagamento.`)
+        // Mensagem amigável ao cliente (o erro cru do MP é técnico/inglês; o detalhe
+        // completo fica no log acima). Caso clássico: "Collector user without key
+        // enabled for QR render" = a conta MP da loja não tem chave PIX cadastrada.
+        const raw = typeof err?.message === 'string' ? err.message : ''
+        const semChavePix = /without key enabled for QR|key enabled|sem chave|no pix key/i.test(raw)
+        throw new BadRequestException(
+          semChavePix
+            ? 'Esta loja ainda não habilitou o PIX na conta de pagamento. Pague com cartão ou tente novamente mais tarde.'
+            : 'Não foi possível gerar o QR Code PIX agora. Tente pagar com cartão.',
+        )
       }
     }
 
