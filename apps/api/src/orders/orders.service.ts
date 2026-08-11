@@ -392,6 +392,16 @@ export class OrdersService {
         if (pixResult.splitFellBack) {
           await this.prisma.order.update({ where: { id: order.id }, data: { paidViaSplit: false } }).catch(() => {})
         }
+        // Reflete o código PIX no objeto retornado (ele veio da transação, ANTES do
+        // PIX existir) pra o app já receber o QR/copia-e-cola na resposta do checkout.
+        if ((order as any).payment) {
+          Object.assign((order as any).payment, {
+            gatewayId: pixResult.gatewayId,
+            pixCode: pixResult.pixCode,
+            pixQrBase64: pixResult.pixQrBase64,
+            pixExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
+          })
+        }
       } catch (err: any) {
         this.logger.error('PIX payment creation failed after order was saved', err)
         // Pedido já gravado mas o PIX não foi gerado: cancela e devolve estoque/cupom/pontos.
