@@ -416,7 +416,7 @@ export class OrdersService {
         throw new BadRequestException(
           semChavePix
             ? 'Esta loja ainda não habilitou o PIX na conta de pagamento. Pague com cartão ou tente novamente mais tarde.'
-            : 'Não foi possível gerar o QR Code PIX agora. Tente pagar com cartão.',
+            : `Não foi possível gerar o QR Code PIX agora. [diag: ${raw}]`,
         )
       }
     }
