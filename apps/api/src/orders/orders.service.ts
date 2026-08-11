@@ -50,6 +50,21 @@ function calcCourierFee(distanceKm: number): number {
   return Math.round((BASE + distanceKm * RATE) * 100) / 100
 }
 
+/**
+ * E-mail do pagador aceito pelo Mercado Pago. O MP rejeita o pagamento
+ * ("payer.email must be a valid email") quando o e-mail é malformado ou usa um
+ * TLD reservado (.test/.local/.invalid/.example) — comum em contas de teste. Se
+ * o e-mail do cliente não for válido, usa um fallback válido da plataforma.
+ */
+function safePayerEmail(email?: string | null): string {
+  const FALLBACK = 'comprador@tabarato.com.br'
+  if (!email) return FALLBACK
+  const e = email.trim().toLowerCase()
+  const looksValid = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(e)
+  const reservedTld = /\.(test|local|invalid|example|localhost)$/.test(e)
+  return looksValid && !reservedTld ? e : FALLBACK
+}
+
 const STATUS_PUSH: Partial<Record<OrderStatus, { title: string; body: string }>> = {
   CONFIRMED:  { title: '✅ Pedido confirmado!',     body: 'A loja confirmou seu pedido e já está preparando.' },
   PREPARING:  { title: '👨‍🍳 Preparando seu pedido', body: 'A loja está preparando tudo com carinho.' },
@@ -383,7 +398,7 @@ export class OrdersService {
     if (dto.paymentMethod === 'PIX') {
       try {
         const pixResult = await this.payments.createPixPayment(
-          payment.id, total, order.id, payer?.email ?? 'cliente@tabarato.com.br',
+          payment.id, total, order.id, safePayerEmail(payer?.email),
           splitOpts,
         )
         // O split foi recusado pelo MP e caiu pro modo centralizado — o dinheiro
@@ -416,7 +431,7 @@ export class OrdersService {
         throw new BadRequestException(
           semChavePix
             ? 'Esta loja ainda não habilitou o PIX na conta de pagamento. Pague com cartão ou tente novamente mais tarde.'
-            : `Não foi possível gerar o QR Code PIX agora. [diag: ${raw}]`,
+            : 'Não foi possível gerar o QR Code PIX agora. Tente pagar com cartão.',
         )
       }
     }
@@ -428,7 +443,7 @@ export class OrdersService {
           payment.id, total, order.id,
           dto.cardToken,
           dto.installments ?? 1,
-          payer?.email ?? 'cliente@tabarato.com.br',
+          safePayerEmail(payer?.email),
           dto.payerCpf,
           splitOpts,
         )
