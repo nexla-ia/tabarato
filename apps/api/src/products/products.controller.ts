@@ -20,6 +20,21 @@ export class ProductsController {
     return this.productsService.findPopular(safeLimit)
   }
 
+  // Listagem geral de produtos (home focada em itens). Filtra por categoria da loja e busca.
+  @Get()
+  findAll(
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const n = parseInt(limit ?? '', 10)
+    return this.productsService.findAll({
+      categoryId: categoryId || undefined,
+      search: search?.trim() || undefined,
+      limit: Number.isFinite(n) ? n : undefined,
+    })
+  }
+
   @Get('store/:storeId')
   findByStore(@Param('storeId') storeId: string) {
     return this.productsService.findByStore(storeId)

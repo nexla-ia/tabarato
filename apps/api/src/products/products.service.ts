@@ -53,6 +53,38 @@ export class ProductsService {
       }))
   }
 
+  /**
+   * Lista produtos de TODAS as lojas aprovadas — alimenta a home focada em itens.
+   * Filtra por categoria (categoria da LOJA, many-to-many) e/ou busca no nome.
+   * Ordena lojas abertas primeiro. Retorna preço de exibição (base ou menor variação).
+   */
+  async findAll(opts: { categoryId?: string; search?: string; limit?: number }) {
+    const { categoryId, search } = opts
+    const limit = Math.min(Math.max(opts.limit ?? 40, 1), 100)
+
+    const products = await this.prisma.product.findMany({
+      where: {
+        isActive: true,
+        store: {
+          status: 'APPROVED',
+          ...(categoryId ? { categories: { some: { id: categoryId } } } : {}),
+        },
+        ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
+      },
+      include: {
+        store: { select: { id: true, name: true, logoUrl: true, isOpen: true, prepTimeMin: true } },
+        variations: { where: { isActive: true }, select: { price: true }, take: 1, orderBy: { price: 'asc' } },
+      },
+      orderBy: [{ store: { isOpen: 'desc' } }, { name: 'asc' }],
+      take: limit,
+    })
+
+    return products.map((p) => ({
+      ...p,
+      displayPrice: p.basePrice ?? p.variations[0]?.price ?? null,
+    }))
+  }
+
   async findByStore(storeId: string) {
     // Só expõe catálogo de loja APROVADA (evita enumeração de lojas pendentes/suspensas).
     const store = await this.prisma.store.findUnique({ where: { id: storeId }, select: { status: true } })
