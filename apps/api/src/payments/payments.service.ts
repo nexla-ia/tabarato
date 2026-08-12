@@ -236,8 +236,15 @@ export class PaymentsService {
           },
         },
       })
-      const store = localPayment?.orders?.[0]?.store as any
-      const sellerToken = store?.mpConnected ? await this.mpOauth.getValidSellerToken(store) : null
+      const orderRow = localPayment?.orders?.[0] as any
+      const store = orderRow?.store as any
+      // Split (paidViaSplit) → pagamento está na conta do lojista, consulta com o
+      // token dele. Centralizado (fallback, paidViaSplit=false) → está na conta da
+      // plataforma, consulta com o token da plataforma (null). Consultar a conta
+      // errada faz o get() não achar o pagamento e o pedido nunca confirmar.
+      const sellerToken = orderRow?.paidViaSplit && store?.mpConnected
+        ? await this.mpOauth.getValidSellerToken(store)
+        : null
 
       const mpPayment = await this.clientFor(sellerToken).get({ id: String(mpId) })
       if (!mpPayment || !mpPayment.external_reference) return
@@ -319,7 +326,12 @@ export class PaymentsService {
 
     try {
       const store = order.store as any
-      const sellerToken = store?.mpConnected ? await this.mpOauth.getValidSellerToken(store) : null
+      // Mesmo critério do webhook/refund: split → conta do lojista; centralizado
+      // (paidViaSplit=false) → conta da plataforma. Consultar a conta certa é o que
+      // permite confirmar o pagamento do PIX que caiu no modo centralizado.
+      const sellerToken = (order as any).paidViaSplit && store?.mpConnected
+        ? await this.mpOauth.getValidSellerToken(store)
+        : null
       const mpPayment = await this.clientFor(sellerToken).get({ id: order.payment.gatewayId })
       if (mpPayment.status === 'approved') {
         const updated = await this.prisma.payment.update({
