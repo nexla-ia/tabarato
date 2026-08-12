@@ -29,7 +29,7 @@ export default async function HomePage({
             <div className={styles.heroCopy}>
               {!filtering && (
                 <>
-                  <span className={styles.heroBadge}>🛵 Entrega no mesmo dia · Vilhena-RO</span>
+                  <span className={styles.heroBadge}>🛵 Entrega na sua casa · Vilhena-RO</span>
                   <h1 className={styles.heroTitle}>
                     O comércio local<br />na palma da<span className={styles.heroTitleAccent}> sua mão</span>
                   </h1>
