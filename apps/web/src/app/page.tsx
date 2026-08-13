@@ -14,20 +14,22 @@ export default async function HomePage({
   searchParams: Promise<{ q?: string; cat?: string }>
 }) {
   const { q, cat } = await searchParams
-  const filtering = Boolean(q || cat)
+  // Busca por texto colapsa pra "modo resultado" (esconde hero/categorias/promo).
+  // Filtro por categoria NÃO — continua na mesma tela, só filtra a lista abaixo.
+  const searching = Boolean(q)
 
   return (
     <>
       <Navbar />
       <main>
         {/* ── Hero ── */}
-        <section className={`${styles.hero} ${filtering ? styles.heroCompact : ''}`}>
-          {!filtering && <div className={styles.heroGlow} />}
-          {!filtering && <div className={styles.heroBlob1} />}
-          {!filtering && <div className={styles.heroBlob2} />}
+        <section className={`${styles.hero} ${searching ? styles.heroCompact : ''}`}>
+          {!searching && <div className={styles.heroGlow} />}
+          {!searching && <div className={styles.heroBlob1} />}
+          {!searching && <div className={styles.heroBlob2} />}
           <div className={`container ${styles.heroInner}`}>
             <div className={styles.heroCopy}>
-              {!filtering && (
+              {!searching && (
                 <>
                   <span className={styles.heroBadge}>🛵 Entrega na sua casa · Vilhena-RO</span>
                   <h1 className={styles.heroTitle}>
@@ -42,23 +44,23 @@ export default async function HomePage({
                 <SearchBar />
               </Suspense>
             </div>
-            {!filtering && (
+            {!searching && (
               <div className={styles.heroArt}>
                 <Image src="/logo.png" alt="Tá Barato" width={280} height={280} priority className={styles.heroLogo} style={{ objectFit: 'contain' }} />
               </div>
             )}
           </div>
-          {!filtering && <div className={styles.heroWave} />}
+          {!searching && <div className={styles.heroWave} />}
         </section>
 
         <div className="container">
-          {!filtering && (
+          {!searching && (
             <Suspense fallback={null}>
               <CategoryRail active={cat} />
             </Suspense>
           )}
 
-          {!filtering && (
+          {!searching && (
             <>
               <PromoStrip />
               <Suspense fallback={null}>
