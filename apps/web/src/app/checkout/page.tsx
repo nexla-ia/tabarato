@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import { useCartStore } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
 import { validateCardForm } from '@/lib/cardValidation'
+import { geocodeAddress } from '@/lib/geocoding'
 import Image from 'next/image'
 import styles from './page.module.css'
 
@@ -87,7 +88,17 @@ export default function CheckoutPage() {
     e.preventDefault()
     setSavingAddr(true)
     try {
-      const { data } = await api.post<Address>('/users/me/addresses', { ...addrForm, isDefault: addresses.length === 0 })
+      // Geocodifica o endereço digitado — sem isso, taxa de entrega e taxa do
+      // entregador são calculadas com base num ponto fixo (centro de Vilhena)
+      // em vez da distância real até a casa do cliente. Falha na geocodificação
+      // não bloqueia o cadastro: cai no fallback já preenchido em addrForm.
+      const query = `${addrForm.street}, ${addrForm.number}, ${addrForm.district}, ${addrForm.city} - ${addrForm.state}, ${addrForm.zipCode}, Brasil`
+      const coords = await geocodeAddress(query)
+      const { data } = await api.post<Address>('/users/me/addresses', {
+        ...addrForm,
+        ...(coords ?? {}),
+        isDefault: addresses.length === 0,
+      })
       setAddresses(prev => [...prev, data])
       setSelectedAddr(data.id)
       setShowAddrForm(false)
@@ -134,7 +145,7 @@ export default function CheckoutPage() {
         router.push(`/orders/${order.id}`)
       }
     } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Não foi possível finalizar o pedido')
+      setError(err.response?.data?.message ?? err.message ?? 'Não foi possível finalizar o pedido')
     } finally { setLoading(false) }
   }
 
