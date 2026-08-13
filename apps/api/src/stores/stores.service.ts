@@ -48,6 +48,32 @@ function computeIsOpen(openingHours: any): boolean | null {
   return currentMinutes >= fromMin && currentMinutes <= toMin
 }
 
+// Campos seguros pra expor nos endpoints PÚBLICOS (findAll/findById, sem auth).
+// Nunca inclui cnpj/pixKey/userId/documentUrl/mp* (identificadores e tokens do
+// Mercado Pago) — isso só a própria loja vê, autenticada, via /stores/my.
+const PUBLIC_STORE_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  logoUrl: true,
+  phone: true,
+  prepTimeMin: true,
+  deliveryRadiusKm: true,
+  lat: true,
+  lng: true,
+  address: true,
+  photos: true,
+  openingHours: true,
+  scheduleExceptions: true,
+  isOpen: true,
+  isPaused: true,
+  maxConcurrentOrders: true,
+  mpConnected: true,
+  createdAt: true,
+  updatedAt: true,
+  categories: { select: { id: true, name: true, icon: true } },
+} as const
+
 @Injectable()
 export class StoresService {
   private readonly logger = new Logger(StoresService.name)
@@ -94,7 +120,7 @@ export class StoresService {
           ],
         }),
       },
-      include: { categories: { select: { id: true, name: true, icon: true } } },
+      select: PUBLIC_STORE_SELECT,
       orderBy: { name: 'asc' },
     })
 
@@ -120,7 +146,7 @@ export class StoresService {
               ],
             }),
           },
-          include: { categories: { select: { id: true, name: true, icon: true } } },
+          select: PUBLIC_STORE_SELECT,
           orderBy: { name: 'asc' },
         })
       : stores
@@ -139,8 +165,9 @@ export class StoresService {
   async findById(id: string) {
     const store = await this.prisma.store.findUnique({
       where: { id },
-      include: {
-        categories: true,
+      select: {
+        ...PUBLIC_STORE_SELECT,
+        status: true,
         products: {
           where: { isActive: true },
           include: {
