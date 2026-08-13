@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Store, User, CreditCard, MapPin, Check, Loader2, ArrowLeft, ArrowRight,
   Eye, EyeOff, Mail, Lock, Phone, FileText, MessageSquare, Bike, Clock,
-  KeyRound, ShieldCheck, PartyPopper, Tag,
+  ShieldCheck, PartyPopper, Tag,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -58,7 +58,6 @@ export default function CadastroLojaPage() {
   // pagamento / entrega
   const [deliveryRadius, setDeliveryRadius] = useState('5')
   const [prepTime, setPrepTime] = useState('30')
-  const [pixKey, setPixKey] = useState('')
 
   // Recupera conta órfã: se já é lojista logado, pula a criação da conta. Se já
   // tem loja, manda pro painel; se não, cai no passo "Sua loja" pra finalizar.
@@ -169,8 +168,6 @@ export default function CadastroLojaPage() {
   /* Passo 2 — cria a LOJA + vincula categorias (retryável: a conta já existe). */
   async function submitStore() {
     setError('')
-    if (!pixKey.trim()) { setError('Informe sua chave PIX para receber pagamentos.'); return }
-
     setLoading(true)
     try {
       // Não há campo próprio pra categoria personalizada — anota na descrição
@@ -189,7 +186,6 @@ export default function CadastroLojaPage() {
         lng: coords?.lng ?? -60.1402,
         deliveryRadiusKm: Number(deliveryRadius) || 5,
         prepTimeMin: Number(prepTime) || 30,
-        pixKey: pixKey.trim(),
       })
       // Vincula as categorias — sem isso a loja não aparece em nenhum filtro/aba.
       for (const catId of selectedCats) {
@@ -380,11 +376,9 @@ export default function CadastroLojaPage() {
                 <Field label="Raio de entrega (km)" Icon={Bike} value={deliveryRadius} onChange={setDeliveryRadius} placeholder="5" type="number" />
                 <Field label="Preparo (min)" Icon={Clock} value={prepTime} onChange={setPrepTime} placeholder="30" type="number" />
               </div>
-              <Field label="Chave PIX *" Icon={KeyRound} value={pixKey} onChange={setPixKey} placeholder="CPF, CNPJ, e-mail ou telefone" />
-
               <div className={styles.infoBox}>
                 <ShieldCheck size={16} />
-                <span>O pagamento é depositado diretamente na sua chave PIX após a confirmação de entrega.</span>
+                <span>Depois de criar a loja, você conecta sua conta Mercado Pago no painel pra receber os pagamentos via PIX automaticamente — sem precisar cadastrar chave manualmente.</span>
               </div>
 
               <div className={styles.summary}>
@@ -423,7 +417,7 @@ function HeroSide() {
         <ul className={styles.heroList}>
           <li><Check size={14} /> Receba pedidos em tempo real</li>
           <li><Check size={14} /> Entregadores da plataforma</li>
-          <li><Check size={14} /> Pagamento direto na sua chave PIX</li>
+          <li><Check size={14} /> Receba via PIX direto no Mercado Pago</li>
         </ul>
       </div>
     </div>
