@@ -2,11 +2,26 @@ import { Suspense } from 'react'
 import Image from 'next/image'
 import { Navbar } from '@/components/Navbar'
 import { SearchBar } from '@/components/SearchBar'
-import { CategoryRail } from './CategoryRail'
+import { CategoryBrowser } from './CategoryBrowser'
 import { PromoStrip } from './PromoStrip'
 import { PopularProducts } from './PopularProducts'
 import { StoreGrid } from './StoreGrid'
+import { getCategories, getStores } from './storesData'
 import styles from './page.module.css'
+
+// Categorias + lojas (sem filtro) pra navegação por categoria, que roda 100%
+// no cliente depois disso — trocar de chip nunca recarrega a página.
+async function CategoryBrowserSection({ cat }: { cat?: string }) {
+  const [categories, stores] = await Promise.all([getCategories(), getStores()])
+  return (
+    <CategoryBrowser categories={categories} stores={stores} initialCat={cat}>
+      <PromoStrip />
+      <Suspense fallback={null}>
+        <PopularProducts />
+      </Suspense>
+    </CategoryBrowser>
+  )
+}
 
 export default async function HomePage({
   searchParams,
@@ -54,24 +69,15 @@ export default async function HomePage({
         </section>
 
         <div className="container">
-          {!searching && (
-            <Suspense fallback={null}>
-              <CategoryRail active={cat} />
+          {!searching ? (
+            <Suspense fallback={<div className={styles.loading}>Carregando lojas…</div>}>
+              <CategoryBrowserSection cat={cat} />
+            </Suspense>
+          ) : (
+            <Suspense fallback={<div className={styles.loading}>Carregando lojas…</div>}>
+              <StoreGrid q={q} />
             </Suspense>
           )}
-
-          {!searching && (
-            <>
-              <PromoStrip />
-              <Suspense fallback={null}>
-                <PopularProducts />
-              </Suspense>
-            </>
-          )}
-
-          <Suspense fallback={<div className={styles.loading}>Carregando lojas…</div>}>
-            <StoreGrid q={q} cat={cat} />
-          </Suspense>
         </div>
 
         {/* ── Footer ── */}
