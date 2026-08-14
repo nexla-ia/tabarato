@@ -72,13 +72,16 @@ export default function CarteiraPage() {
           Sacar via PIX
         </button>
       </div>
+      <p className={styles.hint} style={{ marginTop: 10 }}>
+        O pagamento das suas vendas cai direto na sua conta Mercado Pago conectada — isso já é automático, não precisa sacar daqui. Esse saldo só existe se algum pedido específico não puder usar o Mercado Pago da loja e ficar centralizado na plataforma; nesse caso, cadastre a chave abaixo pra receber o repasse.
+      </p>
 
       <div className={styles.card}>
         <div className={styles.cardHead}>
           <span className={styles.cardIcon}><KeyRound size={18} /></span>
           <div>
             <div className={styles.cardTitle}>Chave PIX de recebimento</div>
-            <div className={styles.cardSub}>Pra onde enviamos o valor dos seus saques.</div>
+            <div className={styles.cardSub}>Só usada pra repassar saldo que ficou centralizado — não é a chave de pagamento dos clientes.</div>
           </div>
         </div>
 

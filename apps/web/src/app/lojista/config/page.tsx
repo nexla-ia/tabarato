@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, CreditCard, ExternalLink, AlertTriangle, Loader2, Store as StoreIcon, Camera, Copy, Plus, X, Upload } from 'lucide-react'
+import { Check, CreditCard, ExternalLink, AlertTriangle, Loader2, Store as StoreIcon, Camera, Copy, Plus, X, Upload, Clock, Images } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Store, DaySchedule } from '@/lib/types'
 import { formatPhone, onlyDigits } from '@/lib/masks'
@@ -11,6 +11,14 @@ interface MpStatus { enabled: boolean; connected: boolean; mpUserId: string | nu
 
 const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 const DEFAULT_HOURS: DaySchedule[] = Array.from({ length: 7 }, () => ({ open: false, from: '08:00', to: '18:00' }))
+
+type Tab = 'loja' | 'horario' | 'fotos' | 'pagamentos'
+const TABS: { key: Tab; label: string; Icon: typeof StoreIcon }[] = [
+  { key: 'loja', label: 'Loja', Icon: StoreIcon },
+  { key: 'horario', label: 'Horário', Icon: Clock },
+  { key: 'fotos', label: 'Fotos e docs', Icon: Images },
+  { key: 'pagamentos', label: 'Pagamentos', Icon: CreditCard },
+]
 
 export default function ConfigPage() {
   const qc = useQueryClient()
@@ -41,6 +49,8 @@ export default function ConfigPage() {
   const docInputRef = useRef<HTMLInputElement>(null)
 
   const [maxConcurrentOrders, setMaxConcurrentOrders] = useState('')
+
+  const [tab, setTab] = useState<Tab>('loja')
 
   // Feedback do retorno do callback do Mercado Pago (?mp=ok|erro)
   useEffect(() => {
@@ -175,11 +185,28 @@ export default function ConfigPage() {
 
   if (storeQ.isLoading) return <div className={styles.loading}>Carregando…</div>
 
+  const mpNeedsAttention = !!mpQ.data?.enabled && !mpQ.data?.connected
+
   return (
     <div className={styles.wrap}>
       <h1 className={styles.title}>Configurações da loja</h1>
       <p className={styles.subtitle}>Dados que aparecem para os clientes</p>
 
+      <div className={styles.tabs}>
+        {TABS.filter((t) => t.key !== 'pagamentos' || mpQ.data?.enabled).map(({ key, label, Icon }) => (
+          <button
+            key={key}
+            type="button"
+            className={`${styles.tab} ${tab === key ? styles.tabActive : ''}`}
+            onClick={() => setTab(key)}
+          >
+            <Icon size={15} /> {label}
+            {key === 'pagamentos' && mpNeedsAttention && <span className={styles.tabDot} />}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'loja' && (
       <div className={styles.card}>
         <label className={styles.label} style={{ marginTop: 0 }}>Foto da loja</label>
         <div className={styles.logoRow}>
@@ -217,9 +244,11 @@ export default function ConfigPage() {
           {saved ? <><Check size={17} /> Salvo!</> : save.isPending ? 'Salvando…' : 'Salvar alterações'}
         </button>
       </div>
+      )}
 
       {/* Horário de funcionamento — abre/fecha sozinha, sem precisar clicar todo dia */}
-      <div className={styles.card} style={{ marginTop: 16 }}>
+      {tab === 'horario' && (
+      <div className={styles.card}>
         <div className={styles.mpHead}>
           <span className={styles.mpIcon} style={{ background: '#FFF0EB', color: 'var(--orange)' }}><StoreIcon size={20} /></span>
           <div>
@@ -256,17 +285,11 @@ export default function ConfigPage() {
           {saved ? <><Check size={17} /> Salvo!</> : save.isPending ? 'Salvando…' : 'Salvar alterações'}
         </button>
       </div>
+      )}
 
-      {/* Mais configurações — galeria, documento da empresa, limite de pedidos */}
-      <div className={styles.card} style={{ marginTop: 16 }}>
-        <div className={styles.mpHead}>
-          <span className={styles.mpIcon} style={{ background: '#FFF0EB', color: 'var(--orange)' }}><StoreIcon size={20} /></span>
-          <div>
-            <div className={styles.mpTitle}>Mais configurações</div>
-            <div className={styles.mpSub}>Fotos da loja, documento da empresa e limite de pedidos.</div>
-          </div>
-        </div>
-
+      {/* Fotos, documento da empresa e limite de pedidos */}
+      {tab === 'fotos' && (
+      <div className={styles.card}>
         <label className={styles.label} style={{ marginTop: 0 }}>Fotos da loja</label>
         <div className={styles.photoGrid}>
           {photos.map((url) => (
@@ -320,10 +343,11 @@ export default function ConfigPage() {
           {saved ? <><Check size={17} /> Salvo!</> : save.isPending ? 'Salvando…' : 'Salvar alterações'}
         </button>
       </div>
+      )}
 
       {/* Pagamentos — Mercado Pago (só aparece quando o marketplace está ativo) */}
-      {mpQ.data?.enabled && (
-        <div className={styles.card} style={{ marginTop: 16 }}>
+      {tab === 'pagamentos' && mpQ.data?.enabled && (
+        <div className={styles.card}>
           <div className={styles.mpHead}>
             <span className={styles.mpIcon}><CreditCard size={20} /></span>
             <div>
