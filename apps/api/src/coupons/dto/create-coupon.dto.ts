@@ -19,6 +19,12 @@ export class CreateCouponDto {
   @IsOptional()
   discountFixed?: number
 
+  // Cupom de frete grátis: a loja absorve a taxa de entrega (o cliente não paga).
+  // Pode vir sozinho ou combinado com desconto no subtotal.
+  @IsBoolean()
+  @IsOptional()
+  freeShipping?: boolean
+
   @IsNumber()
   @Min(0)
   @IsOptional()

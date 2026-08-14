@@ -372,6 +372,7 @@ export class CouriersService {
         where: { id: delivery.orderId },
         select: {
           subtotal: true, couponDiscount: true, storeId: true, paidViaSplit: true,
+          freeShipping: true, deliveryFee: true,
           payment: { select: { status: true } },
         },
       })
@@ -381,9 +382,12 @@ export class CouriersService {
       const isPaid = fullOrder.payment?.status === 'PAID'
       const courierFee = Number(delivery.courierFee)
       const platformCommission = Math.round(Number(fullOrder.subtotal) * 0.10 * 100) / 100
-      // Loja recebe: subtotal − cupom − comissão. Absorve o CUPOM (promo dela), mas NÃO
-      // a fidelidade (bancada pela plataforma). Consistente com o cálculo do split.
-      const storeAmount = Math.max(0, Math.round((Number(fullOrder.subtotal) - Number(fullOrder.couponDiscount) - platformCommission) * 100) / 100)
+      // Cupom de frete grátis: a LOJA absorve a entrega → desconta do repasse dela
+      // (o entregador continua recebendo a taxa normalmente, paga pela plataforma).
+      const storeDeliveryAbsorbed = fullOrder.freeShipping ? Number(fullOrder.deliveryFee) : 0
+      // Loja recebe: subtotal − cupom − comissão − (frete, se frete grátis). Absorve o
+      // CUPOM (promo dela) mas NÃO a fidelidade (bancada pela plataforma).
+      const storeAmount = Math.max(0, Math.round((Number(fullOrder.subtotal) - Number(fullOrder.couponDiscount) - platformCommission - storeDeliveryAbsorbed) * 100) / 100)
       // Fonte da verdade: a flag gravada no pedido no momento da cobrança (não o
       // mpConnected atual, que pode ter mudado após o split → evita pagar a loja 2x).
       const storePaidViaSplit = fullOrder.paidViaSplit

@@ -317,6 +317,7 @@ model Order {
   discount    Decimal     @default(0)
   couponDiscount  Decimal @default(0) @map("coupon_discount")
   loyaltyDiscount Decimal @default(0) @map("loyalty_discount")
+  freeShipping    Boolean @default(false) @map("free_shipping")
   total       Decimal
   couponId    String?     @map("coupon_id")
   status       OrderStatus @default(PENDING)
@@ -555,6 +556,7 @@ model Coupon {
   description     String?
   discountPercent Decimal?  @map("discount_percent")
   discountFixed   Decimal?  @map("discount_fixed")
+  freeShipping    Boolean   @default(false) @map("free_shipping")
   minOrderValue   Decimal?  @map("min_order_value")
   maxUses         Int?      @map("max_uses")
   usedCount       Int       @default(0) @map("used_count")

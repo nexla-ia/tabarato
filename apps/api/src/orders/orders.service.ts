@@ -248,11 +248,13 @@ export class OrdersService {
     let couponDiscount = 0
     let couponId: string | undefined
     let couponMaxUses: number | null = null
+    let couponFreeShipping = false
     if (dto.couponCode) {
       const result = await this.coupons.validate(dto.couponCode, userId, subtotal, dto.storeId)
       couponDiscount = result.discount
       couponId = result.coupon.id
       couponMaxUses = (result.coupon as any).maxUses ?? null
+      couponFreeShipping = Boolean(result.freeShipping)
     }
 
     // ── Loyalty redemption (100 pts = R$10) ──────────────────────────────
@@ -285,8 +287,11 @@ export class OrdersService {
     }
 
     let discount = Math.round((couponDiscount + loyaltyDiscount) * 100) / 100
-    if (discount > subtotal) discount = subtotal // segurança: entrega sempre é paga
-    const total = Math.round((subtotal + deliveryFee - discount) * 100) / 100
+    if (discount > subtotal) discount = subtotal // segurança: desconto de produto nunca passa do subtotal
+    // Cupom de frete grátis: o cliente NÃO paga a entrega (a loja absorve — abatido
+    // do repasse dela na entrega). deliveryFee continua gravado (o entregador recebe).
+    const deliveryWaived = couponFreeShipping ? deliveryFee : 0
+    const total = Math.round((subtotal + deliveryFee - discount - deliveryWaived) * 100) / 100
 
     // Código de entrega (anti-fraude): 6 dígitos CRIPTOGRÁFICOS que o cliente informa
     // ao entregador. Sem ele, o entregador não finaliza a corrida (padrão iFood).
@@ -311,6 +316,7 @@ export class OrdersService {
           discount,
           couponDiscount,
           loyaltyDiscount,
+          freeShipping: couponFreeShipping,
           total,
           notes: dto.notes,
           scheduledFor: scheduledDate,

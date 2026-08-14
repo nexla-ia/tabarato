@@ -16,8 +16,9 @@ export class CouponsService {
   async create(userId: string, dto: CreateCouponDto) {
     const store = await this.getStoreByUser(userId)
 
-    if (!dto.discountPercent && !dto.discountFixed) {
-      throw new BadRequestException('Informe discountPercent ou discountFixed')
+    // Precisa de ALGUM benefício: desconto no subtotal OU frete grátis.
+    if (!dto.discountPercent && !dto.discountFixed && !dto.freeShipping) {
+      throw new BadRequestException('Informe um desconto (percentual/fixo) ou marque frete grátis')
     }
     if (dto.discountPercent && dto.discountFixed) {
       throw new BadRequestException('Use apenas um tipo de desconto por cupom')
@@ -116,18 +117,19 @@ export class CouponsService {
       ? Math.min(subtotal * (discountPercent / 100), subtotal)
       : Math.min(discountFixed ?? 0, subtotal)
 
-    return { coupon, discount: Math.round(discount * 100) / 100 }
+    return { coupon, discount: Math.round(discount * 100) / 100, freeShipping: Boolean((coupon as any).freeShipping) }
   }
 
   // Public endpoint — just validates without consuming (for checkout preview)
   async validatePublic(code: string, userId: string, subtotal: number, storeId: string) {
-    const { coupon, discount } = await this.validate(code, userId, subtotal, storeId)
+    const { coupon, discount, freeShipping } = await this.validate(code, userId, subtotal, storeId)
     return {
       code: coupon.code,
       description: coupon.description,
       discountPercent: coupon.discountPercent,
       discountFixed: coupon.discountFixed,
       discount,
+      freeShipping,
     }
   }
 }
