@@ -86,6 +86,14 @@ export class StoresController {
     return this.storesService.requestWithdrawal(user.sub, body.amount)
   }
 
+  // Chave PIX de RECEBIMENTO dos saques (repasse). Não é a chave de pagamento do cliente.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Patch('my/pix')
+  updatePixKey(@CurrentUser() user: any, @Body() body: { pixKey: string }) {
+    return this.storesService.updatePixKey(user.sub, body.pixKey)
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('STORE_OWNER')
   @Get('my/reviews')

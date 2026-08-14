@@ -280,14 +280,29 @@ export class StoresService {
   async findWallet(userId: string) {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
-    return this.wallet.findByOwner(store.id, 'STORE')
+    const wallet = await this.wallet.findByOwner(store.id, 'STORE')
+    // Inclui a chave PIX de saque pra o app mostrar/editar na Carteira.
+    return { ...wallet, pixKey: store.pixKey ?? null }
   }
 
   async requestWithdrawal(userId: string, amount: number) {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
-    await this.wallet.debit(store.id, 'STORE', amount, 'Saque solicitado', `saque-${randomUUID()}`)
+    // Precisa da chave PIX cadastrada pra saber PRA ONDE mandar o repasse.
+    if (!store.pixKey) throw new BadRequestException('Cadastre sua chave PIX de recebimento antes de solicitar o saque.')
+    await this.wallet.debit(store.id, 'STORE', amount, `Saque via PIX (${store.pixKey})`, `saque-${randomUUID()}`)
     return { message: 'Saque solicitado com sucesso. Será processado em até 24h via PIX.' }
+  }
+
+  /** Chave PIX da loja — usada só pra RECEBER os saques do repasse (não é pagamento do cliente). */
+  async updatePixKey(userId: string, pixKey: string) {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new NotFoundException('Store not found')
+    const key = (pixKey ?? '').trim()
+    if (!key) throw new BadRequestException('Informe uma chave PIX válida.')
+    if (key.length > 140) throw new BadRequestException('Chave PIX muito longa.')
+    await this.prisma.store.update({ where: { id: store.id }, data: { pixKey: key } })
+    return { pixKey: key }
   }
 
   async findMyReviews(userId: string, page = 1) {
