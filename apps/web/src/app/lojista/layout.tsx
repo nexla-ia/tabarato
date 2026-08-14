@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { LayoutDashboard, ReceiptText, Package, Settings, LogOut, Lock } from 'lucide-react'
+import { LayoutDashboard, ReceiptText, Package, Ticket, Settings, LogOut, Lock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import { Store } from '@/lib/types'
@@ -13,12 +13,13 @@ const NAV = [
   { href: '/lojista',          label: 'Painel',         Icon: LayoutDashboard, exact: true },
   { href: '/lojista/pedidos',  label: 'Pedidos',        Icon: ReceiptText, lockable: true },
   { href: '/lojista/produtos', label: 'Produtos',       Icon: Package, lockable: true },
+  { href: '/lojista/cupons',   label: 'Cupons',         Icon: Ticket, lockable: true },
   { href: '/lojista/config',   label: 'Configurações',  Icon: Settings },
 ]
 
-// Só libera Pedidos/Produtos com a loja aprovada — antes disso não tem pedido
-// de verdade nem sentido em cadastrar produtos ainda.
-const LOCKED_PATHS = ['/lojista/pedidos', '/lojista/produtos']
+// Só libera Pedidos/Produtos/Cupons com a loja aprovada — antes disso não tem
+// pedido de verdade nem sentido em cadastrar produtos/cupons ainda.
+const LOCKED_PATHS = ['/lojista/pedidos', '/lojista/produtos', '/lojista/cupons']
 
 export default function LojistaLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()

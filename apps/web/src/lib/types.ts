@@ -49,6 +49,20 @@ export interface Product {
   variations?: ProductVariation[]
 }
 
+export interface Coupon {
+  id: string
+  code: string
+  description?: string | null
+  discountPercent?: number | string | null
+  discountFixed?: number | string | null
+  minOrderValue?: number | string | null
+  maxUses?: number | null
+  usedCount: number
+  expiresAt?: string | null
+  isActive: boolean
+  createdAt: string
+}
+
 export type OrderStatus =
   | 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY'
   | 'PICKED_UP' | 'DELIVERED' | 'CANCELLED'

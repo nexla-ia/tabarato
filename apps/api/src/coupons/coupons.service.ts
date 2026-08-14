@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateCouponDto } from './dto/create-coupon.dto'
+import { UpdateCouponDto } from './dto/update-coupon.dto'
 
 @Injectable()
 export class CouponsService {
@@ -40,6 +41,37 @@ export class CouponsService {
     return this.prisma.coupon.findMany({
       where: { storeId: store.id },
       orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  async update(userId: string, couponId: string, dto: UpdateCouponDto) {
+    const store = await this.getStoreByUser(userId)
+    const coupon = await this.prisma.coupon.findFirst({ where: { id: couponId, storeId: store.id } })
+    if (!coupon) throw new NotFoundException('Cupom não encontrado')
+
+    const nextPercent = dto.discountPercent !== undefined ? dto.discountPercent : (coupon.discountPercent ? Number(coupon.discountPercent) : null)
+    const nextFixed = dto.discountFixed !== undefined ? dto.discountFixed : (coupon.discountFixed ? Number(coupon.discountFixed) : null)
+    if (!nextPercent && !nextFixed) throw new BadRequestException('Informe discountPercent ou discountFixed')
+    if (nextPercent && nextFixed) throw new BadRequestException('Use apenas um tipo de desconto por cupom')
+
+    const nextCode = dto.code ? dto.code.toUpperCase() : coupon.code
+    if (nextCode !== coupon.code) {
+      const existing = await this.prisma.coupon.findUnique({ where: { code: nextCode } })
+      if (existing) throw new BadRequestException('Código já cadastrado')
+    }
+
+    return this.prisma.coupon.update({
+      where: { id: couponId },
+      data: {
+        code: nextCode,
+        description: dto.description !== undefined ? dto.description : coupon.description,
+        discountPercent: nextPercent,
+        discountFixed: nextFixed,
+        minOrderValue: dto.minOrderValue !== undefined ? dto.minOrderValue : (coupon.minOrderValue ? Number(coupon.minOrderValue) : null),
+        maxUses: dto.maxUses !== undefined ? dto.maxUses : coupon.maxUses,
+        expiresAt: dto.expiresAt !== undefined ? (dto.expiresAt ? new Date(dto.expiresAt) : null) : coupon.expiresAt,
+        isActive: dto.isActive !== undefined ? dto.isActive : coupon.isActive,
+      },
     })
   }
 

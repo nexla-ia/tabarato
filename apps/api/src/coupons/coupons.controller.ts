@@ -6,6 +6,7 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { CouponsService } from './coupons.service'
 import { CreateCouponDto } from './dto/create-coupon.dto'
+import { UpdateCouponDto } from './dto/update-coupon.dto'
 
 @UseGuards(JwtAuthGuard)
 @Controller('coupons')
@@ -26,6 +27,14 @@ export class CouponsController {
   @Get()
   findByStore(@CurrentUser() user: any) {
     return this.couponsService.findByStore(user.sub)
+  }
+
+  // Store owner: edit coupon
+  @UseGuards(RolesGuard)
+  @Roles('STORE_OWNER')
+  @Patch(':id')
+  update(@CurrentUser() user: any, @Param('id') id: string, @Body() dto: UpdateCouponDto) {
+    return this.couponsService.update(user.sub, id, dto)
   }
 
   // Store owner: toggle active
