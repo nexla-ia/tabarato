@@ -117,3 +117,30 @@
 }
 .copyBtn:hover { color: var(--orange); border-color: var(--orange); }
 .dayClosed { font-size: 13px; color: var(--faint); font-style: italic; }
+
+/* Galeria de fotos */
+.photoGrid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.photoThumb {
+  position: relative; width: 76px; height: 76px; border-radius: 12px; overflow: hidden;
+  border: 1.5px solid var(--border); flex-shrink: 0;
+}
+.photoThumb img { width: 100%; height: 100%; object-fit: cover; }
+.photoRemove {
+  position: absolute; top: 3px; right: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(0,0,0,0.6); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.photoAdd {
+  width: 76px; height: 76px; border-radius: 12px; flex-shrink: 0;
+  border: 1.5px dashed var(--border); background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  color: var(--muted); font-size: 10.5px; font-weight: 700;
+}
+.photoAdd:hover { border-color: var(--orange); color: var(--orange); }
+.photoAdd:disabled { opacity: 0.6; }
+
+/* Documento */
+.docRow { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.docStatus { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; color: var(--green); }
+.docMissing { font-size: 13.5px; color: var(--muted); }

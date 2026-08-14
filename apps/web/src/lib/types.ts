@@ -14,6 +14,11 @@ export interface DaySchedule {
 
 export type StoreStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'
 
+export interface ScheduleException {
+  date: string // YYYY-MM-DD
+  closed: boolean
+}
+
 export interface Store {
   id: string
   name: string
@@ -24,9 +29,13 @@ export interface Store {
   isPaused?: boolean
   deliveryRadiusKm?: number | null
   openingHours?: DaySchedule[] | null
+  scheduleExceptions?: ScheduleException[] | null
   address?: string | null
   phone?: string | null
   categories?: Category[]
+  photos?: string[]
+  documentUrl?: string | null
+  maxConcurrentOrders?: number | null
 }
 
 export interface ProductVariation {
@@ -61,6 +70,40 @@ export interface Coupon {
   expiresAt?: string | null
   isActive: boolean
   createdAt: string
+}
+
+export type TransactionType = 'CREDIT' | 'DEBIT'
+
+export interface Transaction {
+  id: string
+  amount: number | string
+  type: TransactionType
+  description?: string | null
+  referenceId?: string | null
+  createdAt: string
+}
+
+export interface Wallet {
+  balance: number
+  transactions: Transaction[]
+  pixKey?: string | null
+}
+
+export interface Review {
+  id: string
+  rating: number
+  comment?: string | null
+  photos?: string[]
+  createdAt: string
+  user?: { id: string; name: string; avatarUrl?: string | null } | null
+}
+
+export interface ReviewsPage {
+  reviews: Review[]
+  total: number
+  page: number
+  pages: number
+  avgRating: number | null
 }
 
 export type OrderStatus =

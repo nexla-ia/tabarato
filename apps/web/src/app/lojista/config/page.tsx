@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, CreditCard, ExternalLink, AlertTriangle, Loader2, Store as StoreIcon, Camera, Copy } from 'lucide-react'
+import { Check, CreditCard, ExternalLink, AlertTriangle, Loader2, Store as StoreIcon, Camera, Copy, Plus, X, Upload } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Store, DaySchedule } from '@/lib/types'
 import { formatPhone, onlyDigits } from '@/lib/masks'
@@ -29,6 +29,18 @@ export default function ConfigPage() {
   const [mpMsg, setMpMsg] = useState<'ok' | 'erro' | null>(null)
   const [connecting, setConnecting] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
+
+  const [photos, setPhotos] = useState<string[]>([])
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState('')
+  const photoInputRef = useRef<HTMLInputElement>(null)
+
+  const [documentUrl, setDocumentUrl] = useState('')
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const [docError, setDocError] = useState('')
+  const docInputRef = useRef<HTMLInputElement>(null)
+
+  const [maxConcurrentOrders, setMaxConcurrentOrders] = useState('')
 
   // Feedback do retorno do callback do Mercado Pago (?mp=ok|erro)
   useEffect(() => {
@@ -81,6 +93,9 @@ export default function ConfigPage() {
     setRadius(s.deliveryRadiusKm != null ? String(s.deliveryRadiusKm) : '')
     setLogoUrl(s.logoUrl ?? '')
     setHours(Array.isArray(s.openingHours) && s.openingHours.length === 7 ? s.openingHours : DEFAULT_HOURS)
+    setPhotos(Array.isArray(s.photos) ? s.photos : [])
+    setDocumentUrl(s.documentUrl ?? '')
+    setMaxConcurrentOrders(s.maxConcurrentOrders != null ? String(s.maxConcurrentOrders) : '')
   }, [storeQ.data])
 
   async function handleLogoFile(file: File) {
@@ -95,6 +110,39 @@ export default function ConfigPage() {
       setLogoError('Não foi possível enviar a imagem. Use JPEG, PNG ou WEBP de até 10MB.')
     } finally {
       setUploadingLogo(false)
+    }
+  }
+
+  async function handlePhotoFile(file: File) {
+    setPhotoError('')
+    setUploadingPhoto(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const { data } = await api.post<{ url: string }>('/uploads/image', formData)
+      setPhotos((prev) => [...prev, data.url])
+    } catch {
+      setPhotoError('Não foi possível enviar a foto. Use JPEG, PNG ou WEBP de até 10MB.')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+  function removePhoto(url: string) {
+    setPhotos((prev) => prev.filter((p) => p !== url))
+  }
+
+  async function handleDocFile(file: File) {
+    setDocError('')
+    setUploadingDoc(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const { data } = await api.post<{ url: string }>('/uploads/image', formData)
+      setDocumentUrl(data.url)
+    } catch {
+      setDocError('Não foi possível enviar o documento. Use JPEG, PNG, WEBP ou PDF de até 10MB.')
+    } finally {
+      setUploadingDoc(false)
     }
   }
 
@@ -114,6 +162,9 @@ export default function ConfigPage() {
       deliveryRadiusKm: radius === '' ? undefined : Number(radius),
       logoUrl: logoUrl || undefined,
       openingHours: hours,
+      photos,
+      documentUrl: documentUrl || undefined,
+      maxConcurrentOrders: maxConcurrentOrders === '' ? null : Number(maxConcurrentOrders),
     })).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['store-my'] })
@@ -200,6 +251,70 @@ export default function ConfigPage() {
           ))}
         </div>
         <p className={styles.hint}>Fora desses horários sua loja aparece como fechada automaticamente. Você ainda pode pausar manualmente a qualquer momento no Painel.</p>
+
+        <button className={styles.saveBtn} onClick={() => save.mutate()} disabled={save.isPending || !name}>
+          {saved ? <><Check size={17} /> Salvo!</> : save.isPending ? 'Salvando…' : 'Salvar alterações'}
+        </button>
+      </div>
+
+      {/* Mais configurações — galeria, documento da empresa, limite de pedidos */}
+      <div className={styles.card} style={{ marginTop: 16 }}>
+        <div className={styles.mpHead}>
+          <span className={styles.mpIcon} style={{ background: '#FFF0EB', color: 'var(--orange)' }}><StoreIcon size={20} /></span>
+          <div>
+            <div className={styles.mpTitle}>Mais configurações</div>
+            <div className={styles.mpSub}>Fotos da loja, documento da empresa e limite de pedidos.</div>
+          </div>
+        </div>
+
+        <label className={styles.label} style={{ marginTop: 0 }}>Fotos da loja</label>
+        <div className={styles.photoGrid}>
+          {photos.map((url) => (
+            <div key={url} className={styles.photoThumb}>
+              <img src={url} alt="Foto da loja" />
+              <button type="button" className={styles.photoRemove} onClick={() => removePhoto(url)} title="Remover"><X size={12} /></button>
+            </div>
+          ))}
+          <input
+            ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+            style={{ display: 'none' }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = '' }}
+          />
+          <button type="button" className={styles.photoAdd} onClick={() => photoInputRef.current?.click()} disabled={uploadingPhoto || photos.length >= 20}>
+            {uploadingPhoto ? <Loader2 size={16} className={styles.spin} /> : <Plus size={16} />}
+            {uploadingPhoto ? 'Enviando' : 'Adicionar'}
+          </button>
+        </div>
+        <p className={styles.hint}>Aparecem na galeria da sua loja pros clientes. Até 20 fotos.</p>
+        {photoError && <p className={styles.logoErr}>{photoError}</p>}
+
+        <label className={styles.label}>Documento da empresa</label>
+        <div className={styles.docRow}>
+          {documentUrl ? (
+            <span className={styles.docStatus}><Check size={15} /> Documento enviado — <a href={documentUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--orange)' }}>ver arquivo</a></span>
+          ) : (
+            <span className={styles.docMissing}>Nenhum documento enviado</span>
+          )}
+        </div>
+        <input
+          ref={docInputRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
+          style={{ display: 'none' }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleDocFile(f); e.target.value = '' }}
+        />
+        <button type="button" className={styles.logoBtn} style={{ marginTop: 10 }} onClick={() => docInputRef.current?.click()} disabled={uploadingDoc}>
+          {uploadingDoc ? <><Loader2 size={15} className={styles.spin} /> Enviando…</> : <><Upload size={15} /> {documentUrl ? 'Trocar documento' : 'Enviar documento'}</>}
+        </button>
+        <p className={styles.hint}>Cartão CNPJ ou CCMEI — JPEG, PNG, WEBP ou PDF, até 10MB.</p>
+        {docError && <p className={styles.logoErr}>{docError}</p>}
+
+        <label className={styles.label}>Limite de pedidos simultâneos</label>
+        <input
+          className={styles.input} type="number" min={0}
+          value={maxConcurrentOrders}
+          onChange={(e) => setMaxConcurrentOrders(e.target.value)}
+          placeholder="vazio = ilimitado"
+        />
+        <p className={styles.hint}>Novos pedidos ficam bloqueados ao atingir esse limite. Deixe em branco pra não limitar.</p>
 
         <button className={styles.saveBtn} onClick={() => save.mutate()} disabled={save.isPending || !name}>
           {saved ? <><Check size={17} /> Salvo!</> : save.isPending ? 'Salvando…' : 'Salvar alterações'}
