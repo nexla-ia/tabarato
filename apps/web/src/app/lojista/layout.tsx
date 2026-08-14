@@ -10,6 +10,8 @@ import { Store, Order } from '@/lib/types'
 import { Spinner } from '@/components/Spinner'
 import styles from './layout.module.css'
 
+interface MpStatus { enabled: boolean; connected: boolean }
+
 const NAV = [
   { href: '/lojista',          label: 'Painel',         Icon: LayoutDashboard, exact: true },
   { href: '/lojista/pedidos',  label: 'Pedidos',        Icon: ReceiptText, lockable: true },
@@ -50,6 +52,20 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
     refetchInterval: 20_000,
   })
   const pendingCount = (ordersQ.data ?? []).filter((o) => o.status === 'PENDING').length
+
+  // Mesmos critérios das abas de Configurações — "!" no menu avisa sem
+  // precisar abrir a página pra descobrir o que falta.
+  const mpQ = useQuery<MpStatus>({
+    queryKey: ['mp-status'],
+    queryFn: async () => (await api.get('/stores/mp/status')).data,
+    enabled: !!user && user.role === 'STORE_OWNER' && !locked,
+  })
+  const configNeedsAttention = !!store && (
+    !store.logoUrl || !store.phone ||
+    !(store.openingHours ?? []).some((d) => d.open) ||
+    !store.documentUrl ||
+    (!!mpQ.data?.enabled && !mpQ.data?.connected)
+  )
 
   useEffect(() => {
     if (!ready) return
@@ -99,6 +115,9 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
                 {label}
                 {href === '/lojista/pedidos' && pendingCount > 0 && (
                   <span className={styles.navBadge}>{pendingCount > 99 ? '99+' : pendingCount}</span>
+                )}
+                {href === '/lojista/config' && configNeedsAttention && (
+                  <span className={styles.navWarn} title="Falta preencher algo nas configurações">!</span>
                 )}
               </Link>
             )

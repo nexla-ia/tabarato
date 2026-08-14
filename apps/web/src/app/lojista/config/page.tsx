@@ -199,8 +199,17 @@ export default function ConfigPage() {
 
   return (
     <div className={styles.wrap}>
-      <h1 className={styles.title}>Configurações da loja</h1>
-      <p className={styles.subtitle}>Dados que aparecem para os clientes</p>
+      <div className={styles.headRow}>
+        <div>
+          <h1 className={styles.title}>Configurações da loja</h1>
+          <p className={styles.subtitle} style={{ marginBottom: 0 }}>Dados que aparecem para os clientes</p>
+        </div>
+        {storeQ.data && (
+          <a href={`/store/${storeQ.data.id}`} target="_blank" rel="noopener noreferrer" className={styles.viewStoreBtn}>
+            <ExternalLink size={14} /> Ver loja
+          </a>
+        )}
+      </div>
 
       <div className={styles.tabs}>
         {TABS.filter((t) => t.key !== 'pagamentos' || mpQ.data?.enabled).map(({ key, label, Icon }) => (
