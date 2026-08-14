@@ -5,6 +5,7 @@ import { Check, CreditCard, ExternalLink, AlertTriangle, Loader2, Store as Store
 import { api } from '@/lib/api'
 import { Store, DaySchedule } from '@/lib/types'
 import { formatPhone, onlyDigits } from '@/lib/masks'
+import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 
 interface MpStatus { enabled: boolean; connected: boolean; mpUserId: string | null }
@@ -183,9 +184,18 @@ export default function ConfigPage() {
     },
   })
 
-  if (storeQ.isLoading) return <div className={styles.loading}>Carregando…</div>
+  if (storeQ.isLoading) return <Spinner />
 
   const mpNeedsAttention = !!mpQ.data?.enabled && !mpQ.data?.connected
+  const lojaNeedsAttention = !logoUrl || !phone
+  const horarioNeedsAttention = hours.every((d) => !d.open)
+  const fotosNeedsAttention = !documentUrl
+  const TAB_NEEDS_ATTENTION: Record<Tab, boolean> = {
+    loja: lojaNeedsAttention,
+    horario: horarioNeedsAttention,
+    fotos: fotosNeedsAttention,
+    pagamentos: mpNeedsAttention,
+  }
 
   return (
     <div className={styles.wrap}>
@@ -201,7 +211,7 @@ export default function ConfigPage() {
             onClick={() => setTab(key)}
           >
             <Icon size={15} /> {label}
-            {key === 'pagamentos' && mpNeedsAttention && <span className={styles.tabDot} />}
+            {TAB_NEEDS_ATTENTION[key] && <span className={styles.tabWarn} title="Falta preencher algo aqui">!</span>}
           </button>
         ))}
       </div>

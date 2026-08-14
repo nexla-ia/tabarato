@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, X, Ticket } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Coupon } from '@/lib/types'
 import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
+import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 
 type DiscountType = 'percent' | 'fixed'
@@ -113,7 +114,7 @@ export default function CuponsPage() {
       </div>
 
       {couponsQ.isLoading ? (
-        <div className={styles.empty}>Carregando…</div>
+        <Spinner />
       ) : coupons.length === 0 ? (
         <div className={styles.empty}>
           <Ticket size={32} strokeWidth={1.5} />

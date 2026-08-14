@@ -7,6 +7,7 @@ import {
   Order, OrderStatus, STATUS_LABEL, STATUS_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL,
   PAYMENT_LABEL, money, timeAgo,
 } from '@/lib/types'
+import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 
 const FILTERS: { key: OrderStatus | 'ALL'; label: string }[] = [
@@ -84,7 +85,7 @@ export default function PedidosPage() {
       </div>
 
       {ordersQ.isLoading ? (
-        <div className={styles.empty}>Carregando…</div>
+        <Spinner />
       ) : filtered.length === 0 ? (
         <div className={styles.empty}>Nenhum pedido {filter !== 'ALL' ? `em "${STATUS_LABEL[filter]}"` : ''}.</div>
       ) : (

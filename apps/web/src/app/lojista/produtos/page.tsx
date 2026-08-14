@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import { Product, Store, Category, money } from '@/lib/types'
 import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
 import { CategorySelect } from '@/components/CategorySelect'
+import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 
 interface FormState {
@@ -95,7 +96,7 @@ export default function ProdutosPage() {
       </div>
 
       {productsQ.isLoading ? (
-        <div className={styles.empty}>Carregando…</div>
+        <Spinner />
       ) : products.length === 0 ? (
         <div className={styles.empty}>
           <Package size={32} strokeWidth={1.5} />

@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query'
 import { LayoutDashboard, ReceiptText, Package, Ticket, Wallet, Star, Settings, LogOut, Lock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
-import { Store } from '@/lib/types'
+import { Store, Order } from '@/lib/types'
+import { Spinner } from '@/components/Spinner'
 import styles from './layout.module.css'
 
 const NAV = [
@@ -40,6 +41,16 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
   const store = storeQ.data
   const locked = !!store && store.status !== 'APPROVED'
 
+  // Contagem de pedidos aguardando confirmação — mostra no menu, mesma queryKey
+  // usada em /lojista e /lojista/pedidos (compartilha cache, sem request extra).
+  const ordersQ = useQuery<Order[]>({
+    queryKey: ['store-orders'],
+    queryFn: async () => (await api.get('/orders/store')).data,
+    enabled: !!user && user.role === 'STORE_OWNER' && !locked,
+    refetchInterval: 20_000,
+  })
+  const pendingCount = (ordersQ.data ?? []).filter((o) => o.status === 'PENDING').length
+
   useEffect(() => {
     if (!ready) return
     if (!user) { router.replace('/login'); return }
@@ -51,7 +62,7 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
   }, [locked, pathname, router])
 
   if (!ready || !user || user.role !== 'STORE_OWNER') {
-    return <div className={styles.loading}>Carregando…</div>
+    return <div className={styles.loading}><Spinner /></div>
   }
 
   function handleLogout() {
@@ -86,6 +97,9 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
               <Link key={href} href={href} className={`${styles.navItem} ${active ? styles.navItemActive : ''}`}>
                 <Icon size={18} />
                 {label}
+                {href === '/lojista/pedidos' && pendingCount > 0 && (
+                  <span className={styles.navBadge}>{pendingCount > 99 ? '99+' : pendingCount}</span>
+                )}
               </Link>
             )
           })}

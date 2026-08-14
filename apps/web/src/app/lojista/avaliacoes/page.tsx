@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Star, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import { ReviewsPage, Review } from '@/lib/types'
+import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 
 function Stars({ n, size = 14 }: { n: number; size?: number }) {
@@ -31,7 +32,7 @@ export default function AvaliacoesPage() {
   const data = reviewsQ.data
   const reviews = data?.reviews ?? []
 
-  if (reviewsQ.isLoading) return <div className={styles.loading}>Carregando…</div>
+  if (reviewsQ.isLoading) return <Spinner />
 
   return (
     <div className={styles.wrap}>

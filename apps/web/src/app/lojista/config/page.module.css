@@ -1,5 +1,4 @@
 .wrap { max-width: 560px; margin: 0 auto; }
-.loading { color: var(--muted); font-weight: 600; }
 .title { font-family: var(--display); font-size: 24px; font-weight: 800; letter-spacing: -0.025em; }
 .subtitle { color: var(--muted); font-size: 14px; margin-top: 2px; margin-bottom: 18px; }
 
@@ -17,8 +16,10 @@
 }
 .tab:hover { color: var(--text); }
 .tabActive { background: var(--card); color: var(--orange-dark); box-shadow: var(--shadow-sm); }
-.tabDot {
-  width: 6px; height: 6px; border-radius: 50%; background: #F59E0B; margin-left: 2px;
+.tabWarn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: #F59E0B; color: #fff; font-size: 10px; font-weight: 800; line-height: 1;
 }
 
 .card {

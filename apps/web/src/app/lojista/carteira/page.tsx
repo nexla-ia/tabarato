@@ -1,43 +1,17 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Wallet as WalletIcon, KeyRound, Receipt, X, Loader2, Pencil } from 'lucide-react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Wallet as WalletIcon, Receipt, X, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Wallet, Transaction, money, timeAgo } from '@/lib/types'
-import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
+import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 
 export default function CarteiraPage() {
-  const qc = useQueryClient()
   const walletQ = useQuery<Wallet>({ queryKey: ['wallet'], queryFn: async () => (await api.get('/stores/my/wallet')).data })
 
-  const [editingPix, setEditingPix] = useState(false)
-  const [pixKey, setPixKey] = useState('')
-  const [withdrawOpen, setWithdrawOpen] = useState(false)
-  const [withdrawAmount, setWithdrawAmount] = useState('')
-  const [withdrawError, setWithdrawError] = useState('')
-  const [withdrawMsg, setWithdrawMsg] = useState('')
   const [receiptText, setReceiptText] = useState<string | null>(null)
   const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null)
-
-  useEffect(() => { setPixKey(walletQ.data?.pixKey ?? '') }, [walletQ.data?.pixKey])
-
-  const savePix = useMutation({
-    mutationFn: async () => (await api.patch('/stores/my/pix', { pixKey: pixKey.trim() })).data,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['wallet'] }); setEditingPix(false) },
-  })
-
-  const withdraw = useMutation({
-    mutationFn: async () => (await api.post('/stores/my/wallet/withdraw', { amount: moneyInputToNumber(withdrawAmount) })).data,
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['wallet'] })
-      setWithdrawAmount('')
-      setWithdrawError('')
-      setWithdrawMsg(data?.message ?? 'Saque solicitado com sucesso.')
-      setTimeout(() => { setWithdrawOpen(false); setWithdrawMsg('') }, 2000)
-    },
-    onError: (err: any) => setWithdrawError(err.response?.data?.message ?? 'Não foi possível solicitar o saque.'),
-  })
 
   async function viewReceipt(txId: string) {
     setLoadingReceiptId(txId)
@@ -51,7 +25,7 @@ export default function CarteiraPage() {
     }
   }
 
-  if (walletQ.isLoading) return <div className={styles.loading}>Carregando…</div>
+  if (walletQ.isLoading) return <Spinner />
 
   const wallet = walletQ.data
   const transactions = wallet?.transactions ?? []
@@ -59,64 +33,15 @@ export default function CarteiraPage() {
   return (
     <div className={styles.wrap}>
       <h1 className={styles.title}>Carteira</h1>
-      <p className={styles.subtitle}>Saldo, saques e histórico de transações</p>
+      <p className={styles.subtitle}>Saldo e histórico de transações</p>
 
       <div className={styles.balanceCard}>
-        <div className={styles.balanceLabel}><WalletIcon size={15} /> Saldo disponível</div>
+        <div className={styles.balanceLabel}><WalletIcon size={15} /> Saldo</div>
         <div className={styles.balanceValue}>{money(wallet?.balance ?? 0)}</div>
-        <button
-          className={styles.withdrawBtn}
-          onClick={() => { setWithdrawOpen(true); setWithdrawError('') }}
-          disabled={!wallet || wallet.balance <= 0}
-        >
-          Sacar via PIX
-        </button>
       </div>
       <p className={styles.hint} style={{ marginTop: 10 }}>
-        O pagamento das suas vendas cai direto na sua conta Mercado Pago conectada — isso já é automático, não precisa sacar daqui. Esse saldo só existe se algum pedido específico não puder usar o Mercado Pago da loja e ficar centralizado na plataforma; nesse caso, cadastre a chave abaixo pra receber o repasse.
+        O pagamento das suas vendas cai direto na sua conta Mercado Pago conectada — é automático, não precisa sacar daqui. Esse saldo só existe se algum pedido específico não puder usar o Mercado Pago da loja e ficar centralizado na plataforma; nesse caso, nossa equipe entra em contato pra fazer o repasse.
       </p>
-
-      <div className={styles.card}>
-        <div className={styles.cardHead}>
-          <span className={styles.cardIcon}><KeyRound size={18} /></span>
-          <div>
-            <div className={styles.cardTitle}>Chave PIX de recebimento</div>
-            <div className={styles.cardSub}>Só usada pra repassar saldo que ficou centralizado — não é a chave de pagamento dos clientes.</div>
-          </div>
-        </div>
-
-        {editingPix ? (
-          <>
-            <input
-              className={styles.input} style={{ marginTop: 14 }}
-              value={pixKey} onChange={(e) => setPixKey(e.target.value)}
-              placeholder="CPF, CNPJ, e-mail ou telefone"
-            />
-            <div className={styles.pixActions}>
-              <button
-                className={`${styles.smallBtn} ${styles.smallBtnPrimary}`}
-                onClick={() => savePix.mutate()}
-                disabled={savePix.isPending || !pixKey.trim()}
-              >
-                {savePix.isPending ? 'Salvando…' : 'Salvar'}
-              </button>
-              <button className={`${styles.smallBtn} ${styles.smallBtnGhost}`} onClick={() => { setEditingPix(false); setPixKey(wallet?.pixKey ?? '') }}>
-                Cancelar
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className={styles.pixRow}>
-            {wallet?.pixKey
-              ? <span className={styles.pixValue}>{wallet.pixKey}</span>
-              : <span className={styles.pixEmpty}>Nenhuma chave cadastrada</span>}
-            <button className={styles.linkBtn} onClick={() => setEditingPix(true)}>
-              <Pencil size={13} style={{ display: 'inline', marginRight: 4, verticalAlign: -2 }} />
-              {wallet?.pixKey ? 'Trocar' : 'Cadastrar'}
-            </button>
-          </div>
-        )}
-      </div>
 
       <div className={styles.card}>
         <div className={styles.cardHead}>
@@ -148,42 +73,6 @@ export default function CarteiraPage() {
           </div>
         )}
       </div>
-
-      {withdrawOpen && (
-        <div className={styles.overlay} onClick={() => setWithdrawOpen(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHead}>
-              <h3>Sacar via PIX</h3>
-              <button onClick={() => setWithdrawOpen(false)}><X size={18} /></button>
-            </div>
-
-            <p className={styles.cardSub}>Saldo disponível: <strong>{money(wallet?.balance ?? 0)}</strong></p>
-
-            <label className={styles.linkBtn} style={{ display: 'block', margin: '14px 0 6px', color: 'var(--muted)', fontSize: 12, fontWeight: 700 }}>Valor a sacar (R$)</label>
-            <input
-              className={styles.input} inputMode="numeric"
-              value={formatMoneyInput(withdrawAmount)}
-              onChange={(e) => setWithdrawAmount(onlyDigits(e.target.value))}
-              placeholder="0,00"
-            />
-
-            {!wallet?.pixKey && <p className={styles.err}>Cadastre sua chave PIX de recebimento antes de sacar.</p>}
-            {withdrawError && <p className={styles.err}>{withdrawError}</p>}
-            {withdrawMsg && <p className={styles.cardSub} style={{ color: 'var(--green)', fontWeight: 700, marginTop: 8 }}>{withdrawMsg}</p>}
-
-            <div className={styles.modalActions}>
-              <button className={styles.modalCancel} onClick={() => setWithdrawOpen(false)}>Cancelar</button>
-              <button
-                className={styles.modalConfirm}
-                onClick={() => withdraw.mutate()}
-                disabled={withdraw.isPending || !wallet?.pixKey || moneyInputToNumber(withdrawAmount) <= 0 || moneyInputToNumber(withdrawAmount) > (wallet?.balance ?? 0)}
-              >
-                {withdraw.isPending ? 'Solicitando…' : 'Confirmar saque'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {receiptText !== null && (
         <div className={styles.overlay} onClick={() => setReceiptText(null)}>

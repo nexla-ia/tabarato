@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Power, Pause, Play, ArrowRight, Clock, Hourglass, XCircle, Ban } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Store, Order, STATUS_LABEL, STATUS_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL, money, timeAgo } from '@/lib/types'
+import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 
 function startOfToday() {
@@ -122,7 +123,7 @@ export default function LojistaDashboard() {
       </div>
 
       {ordersQ.isLoading ? (
-        <div className={styles.empty}>Carregando pedidos…</div>
+        <Spinner label="Carregando pedidos…" />
       ) : active.length === 0 ? (
         <div className={styles.empty}>Nenhum pedido ativo no momento.</div>
       ) : (
