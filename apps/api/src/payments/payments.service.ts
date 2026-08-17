@@ -155,6 +155,7 @@ export class PaymentsService {
       payerRegDate?: string
       items?: Array<{ id: string; title: string; quantity: number; unit_price: number }>
       deviceId?: string
+      payerAddress?: { zip_code?: string; street_name?: string; street_number?: string }
     },
   ) {
     const webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
@@ -164,6 +165,7 @@ export class PaymentsService {
       transaction_amount: amount,
       token: cardToken,
       description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
+      statement_descriptor: 'TABARATO',
       installments,
       payer: {
         email: payerEmail,
@@ -184,6 +186,7 @@ export class PaymentsService {
             ? { phone: { area_code: opts.payerPhone.slice(0, 2), number: opts.payerPhone.slice(2) } }
             : {}),
           ...(opts?.payerRegDate ? { registration_date: opts.payerRegDate } : {}),
+          ...(opts?.payerAddress ? { address: opts.payerAddress } : {}),
         },
       },
       notification_url: webhookUrl,

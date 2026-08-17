@@ -467,6 +467,11 @@ export class OrdersService {
             payerRegDate: payer?.createdAt ? payer.createdAt.toISOString() : undefined,
             items: mpItems,
             deviceId: dto.deviceId,
+            payerAddress: {
+              zip_code: address.zipCode?.replace(/\D/g, ''),
+              street_name: address.street,
+              street_number: address.number,
+            },
           },
         )
         if (result.splitFellBack) {
