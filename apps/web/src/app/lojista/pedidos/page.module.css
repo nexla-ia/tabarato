@@ -63,6 +63,14 @@
   background: #FEE2E2; color: #DC2626; font-size: 10.5px; font-weight: 800;
   padding: 3px 8px; border-radius: 20px;
 }
+.headRight { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.chatBtn {
+  width: 26px; height: 26px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); border: 1px solid var(--border); background: var(--bg);
+  transition: all 0.12s;
+}
+.chatBtn:hover { color: var(--orange); border-color: var(--orange); }
 .time { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
 
 .client { font-weight: 700; font-size: 14px; }

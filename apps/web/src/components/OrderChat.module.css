@@ -1,0 +1,46 @@
+.chat {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border); border-radius: 14px;
+  background: var(--bg); overflow: hidden;
+}
+
+.messages {
+  flex: 1; min-height: 220px; max-height: 360px; overflow-y: auto;
+  padding: 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.empty { color: var(--muted); font-size: 13px; text-align: center; margin: auto; }
+
+.bubbleRow { display: flex; }
+.bubbleRowMine { justify-content: flex-end; }
+
+.bubble {
+  max-width: 78%; display: flex; flex-direction: column; gap: 2px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 13px 13px 13px 3px; padding: 8px 11px;
+}
+.bubbleMine {
+  background: var(--orange); border-color: var(--orange); color: #fff;
+  border-radius: 13px 13px 3px 13px;
+}
+.bubbleSender { font-size: 11px; font-weight: 800; color: var(--orange-dark); }
+.bubbleText { font-size: 13.5px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+.bubbleTime { font-size: 10px; opacity: 0.65; align-self: flex-end; margin-top: 1px; }
+
+.inputRow {
+  display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border);
+  background: var(--card);
+}
+.input {
+  flex: 1; min-width: 0; border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 9px 12px; font-size: 13.5px; outline: none;
+  background: var(--bg); color: var(--text);
+}
+.input:focus { border-color: var(--orange); }
+.sendBtn {
+  width: 38px; height: 38px; flex-shrink: 0; border-radius: 10px;
+  background: var(--orange); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s, opacity 0.12s;
+}
+.sendBtn:hover { background: var(--orange-dark); }
+.sendBtn:disabled { opacity: 0.45; }

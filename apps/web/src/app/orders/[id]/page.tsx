@@ -4,6 +4,8 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Navbar } from '@/components/Navbar'
+import { OrderChat } from '@/components/OrderChat'
+import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import styles from './page.module.css'
 
@@ -22,6 +24,7 @@ function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).rep
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const { user } = useAuth()
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [pixCopied, setPixCopied] = useState(false)
@@ -158,6 +161,16 @@ export default function OrderDetailPage() {
           <div className={styles.card} style={{ marginTop: 14 }}>
             <h3 className={styles.sectionLabel}>Foto de entrega</h3>
             <Image src={order.delivery.photoUrl} alt="Entrega" width={600} height={300} style={{ borderRadius: 10, objectFit: 'cover', width: '100%', height: 'auto' }} />
+          </div>
+        )}
+
+        {/* Chat com a loja */}
+        {user && (
+          <div className={styles.card} style={{ marginTop: 14 }}>
+            <h3 className={styles.sectionLabel}>Fale com a loja</h3>
+            <div style={{ marginTop: 10 }}>
+              <OrderChat orderId={order.id} currentUserId={user.id} />
+            </div>
           </div>
         )}
       </div>
