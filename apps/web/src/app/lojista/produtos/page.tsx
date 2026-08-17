@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, X, Package, Camera, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Product, Store, Category, money } from '@/lib/types'
 import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
@@ -73,6 +73,30 @@ export default function ProdutosPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products-my'] }),
   })
 
+  // Ajuste rápido de estoque (+/-) direto no card — o PATCH exige o produto
+  // inteiro (nome/categoria não são opcionais no DTO), então reenvia tudo.
+  const adjustStock = useMutation({
+    mutationFn: async ({ p, stock }: { p: Product; stock: number }) =>
+      (await api.patch(`/products/${p.id}`, {
+        name: p.name,
+        description: p.description || undefined,
+        basePrice: Number(p.basePrice),
+        stock,
+        categoryId: p.categoryId,
+        imageUrl: p.imageUrl || undefined,
+        isActive: p.isActive,
+      })).data,
+    onMutate: async ({ p, stock }) => {
+      await qc.cancelQueries({ queryKey: ['products-my'] })
+      const prev = qc.getQueryData<Product[]>(['products-my'])
+      qc.setQueryData<Product[]>(['products-my'], (old) =>
+        old?.map((x) => (x.id === p.id ? { ...x, stock } : x)))
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => { if (ctx?.prev) qc.setQueryData(['products-my'], ctx.prev) },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['products-my'] }),
+  })
+
   const products = productsQ.data ?? []
 
   function edit(p: Product) {
@@ -107,27 +131,46 @@ export default function ProdutosPage() {
           {products.map(p => (
             <div key={p.id} className={`${styles.card} ${!p.isActive ? styles.inactive : ''}`}>
               <div className={styles.thumb}>
-                {p.imageUrl ? <img src={p.imageUrl} alt={p.name} /> : <Package size={26} strokeWidth={1.5} />}
+                {p.imageUrl ? <img src={p.imageUrl} alt={p.name} /> : <Package size={30} strokeWidth={1.5} />}
+                {!p.isActive && <span className={styles.inactiveBadge}>Inativo</span>}
               </div>
-              <div className={styles.info}>
+              <div className={styles.body}>
                 <div className={styles.pName}>{p.name}</div>
+                {p.description && <div className={styles.pDesc}>{p.description}</div>}
                 <div className={styles.pPrice}>{money(p.basePrice)}</div>
-                <div className={styles.pMeta}>
-                  {p.stock == null ? 'Estoque livre' : `${p.stock} un.`}
-                  {!p.isActive && <span className={styles.pInactive}>· inativo</span>}
-                </div>
+
+                {p.stock == null ? (
+                  <div className={styles.pMeta}>Estoque livre</div>
+                ) : (
+                  <div className={styles.stockRow}>
+                    <button
+                      className={styles.stepBtn}
+                      onClick={() => adjustStock.mutate({ p, stock: Math.max(0, p.stock! - 1) })}
+                      disabled={p.stock <= 0}
+                      title="Diminuir estoque"
+                    ><Minus size={13} /></button>
+                    <span className={styles.stockVal}>{p.stock} un.</span>
+                    <button
+                      className={styles.stepBtn}
+                      onClick={() => adjustStock.mutate({ p, stock: p.stock! + 1 })}
+                      title="Aumentar estoque"
+                    ><Plus size={13} /></button>
+                  </div>
+                )}
               </div>
-              <div className={styles.cardActions}>
+              <div className={styles.cardFooter}>
                 <label className={styles.switch}>
                   <input type="checkbox" checked={p.isActive} onChange={() => toggle.mutate(p.id)} />
                   <span className={styles.slider} />
                 </label>
-                <button className={styles.iconBtn} onClick={() => edit(p)} title="Editar"><Pencil size={15} /></button>
-                <button
-                  className={`${styles.iconBtn} ${styles.danger}`}
-                  onClick={() => { if (confirm(`Excluir "${p.name}"?`)) remove.mutate(p.id) }}
-                  title="Excluir"
-                ><Trash2 size={15} /></button>
+                <div className={styles.cardActions}>
+                  <button className={styles.iconBtn} onClick={() => edit(p)} title="Editar"><Pencil size={15} /></button>
+                  <button
+                    className={`${styles.iconBtn} ${styles.danger}`}
+                    onClick={() => { if (confirm(`Excluir "${p.name}"?`)) remove.mutate(p.id) }}
+                    title="Excluir"
+                  ><Trash2 size={15} /></button>
+                </div>
               </div>
             </div>
           ))}
