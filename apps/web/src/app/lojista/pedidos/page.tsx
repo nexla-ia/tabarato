@@ -10,8 +10,11 @@ import {
 import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 
-const FILTERS: { key: OrderStatus | 'ALL'; label: string }[] = [
+type FilterKey = OrderStatus | 'ALL' | 'LATE'
+
+const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'ALL', label: 'Todos' },
+  { key: 'LATE', label: 'Atrasados' },
   { key: 'PENDING', label: 'Aguardando' },
   { key: 'CONFIRMED', label: 'Confirmado' },
   { key: 'PREPARING', label: 'Preparando' },
@@ -22,7 +25,7 @@ const FILTERS: { key: OrderStatus | 'ALL'; label: string }[] = [
 
 export default function PedidosPage() {
   const qc = useQueryClient()
-  const [filter, setFilter] = useState<OrderStatus | 'ALL'>('ALL')
+  const [filter, setFilter] = useState<FilterKey>('ALL')
   const [cancelId, setCancelId] = useState<string | null>(null)
   const [note, setNote] = useState('')
 
@@ -62,8 +65,12 @@ export default function PedidosPage() {
   })
 
   const orders = ordersQ.data ?? []
-  const filtered = filter === 'ALL' ? orders : orders.filter(o => o.status === filter)
   const lateCount = orders.filter(isOrderLate).length
+  const filtered = (
+    filter === 'ALL' ? orders
+    : filter === 'LATE' ? orders.filter(isOrderLate)
+    : orders.filter(o => o.status === filter)
+  ).slice().sort((a, b) => Number(isOrderLate(b)) - Number(isOrderLate(a)))
 
   return (
     <div>
@@ -79,13 +86,15 @@ export default function PedidosPage() {
 
       <div className={styles.filters}>
         {FILTERS.map(f => {
-          const count = f.key === 'ALL' ? orders.length : orders.filter(o => o.status === f.key).length
+          const count = f.key === 'ALL' ? orders.length : f.key === 'LATE' ? lateCount : orders.filter(o => o.status === f.key).length
+          const isLateChip = f.key === 'LATE'
           return (
             <button
               key={f.key}
-              className={`${styles.chip} ${filter === f.key ? styles.chipActive : ''}`}
+              className={`${styles.chip} ${filter === f.key ? styles.chipActive : ''} ${isLateChip ? styles.chipLate : ''} ${isLateChip && filter === f.key ? styles.chipLateActive : ''}`}
               onClick={() => setFilter(f.key)}
             >
+              {isLateChip && <TriangleAlert size={12} />}
               {f.label}{count > 0 && <span className={styles.chipCount}>{count}</span>}
             </button>
           )
@@ -95,7 +104,9 @@ export default function PedidosPage() {
       {ordersQ.isLoading ? (
         <Spinner />
       ) : filtered.length === 0 ? (
-        <div className={styles.empty}>Nenhum pedido {filter !== 'ALL' ? `em "${STATUS_LABEL[filter]}"` : ''}.</div>
+        <div className={styles.empty}>
+          Nenhum pedido {filter === 'LATE' ? 'atrasado' : filter !== 'ALL' ? `em "${STATUS_LABEL[filter]}"` : ''}.
+        </div>
       ) : (
         <div className={styles.list}>
           {filtered.map(o => {

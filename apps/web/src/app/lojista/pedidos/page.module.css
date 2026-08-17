@@ -17,6 +17,11 @@
 }
 .chipActive .chipCount { background: rgba(255,255,255,0.25); }
 
+.chipLate { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
+.chipLate:hover { border-color: #DC2626; color: #DC2626; }
+.chipLateActive, .chipLateActive:hover { background: #DC2626; border-color: #DC2626; color: #fff; }
+.chipLateActive .chipCount { background: rgba(255,255,255,0.25); }
+
 .empty {
   background: var(--card); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 40px; text-align: center;
@@ -38,7 +43,17 @@
   display: flex; flex-direction: column; gap: 8px;
   box-shadow: var(--shadow-sm);
 }
-.cardLate { border-color: #FCA5A5; box-shadow: 0 0 0 1px #FCA5A5 inset; }
+.cardLate {
+  background: #FFF6F6; border: 2px solid #EF4444;
+  animation: lateGlow 1.8s ease-in-out infinite;
+}
+@keyframes lateGlow {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(220,38,38,0.10); }
+  50% { box-shadow: 0 0 0 7px rgba(220,38,38,0.22); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cardLate { animation: none; box-shadow: 0 0 0 3px rgba(220,38,38,0.16); }
+}
 .cardHead { display: flex; align-items: center; justify-content: space-between; }
 .headLeft { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .orderId { font-weight: 800; font-size: 14px; }
