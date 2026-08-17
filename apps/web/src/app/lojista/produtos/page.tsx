@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus, TriangleAlert } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Product, Store, Category, money } from '@/lib/types'
 import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
@@ -128,11 +128,17 @@ export default function ProdutosPage() {
         </div>
       ) : (
         <div className={styles.grid}>
-          {products.map(p => (
+          {products.map(p => {
+            const outOfStock = p.stock != null && p.stock <= 0
+            return (
             <div key={p.id} className={`${styles.card} ${!p.isActive ? styles.inactive : ''}`}>
               <div className={styles.thumb}>
                 {p.imageUrl ? <img src={p.imageUrl} alt={p.name} /> : <Package size={30} strokeWidth={1.5} />}
-                {!p.isActive && <span className={styles.inactiveBadge}>Inativo</span>}
+                {outOfStock ? (
+                  <span className={styles.outBadge}><TriangleAlert size={11} /> Esgotado</span>
+                ) : !p.isActive ? (
+                  <span className={styles.inactiveBadge}>Inativo</span>
+                ) : null}
               </div>
               <div className={styles.body}>
                 <div className={styles.pName}>{p.name}</div>
@@ -142,20 +148,25 @@ export default function ProdutosPage() {
                 {p.stock == null ? (
                   <div className={styles.pMeta}>Estoque livre</div>
                 ) : (
-                  <div className={styles.stockRow}>
-                    <button
-                      className={styles.stepBtn}
-                      onClick={() => adjustStock.mutate({ p, stock: Math.max(0, p.stock! - 1) })}
-                      disabled={p.stock <= 0}
-                      title="Diminuir estoque"
-                    ><Minus size={13} /></button>
-                    <span className={styles.stockVal}>{p.stock} un.</span>
-                    <button
-                      className={styles.stepBtn}
-                      onClick={() => adjustStock.mutate({ p, stock: p.stock! + 1 })}
-                      title="Aumentar estoque"
-                    ><Plus size={13} /></button>
-                  </div>
+                  <>
+                    <div className={styles.stockRow}>
+                      <button
+                        className={styles.stepBtn}
+                        onClick={() => adjustStock.mutate({ p, stock: Math.max(0, p.stock! - 1) })}
+                        disabled={p.stock <= 0}
+                        title="Diminuir estoque"
+                      ><Minus size={13} /></button>
+                      <span className={`${styles.stockVal} ${outOfStock ? styles.stockValOut : ''}`}>{p.stock} un.</span>
+                      <button
+                        className={styles.stepBtn}
+                        onClick={() => adjustStock.mutate({ p, stock: p.stock! + 1 })}
+                        title="Aumentar estoque"
+                      ><Plus size={13} /></button>
+                    </div>
+                    {outOfStock && (
+                      <div className={styles.outWarning}><TriangleAlert size={12} /> Produto acabou</div>
+                    )}
+                  </>
                 )}
               </div>
               <div className={styles.cardFooter}>
@@ -173,7 +184,8 @@ export default function ProdutosPage() {
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
