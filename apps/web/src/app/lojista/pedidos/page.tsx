@@ -1,11 +1,11 @@
 'use client'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Clock, X, MapPin, CreditCard } from 'lucide-react'
+import { ArrowRight, Clock, X, MapPin, CreditCard, TriangleAlert } from 'lucide-react'
 import { api } from '@/lib/api'
 import {
   Order, OrderStatus, STATUS_LABEL, STATUS_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL,
-  PAYMENT_LABEL, money, timeAgo,
+  PAYMENT_LABEL, money, timeAgo, isOrderLate,
 } from '@/lib/types'
 import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
@@ -63,11 +63,19 @@ export default function PedidosPage() {
 
   const orders = ordersQ.data ?? []
   const filtered = filter === 'ALL' ? orders : orders.filter(o => o.status === filter)
+  const lateCount = orders.filter(isOrderLate).length
 
   return (
     <div>
       <h1 className={styles.title}>Pedidos</h1>
       <p className={styles.subtitle}>Gerencie e acompanhe seus pedidos</p>
+
+      {lateCount > 0 && (
+        <div className={styles.lateBanner}>
+          <TriangleAlert size={16} />
+          {lateCount} pedido{lateCount === 1 ? '' : 's'} aguardando confirmação há mais de 7 minutos
+        </div>
+      )}
 
       <div className={styles.filters}>
         {FILTERS.map(f => {
@@ -93,14 +101,18 @@ export default function PedidosPage() {
           {filtered.map(o => {
             const next = NEXT_STATUS[o.status]
             const canCancel = ['PENDING', 'CONFIRMED', 'PREPARING'].includes(o.status)
+            const late = isOrderLate(o)
             return (
-              <div key={o.id} className={styles.card}>
+              <div key={o.id} className={`${styles.card} ${late ? styles.cardLate : ''}`}>
                 <div className={styles.cardHead}>
                   <div className={styles.headLeft}>
                     <span className={styles.orderId}>#{o.id.slice(-6).toUpperCase()}</span>
                     <span className={styles.badge} style={{ background: `${STATUS_COLOR[o.status]}18`, color: STATUS_COLOR[o.status] }}>
                       {STATUS_LABEL[o.status]}
                     </span>
+                    {late && (
+                      <span className={styles.lateBadge}><TriangleAlert size={11} /> Atrasado</span>
+                    )}
                   </div>
                   <span className={styles.time}><Clock size={12} /> {timeAgo(o.createdAt)}</span>
                 </div>

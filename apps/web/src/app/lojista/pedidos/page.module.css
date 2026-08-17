@@ -23,6 +23,13 @@
   color: var(--muted); font-size: 14px;
 }
 
+.lateBanner {
+  display: flex; align-items: center; gap: 8px;
+  background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626;
+  border-radius: 12px; padding: 11px 14px; font-size: 13px; font-weight: 700;
+  margin-bottom: 18px;
+}
+
 .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; }
 
 .card {
@@ -31,10 +38,16 @@
   display: flex; flex-direction: column; gap: 8px;
   box-shadow: var(--shadow-sm);
 }
+.cardLate { border-color: #FCA5A5; box-shadow: 0 0 0 1px #FCA5A5 inset; }
 .cardHead { display: flex; align-items: center; justify-content: space-between; }
-.headLeft { display: flex; align-items: center; gap: 8px; }
+.headLeft { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .orderId { font-weight: 800; font-size: 14px; }
 .badge { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.lateBadge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #FEE2E2; color: #DC2626; font-size: 10.5px; font-weight: 800;
+  padding: 3px 8px; border-radius: 20px;
+}
 .time { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
 
 .client { font-weight: 700; font-size: 14px; }

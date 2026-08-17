@@ -163,6 +163,13 @@ export function money(v: number | string | null | undefined): string {
   return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}`
 }
 
+// Pedido "Aguardando" (PENDING) há mais de 7min sem confirmação da loja = atrasado.
+export const LATE_CONFIRM_MS = 7 * 60 * 1000
+
+export function isOrderLate(o: Pick<Order, 'status' | 'createdAt'>): boolean {
+  return o.status === 'PENDING' && Date.now() - new Date(o.createdAt).getTime() > LATE_CONFIRM_MS
+}
+
 export function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const min = Math.floor(diff / 60000)

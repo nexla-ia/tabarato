@@ -33,3 +33,14 @@ export function playNewOrderSound() {
   tone(c, 880, 0, 0.18, 0.22)
   tone(c, 1175, 0.16, 0.22, 0.22)
 }
+
+// Três bips graves — pedido "Aguardando" passou do prazo de confirmação.
+// Grave + repetido de propósito, pra soar mais urgente que o de pedido novo.
+export function playLateOrderAlert() {
+  const c = getCtx()
+  if (!c) return
+  if (c.state === 'suspended') c.resume().catch(() => {})
+  tone(c, 660, 0, 0.14, 0.26)
+  tone(c, 660, 0.2, 0.14, 0.26)
+  tone(c, 660, 0.4, 0.18, 0.26)
+}

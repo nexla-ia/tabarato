@@ -82,6 +82,7 @@
   border-radius: 999px; background: var(--orange); color: #fff;
   font-size: 11px; font-weight: 800; line-height: 19px; text-align: center;
 }
+.navBadgeLate { background: #DC2626; }
 
 .navWarn {
   margin-left: auto;

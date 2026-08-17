@@ -6,8 +6,8 @@ import { useQuery } from '@tanstack/react-query'
 import { LayoutDashboard, ReceiptText, Package, Ticket, Wallet, Star, Settings, LogOut, Lock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
-import { Store, Order } from '@/lib/types'
-import { playNewOrderSound } from '@/lib/notifySound'
+import { Store, Order, isOrderLate } from '@/lib/types'
+import { playNewOrderSound, playLateOrderAlert } from '@/lib/notifySound'
 import { Spinner } from '@/components/Spinner'
 import styles from './layout.module.css'
 
@@ -66,6 +66,19 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
       if (hasNew) playNewOrderSound()
     }
     seenOrderIds.current = ids
+  }, [ordersQ.data])
+
+  // Alerta (uma vez por pedido) quando ele cruza os 7min "Aguardando" sem confirmação.
+  const lateOrders = (ordersQ.data ?? []).filter(isOrderLate)
+  const hasLateOrders = lateOrders.length > 0
+  const alertedLateIds = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const fresh = lateOrders.filter((o) => !alertedLateIds.current.has(o.id))
+    if (fresh.length > 0) {
+      playLateOrderAlert()
+      fresh.forEach((o) => alertedLateIds.current.add(o.id))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ordersQ.data])
 
   // Mesmos critérios das abas de Configurações — "!" no menu avisa sem
@@ -129,7 +142,12 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
                 <Icon size={18} />
                 {label}
                 {href === '/lojista/pedidos' && pendingCount > 0 && (
-                  <span className={styles.navBadge}>{pendingCount > 99 ? '99+' : pendingCount}</span>
+                  <span
+                    className={`${styles.navBadge} ${hasLateOrders ? styles.navBadgeLate : ''}`}
+                    title={hasLateOrders ? 'Tem pedido atrasado sem confirmação' : undefined}
+                  >
+                    {pendingCount > 99 ? '99+' : pendingCount}
+                  </span>
                 )}
                 {href === '/lojista/config' && configNeedsAttention && (
                   <span className={styles.navWarn} title="Falta preencher algo nas configurações">!</span>
