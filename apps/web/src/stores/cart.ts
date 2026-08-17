@@ -11,16 +11,27 @@ export interface CartItem {
   variationName?: string
 }
 
+export interface AppliedCoupon {
+  code: string
+  description?: string | null
+  discountPercent?: number | string | null
+  discountFixed?: number | string | null
+  discount: number
+  freeShipping: boolean
+}
+
 interface CartState {
   storeId: string | null
   storeName: string | null
   items: CartItem[]
   userId: string | null
+  coupon: AppliedCoupon | null
   addItem: (storeId: string, storeName: string, item: CartItem, userId?: string) => void
   removeItem: (productId: string, variationId?: string) => void
   updateQty: (productId: string, variationId: string | undefined, qty: number) => void
   clear: () => void
   total: () => number
+  setCoupon: (coupon: AppliedCoupon | null) => void
 }
 
 export const useCartStore = create<CartState>()(
@@ -30,12 +41,13 @@ export const useCartStore = create<CartState>()(
       storeName: null,
       items: [],
       userId: null,
+      coupon: null,
 
       addItem(storeId, storeName, item, userId) {
         const state = get()
         // Different store — ask user (handled in UI), clear and add
         if (state.storeId && state.storeId !== storeId) {
-          set({ storeId, storeName, userId: userId ?? null, items: [{ ...item, quantity: item.quantity }] })
+          set({ storeId, storeName, userId: userId ?? null, items: [{ ...item, quantity: item.quantity }], coupon: null })
           return
         }
         const existing = state.items.find(
@@ -61,7 +73,7 @@ export const useCartStore = create<CartState>()(
         const items = get().items.filter(
           i => !(i.productId === productId && i.variationId === variationId),
         )
-        set({ items, ...(items.length === 0 ? { storeId: null, storeName: null } : {}) })
+        set({ items, ...(items.length === 0 ? { storeId: null, storeName: null, coupon: null } : {}) })
       },
 
       updateQty(productId, variationId, qty) {
@@ -76,9 +88,11 @@ export const useCartStore = create<CartState>()(
         })
       },
 
-      clear: () => set({ storeId: null, storeName: null, items: [], userId: null }),
+      clear: () => set({ storeId: null, storeName: null, items: [], userId: null, coupon: null }),
 
       total: () => get().items.reduce((acc, i) => acc + i.price * i.quantity, 0),
+
+      setCoupon: (coupon) => set({ coupon }),
     }),
     { name: 'tb-cart' },
   ),

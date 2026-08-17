@@ -1,9 +1,11 @@
 'use client'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft } from 'lucide-react'
+import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft, Tag, X } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
+import { api } from '@/lib/api'
 import { Navbar } from '@/components/Navbar'
 import styles from './page.module.css'
 
@@ -11,8 +13,12 @@ function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).rep
 
 export default function CartPage() {
   const router = useRouter()
-  const { items, storeId, storeName, total, updateQty, removeItem, clear } = useCartStore()
+  const { items, storeId, storeName, total, updateQty, removeItem, clear, coupon, setCoupon } = useCartStore()
   const DELIVERY_ESTIMATE = 10.00 // shown estimate only; real value calculated on checkout
+
+  const [couponInput, setCouponInput] = useState('')
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState('')
 
   if (items.length === 0) {
     return (
@@ -29,7 +35,40 @@ export default function CartPage() {
   }
 
   const subtotal = total()
-  const orderTotal = subtotal + DELIVERY_ESTIMATE
+  const deliveryEstimate = coupon?.freeShipping ? 0 : DELIVERY_ESTIMATE
+  const orderTotal = Math.max(0, subtotal - (coupon?.discount ?? 0)) + deliveryEstimate
+
+  async function applyCoupon() {
+    const code = couponInput.trim().toUpperCase()
+    if (!code || !storeId) return
+    setCouponLoading(true)
+    setCouponError('')
+    try {
+      const { data } = await api.get('/coupons/validate', { params: { code, subtotal, storeId } })
+      setCoupon({
+        code: data.code,
+        description: data.description,
+        discountPercent: data.discountPercent,
+        discountFixed: data.discountFixed,
+        discount: data.discount,
+        freeShipping: !!data.freeShipping,
+      })
+      setCouponInput('')
+    } catch (err: any) {
+      setCouponError(
+        err.response?.status === 401
+          ? 'Faça login para usar um cupom'
+          : (err.response?.data?.message ?? 'Cupom inválido'),
+      )
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  function removeCoupon() {
+    setCoupon(null)
+    setCouponError('')
+  }
 
   return (
     <>
@@ -88,15 +127,58 @@ export default function CartPage() {
               <span>Subtotal</span>
               <span>{fmtBRL(subtotal)}</span>
             </div>
+            {coupon && (
+              <div className={`${styles.summaryRow} ${styles.summaryDiscount}`}>
+                <span>Cupom {coupon.code}</span>
+                <span>-{fmtBRL(coupon.discount)}</span>
+              </div>
+            )}
             <div className={styles.summaryRow}>
               <span>Entrega (estimativa)</span>
-              <span>{fmtBRL(DELIVERY_ESTIMATE)}</span>
+              <span>{coupon?.freeShipping ? <span className={styles.summaryDiscount}>Grátis</span> : fmtBRL(DELIVERY_ESTIMATE)}</span>
             </div>
             <div className={styles.summaryDivider} />
             <div className={styles.summaryTotal}>
               <span>Total estimado</span>
               <span>{fmtBRL(orderTotal)}</span>
             </div>
+
+            <div className={styles.couponBox}>
+              {coupon ? (
+                <div className={styles.couponApplied}>
+                  <div className={styles.couponAppliedInfo}>
+                    <Tag size={14} />
+                    <div>
+                      <span className={styles.couponCode}>{coupon.code}</span>
+                      {coupon.description && <span className={styles.couponDesc}>{coupon.description}</span>}
+                    </div>
+                  </div>
+                  <button className={styles.couponRemove} onClick={removeCoupon} title="Remover cupom">
+                    <X size={15} />
+                  </button>
+                </div>
+              ) : (
+                <div className={styles.couponForm}>
+                  <input
+                    className={styles.couponInput}
+                    placeholder="Cupom de desconto"
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyCoupon() }}
+                    maxLength={30}
+                  />
+                  <button
+                    className={styles.couponApply}
+                    onClick={applyCoupon}
+                    disabled={!couponInput.trim() || couponLoading}
+                  >
+                    {couponLoading ? '...' : 'Aplicar'}
+                  </button>
+                </div>
+              )}
+              {couponError && <p className={styles.couponError}>{couponError}</p>}
+            </div>
+
             <button className={styles.checkoutBtn} onClick={() => router.push('/checkout')}>
               Finalizar pedido →
             </button>

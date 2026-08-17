@@ -40,7 +40,7 @@ async function tokenizeCard(data: { cardNumber: string; cvv: string; expiryMonth
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { items, storeId, total, clear } = useCartStore()
+  const { items, storeId, total, clear, coupon } = useCartStore()
   const { user, ready } = useAuth()
 
   // Chave de idempotência: estável entre retries do mesmo checkout (evita pedido duplicado)
@@ -135,6 +135,7 @@ export default function CheckoutPage() {
         payerCpf: isCard ? cardCpf : undefined,
         idempotencyKey: idemKey.current,
         items: items.map(i => ({ productId: i.productId, variationId: i.variationId, quantity: i.quantity })),
+        couponCode: coupon?.code,
       })
 
       clear()
@@ -307,8 +308,14 @@ export default function CheckoutPage() {
             <div className={styles.summaryRow}>
               <span>Subtotal</span><span>{fmtBRL(total())}</span>
             </div>
+            {coupon && (
+              <div className={styles.summaryRow}>
+                <span>Cupom {coupon.code}</span>
+                <span>{coupon.discount > 0 ? `-${fmtBRL(coupon.discount)}` : ''}{coupon.freeShipping ? (coupon.discount > 0 ? ' + frete grátis' : 'Frete grátis') : ''}</span>
+              </div>
+            )}
             <div className={styles.summaryRow}>
-              <span>Entrega</span><span>calculado no pedido</span>
+              <span>Entrega</span><span>{coupon?.freeShipping ? 'Grátis' : 'calculado no pedido'}</span>
             </div>
           </div>
         </section>
