@@ -175,9 +175,14 @@ export class PaymentsService {
       response = await this.clientFor(opts?.sellerToken).create({ body: buildBody(true) })
     } catch (err: any) {
       const detail = this.extractMpError(err)
-      if (!opts?.sellerToken || !/application_fee/i.test(detail)) throw err
+      // O cartão é tokenizado com a PUBLIC KEY da plataforma, então cobrar com o token
+      // do lojista (split) dá "invalid credentials" / token inválido. Nesses casos (e no
+      // application_fee recusado) cai pro modo CENTRALIZADO — token da plataforma, que
+      // casa com o token do cartão. O repasse à loja vai pela carteira.
+      const fallbackable = /application_fee|invalid.?credential|invalid.*token|card.?token|unauthorized|não autoriz/i.test(detail)
+      if (!opts?.sellerToken || !fallbackable) throw err
 
-      this.logger.warn(`Cartão pedido ${orderId.slice(0, 8)}: caindo pro modo centralizado (split recusado pelo MP): ${detail}`)
+      this.logger.warn(`Cartão pedido ${orderId.slice(0, 8)}: caindo pro modo centralizado (${detail})`)
       response = await this.clientFor(null).create({ body: buildBody(false) })
       splitFellBack = true
     }
