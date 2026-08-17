@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
@@ -7,6 +7,7 @@ import { LayoutDashboard, ReceiptText, Package, Ticket, Wallet, Star, Settings, 
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import { Store, Order } from '@/lib/types'
+import { playNewOrderSound } from '@/lib/notifySound'
 import { Spinner } from '@/components/Spinner'
 import styles from './layout.module.css'
 
@@ -52,6 +53,20 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
     refetchInterval: 20_000,
   })
   const pendingCount = (ordersQ.data ?? []).filter((o) => o.status === 'PENDING').length
+
+  // Toca um beep quando surge um pedido novo (id que ainda não tínhamos visto).
+  // A 1ª leitura só grava a base, sem tocar — senão apitaria a cada login.
+  const seenOrderIds = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    const data = ordersQ.data
+    if (!data) return
+    const ids = new Set(data.map((o) => o.id))
+    if (seenOrderIds.current) {
+      const hasNew = data.some((o) => !seenOrderIds.current!.has(o.id))
+      if (hasNew) playNewOrderSound()
+    }
+    seenOrderIds.current = ids
+  }, [ordersQ.data])
 
   // Mesmos critérios das abas de Configurações — "!" no menu avisa sem
   // precisar abrir a página pra descobrir o que falta.
