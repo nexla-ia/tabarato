@@ -17,6 +17,7 @@ interface FormState {
   discountType: DiscountType
   discountPercent: string
   discountFixed: string // dígitos crus em centavos, igual ao preço de produto
+  freeShipping: boolean
   minOrderValue: string // idem
   maxUses: string
   expiresAt: string // yyyy-mm-dd
@@ -25,7 +26,7 @@ interface FormState {
 
 const EMPTY: FormState = {
   code: '', description: '', discountType: 'percent',
-  discountPercent: '', discountFixed: '', minOrderValue: '', maxUses: '', expiresAt: '', isActive: true,
+  discountPercent: '', discountFixed: '', freeShipping: false, minOrderValue: '', maxUses: '', expiresAt: '', isActive: true,
 }
 
 function money(v: number | string | null | undefined) {
@@ -45,7 +46,8 @@ export default function CuponsPage() {
         code: f.code.trim().toUpperCase(),
         description: f.description.trim() || undefined,
         discountPercent: f.discountType === 'percent' ? Number(f.discountPercent) || undefined : null,
-        discountFixed: f.discountType === 'fixed' ? moneyInputToNumber(f.discountFixed) : null,
+        discountFixed: f.discountType === 'fixed' ? moneyInputToNumber(f.discountFixed) || undefined : null,
+        freeShipping: f.freeShipping,
         minOrderValue: f.minOrderValue ? moneyInputToNumber(f.minOrderValue) : null,
         maxUses: f.maxUses === '' ? null : Number(f.maxUses),
         expiresAt: f.expiresAt || null,
@@ -78,6 +80,7 @@ export default function CuponsPage() {
       discountType: c.discountFixed ? 'fixed' : 'percent',
       discountPercent: c.discountPercent ? String(Number(c.discountPercent)) : '',
       discountFixed: c.discountFixed ? String(Math.round(Number(c.discountFixed) * 100)) : '',
+      freeShipping: !!c.freeShipping,
       minOrderValue: c.minOrderValue ? String(Math.round(Number(c.minOrderValue) * 100)) : '',
       maxUses: c.maxUses == null ? '' : String(c.maxUses),
       expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : '',
@@ -91,14 +94,16 @@ export default function CuponsPage() {
   }
 
   function discountLabel(c: Coupon) {
-    if (c.discountPercent) return `${Number(c.discountPercent)}% de desconto`
-    if (c.discountFixed) return `${money(c.discountFixed)} de desconto`
-    return '—'
+    const parts: string[] = []
+    if (c.discountPercent) parts.push(`${Number(c.discountPercent)}% de desconto`)
+    if (c.discountFixed) parts.push(`${money(c.discountFixed)} de desconto`)
+    if (c.freeShipping) parts.push('frete grátis')
+    return parts.length ? parts.join(' + ') : '—'
   }
 
   const isExpired = (c: Coupon) => !!c.expiresAt && new Date(c.expiresAt) < new Date()
   const canSave = !!form?.code.trim() && (
-    form.discountType === 'percent' ? !!form.discountPercent : !!form.discountFixed
+    form.freeShipping || (form.discountType === 'percent' ? !!form.discountPercent : !!form.discountFixed)
   )
 
   return (
@@ -202,7 +207,7 @@ export default function CuponsPage() {
 
             {form.discountType === 'percent' ? (
               <>
-                <label className={styles.label}>Desconto (%) *</label>
+                <label className={styles.label}>Desconto (%){form.freeShipping ? '' : ' *'}</label>
                 <input
                   className={styles.input} type="number" min={1} max={100}
                   value={form.discountPercent}
@@ -212,7 +217,7 @@ export default function CuponsPage() {
               </>
             ) : (
               <>
-                <label className={styles.label}>Desconto (R$) *</label>
+                <label className={styles.label}>Desconto (R$){form.freeShipping ? '' : ' *'}</label>
                 <input
                   className={styles.input} inputMode="numeric"
                   value={formatMoneyInput(form.discountFixed)}
@@ -221,6 +226,17 @@ export default function CuponsPage() {
                 />
               </>
             )}
+
+            <label className={styles.checkRow}>
+              <input
+                type="checkbox"
+                checked={form.freeShipping}
+                disabled={!!form.id}
+                onChange={(e) => setForm({ ...form, freeShipping: e.target.checked })}
+              />
+              Frete grátis (a loja absorve o valor da entrega)
+            </label>
+            {form.id && <p className={styles.hint}>Não é possível alterar o frete grátis de um cupom já criado.</p>}
 
             <div className={styles.row}>
               <div style={{ flex: 1 }}>

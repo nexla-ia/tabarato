@@ -64,6 +64,7 @@ export interface Coupon {
   description?: string | null
   discountPercent?: number | string | null
   discountFixed?: number | string | null
+  freeShipping?: boolean | null
   minOrderValue?: number | string | null
   maxUses?: number | null
   usedCount: number
