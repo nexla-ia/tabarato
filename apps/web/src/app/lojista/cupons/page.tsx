@@ -231,12 +231,10 @@ export default function CuponsPage() {
               <input
                 type="checkbox"
                 checked={form.freeShipping}
-                disabled={!!form.id}
                 onChange={(e) => setForm({ ...form, freeShipping: e.target.checked })}
               />
               Frete grátis (a loja absorve o valor da entrega)
             </label>
-            {form.id && <p className={styles.hint}>Não é possível alterar o frete grátis de um cupom já criado.</p>}
 
             <div className={styles.row}>
               <div style={{ flex: 1 }}>
