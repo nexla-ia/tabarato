@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, HttpException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { randomInt } from 'crypto'
 import { OrderStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
@@ -471,8 +471,20 @@ export class OrdersService {
           throw new BadRequestException(`Pagamento recusado. Motivo: ${result.statusDetail ?? 'cartão não autorizado'}. Verifique os dados e tente novamente.`)
         }
       } catch (err: any) {
-        if (err?.status === 400) throw err
-        throw new BadRequestException('Não foi possível processar o pagamento com cartão. Tente outro método.')
+        // Nossa própria exceção (ex.: "Pagamento recusado" acima) → repassa como está.
+        // (Antes usava err?.status===400, mas um erro CRU do MP também tem status 400 →
+        //  era re-lançado sem ser HttpException → o Nest devolvia 500.)
+        if (err instanceof HttpException) throw err
+
+        this.logger.error(`Card payment failed (order ${order.id.slice(0, 8)})`, err)
+        // Cartão falhou: cancela o pedido e devolve estoque/cupom/pontos.
+        await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } }).catch(() => {})
+        await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } }).catch(() => {})
+        await this.restoreOrderConsumption(order.id)
+        // Surface o motivo real do MP (ex.: valor abaixo do mínimo do cartão).
+        const cause = Array.isArray(err?.cause) ? err.cause.map((c: any) => c?.description).filter(Boolean).join('; ') : ''
+        const raw = (cause || err?.message || '').toString().slice(0, 160)
+        throw new BadRequestException(`Não foi possível processar o pagamento com cartão${raw ? ` (${raw})` : ''}. Verifique os dados ou pague com PIX.`)
       }
     }
 
