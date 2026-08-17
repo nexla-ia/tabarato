@@ -123,7 +123,7 @@ export class OrdersService {
         where: { id: dto.storeId },
         include: { user: { select: { pushToken: true } } },
       }),
-      this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
+      this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true, phone: true, createdAt: true } }),
     ])
     if (!store) throw new BadRequestException('Loja não encontrada')
 
@@ -188,6 +188,8 @@ export class OrdersService {
       unitPrice: number
       notes?: string
     }[] = []
+    // Itens formatados pro MP (additional_info) — melhora o score do antifraude.
+    const mpItems: { id: string; title: string; quantity: number; unit_price: number }[] = []
     const stockDecrements: { id: string; type: 'variation' | 'product'; by: number }[] = []
 
     for (const item of dto.items) {
@@ -234,6 +236,7 @@ export class OrdersService {
         unitPrice,
         notes: item.notes,
       })
+      mpItems.push({ id: item.productId, title: product.name, quantity: item.quantity, unit_price: unitPrice })
     }
 
     // Normaliza o subtotal a centavos (evita floats tipo 59.9999 chegando ao gateway)
@@ -445,13 +448,25 @@ export class OrdersService {
     // Card payment — synchronous
     if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && dto.cardToken) {
       try {
+        // Dados ricos do pagador reduzem o "cc_rejected_high_risk" do antifraude do MP.
+        const nameParts = (payer?.name ?? '').trim().split(/\s+/).filter(Boolean)
+        const payerFirstName = nameParts[0]
+        const payerLastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined
+        const payerPhone = (payer?.phone ?? '').replace(/\D/g, '') || undefined
         const result = await this.payments.createCardPayment(
           payment.id, total, order.id,
           dto.cardToken,
           dto.installments ?? 1,
           safePayerEmail(payer?.email),
           dto.payerCpf,
-          splitOpts,
+          {
+            ...splitOpts,
+            payerFirstName,
+            payerLastName,
+            payerPhone,
+            payerRegDate: payer?.createdAt ? payer.createdAt.toISOString() : undefined,
+            items: mpItems,
+          },
         )
         if (result.splitFellBack) {
           await this.prisma.order.update({ where: { id: order.id }, data: { paidViaSplit: false } }).catch(() => {})

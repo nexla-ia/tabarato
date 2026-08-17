@@ -146,7 +146,15 @@ export class PaymentsService {
     installments: number,
     payerEmail: string,
     payerCpf?: string,
-    opts?: { sellerToken?: string | null; applicationFee?: number },
+    opts?: {
+      sellerToken?: string | null
+      applicationFee?: number
+      payerFirstName?: string
+      payerLastName?: string
+      payerPhone?: string
+      payerRegDate?: string
+      items?: Array<{ id: string; title: string; quantity: number; unit_price: number }>
+    },
   ) {
     const webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
       ?? `${this.config.get<string>('API_URL') ?? ''}/api/webhooks/mercadopago`
@@ -158,9 +166,24 @@ export class PaymentsService {
       installments,
       payer: {
         email: payerEmail,
+        ...(opts?.payerFirstName ? { first_name: opts.payerFirstName } : {}),
+        ...(opts?.payerLastName ? { last_name: opts.payerLastName } : {}),
         ...(payerCpf
           ? { identification: { type: 'CPF', number: payerCpf.replace(/\D/g, '') } }
           : {}),
+      },
+      // Antifraude do MP: quanto mais contexto (itens + dados do pagador),
+      // menor a chance de "cc_rejected_high_risk".
+      additional_info: {
+        ...(opts?.items?.length ? { items: opts.items } : {}),
+        payer: {
+          ...(opts?.payerFirstName ? { first_name: opts.payerFirstName } : {}),
+          ...(opts?.payerLastName ? { last_name: opts.payerLastName } : {}),
+          ...(opts?.payerPhone
+            ? { phone: { area_code: opts.payerPhone.slice(0, 2), number: opts.payerPhone.slice(2) } }
+            : {}),
+          ...(opts?.payerRegDate ? { registration_date: opts.payerRegDate } : {}),
+        },
       },
       notification_url: webhookUrl,
       external_reference: orderId,
