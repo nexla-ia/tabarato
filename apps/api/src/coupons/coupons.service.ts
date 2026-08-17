@@ -52,7 +52,9 @@ export class CouponsService {
 
     const nextPercent = dto.discountPercent !== undefined ? dto.discountPercent : (coupon.discountPercent ? Number(coupon.discountPercent) : null)
     const nextFixed = dto.discountFixed !== undefined ? dto.discountFixed : (coupon.discountFixed ? Number(coupon.discountFixed) : null)
-    if (!nextPercent && !nextFixed) throw new BadRequestException('Informe discountPercent ou discountFixed')
+    const nextFreeShipping = dto.freeShipping !== undefined ? dto.freeShipping : Boolean((coupon as any).freeShipping)
+    // Precisa de ALGUM benefício: desconto no subtotal OU frete grátis.
+    if (!nextPercent && !nextFixed && !nextFreeShipping) throw new BadRequestException('Informe um desconto (percentual/fixo) ou marque frete grátis')
     if (nextPercent && nextFixed) throw new BadRequestException('Use apenas um tipo de desconto por cupom')
 
     const nextCode = dto.code ? dto.code.toUpperCase() : coupon.code
@@ -68,6 +70,7 @@ export class CouponsService {
         description: dto.description !== undefined ? dto.description : coupon.description,
         discountPercent: nextPercent,
         discountFixed: nextFixed,
+        freeShipping: nextFreeShipping,
         minOrderValue: dto.minOrderValue !== undefined ? dto.minOrderValue : (coupon.minOrderValue ? Number(coupon.minOrderValue) : null),
         maxUses: dto.maxUses !== undefined ? dto.maxUses : coupon.maxUses,
         expiresAt: dto.expiresAt !== undefined ? (dto.expiresAt ? new Date(dto.expiresAt) : null) : coupon.expiresAt,

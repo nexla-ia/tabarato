@@ -20,6 +20,10 @@ export class UpdateCouponDto {
   @IsOptional()
   discountFixed?: number | null
 
+  @IsBoolean()
+  @IsOptional()
+  freeShipping?: boolean
+
   @IsNumber()
   @Min(0)
   @IsOptional()
