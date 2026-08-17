@@ -466,6 +466,7 @@ export class OrdersService {
             payerPhone,
             payerRegDate: payer?.createdAt ? payer.createdAt.toISOString() : undefined,
             items: mpItems,
+            deviceId: dto.deviceId,
           },
         )
         if (result.splitFellBack) {

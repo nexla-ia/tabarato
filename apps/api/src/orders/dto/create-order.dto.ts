@@ -61,6 +61,12 @@ export class CreateOrderDto {
   @IsOptional()
   payerCpf?: string
 
+  // Device fingerprint do MP (security.js) — reduz cc_rejected_high_risk no cartão
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  deviceId?: string
+
   @IsString()
   @IsOptional()
   scheduledFor?: string // ISO date string

@@ -154,6 +154,7 @@ export class PaymentsService {
       payerPhone?: string
       payerRegDate?: string
       items?: Array<{ id: string; title: string; quantity: number; unit_price: number }>
+      deviceId?: string
     },
   ) {
     const webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
@@ -192,10 +193,15 @@ export class PaymentsService {
         : {}),
     } as any)
 
+    // O device_id (fingerprint gerado pelo security.js do MP no app) vai como header
+    // X-Meli-Session-Id. É o dado que MAIS reduz "cc_rejected_high_risk" — sem ele, o
+    // antifraude do MP recusa cartão de integração nova por falta de contexto do device.
+    const reqOpts = opts?.deviceId ? { requestOptions: { meliSessionId: opts.deviceId } } : {}
+
     let response: any
     let splitFellBack = false
     try {
-      response = await this.clientFor(opts?.sellerToken).create({ body: buildBody(true) })
+      response = await this.clientFor(opts?.sellerToken).create({ body: buildBody(true), ...reqOpts })
     } catch (err: any) {
       const detail = this.extractMpError(err)
       // O cartão é tokenizado com a PUBLIC KEY da plataforma, então cobrar com o token
@@ -206,7 +212,7 @@ export class PaymentsService {
       if (!opts?.sellerToken || !fallbackable) throw err
 
       this.logger.warn(`Cartão pedido ${orderId.slice(0, 8)}: caindo pro modo centralizado (${detail})`)
-      response = await this.clientFor(null).create({ body: buildBody(false) })
+      response = await this.clientFor(null).create({ body: buildBody(false), ...reqOpts })
       splitFellBack = true
     }
 
