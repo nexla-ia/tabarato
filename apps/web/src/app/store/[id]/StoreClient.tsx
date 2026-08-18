@@ -6,6 +6,7 @@ import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star
 import { useCartStore } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
 import { formatPhone } from '@/lib/masks'
+import { Lightbox } from '@/components/Lightbox'
 import styles from './StoreClient.module.css'
 
 interface Variation { id: string; name: string; price: number | string; stock?: number | null }
@@ -55,6 +56,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
   const [query, setQuery] = useState('')
   const { user } = useAuth()
   const [confirmClear, setConfirmClear] = useState<(() => void) | null>(null)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const cartCount = items.reduce((a, i) => a + i.quantity, 0)
 
   function handleAdd(product: Product, variation?: { id: string; name: string; price: number | string }) {
@@ -116,9 +118,14 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
         {photos.length > 0 && (
           <div className={`hideScroll ${styles.gallery}`}>
             {photos.map((url, i) => (
-              <a key={i} href={url} target="_blank" rel="noopener noreferrer" className={styles.galleryItem}>
+              <button
+                key={i}
+                type="button"
+                className={styles.galleryItem}
+                onClick={() => setLightboxIndex(i)}
+              >
                 <Image src={url} alt={`${store.name} foto ${i + 1}`} fill sizes="220px" style={{ objectFit: 'cover' }} />
-              </a>
+              </button>
             ))}
           </div>
         )}
@@ -255,6 +262,17 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
             Ver carrinho <ChevronRight size={16} />
           </Link>
         </div>
+      )}
+
+      {/* Galeria de fotos da loja */}
+      {lightboxIndex != null && (
+        <Lightbox
+          photos={photos}
+          index={lightboxIndex}
+          alt={store.name}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+        />
       )}
 
       {/* Confirm clear cart modal */}

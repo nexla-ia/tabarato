@@ -1,7 +1,8 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import Image from 'next/image'
-import { ChevronLeft, ChevronRight, X, Package } from 'lucide-react'
+import { Package } from 'lucide-react'
+import { Lightbox } from '@/components/Lightbox'
 import styles from './ProductGallery.module.css'
 
 export function ProductGallery({ photos, alt, outOfStock }: { photos: string[]; alt: string; outOfStock?: boolean }) {
@@ -14,18 +15,6 @@ export function ProductGallery({ photos, alt, outOfStock }: { photos: string[]; 
   const hasPhotos = photos.length > 0
   const current = hasPhotos ? photos[Math.min(active, photos.length - 1)] : null
 
-  // Esc fecha, setas navegam — só enquanto o lightbox tá aberto.
-  useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
-      if (e.key === 'ArrowRight') setActive((i) => (i + 1) % photos.length)
-      if (e.key === 'ArrowLeft') setActive((i) => (i - 1 + photos.length) % photos.length)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, photos.length])
-
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
     const rect = imgWrapRef.current?.getBoundingClientRect()
     if (!rect) return
@@ -34,9 +23,6 @@ export function ProductGallery({ photos, alt, outOfStock }: { photos: string[]; 
       y: Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)),
     })
   }
-
-  function next() { setActive((i) => (i + 1) % photos.length) }
-  function prev() { setActive((i) => (i - 1 + photos.length) % photos.length) }
 
   return (
     <div className={styles.gallery}>
@@ -84,35 +70,7 @@ export function ProductGallery({ photos, alt, outOfStock }: { photos: string[]; 
       </div>
 
       {open && current && (
-        <div className={styles.lightbox} onClick={() => setOpen(false)}>
-          <button className={styles.lightboxClose} onClick={() => setOpen(false)} title="Fechar">
-            <X size={22} />
-          </button>
-          {photos.length > 1 && (
-            <button
-              className={`${styles.lightboxNav} ${styles.lightboxPrev}`}
-              onClick={(e) => { e.stopPropagation(); prev() }}
-              title="Anterior"
-            >
-              <ChevronLeft size={26} />
-            </button>
-          )}
-          <div className={styles.lightboxImgWrap} onClick={(e) => e.stopPropagation()}>
-            <Image src={current} alt={alt} fill sizes="90vw" style={{ objectFit: 'contain' }} />
-          </div>
-          {photos.length > 1 && (
-            <button
-              className={`${styles.lightboxNav} ${styles.lightboxNext}`}
-              onClick={(e) => { e.stopPropagation(); next() }}
-              title="Próxima"
-            >
-              <ChevronRight size={26} />
-            </button>
-          )}
-          {photos.length > 1 && (
-            <div className={styles.lightboxCount}>{active + 1} / {photos.length}</div>
-          )}
-        </div>
+        <Lightbox photos={photos} index={active} alt={alt} onClose={() => setOpen(false)} onNavigate={setActive} />
       )}
     </div>
   )
