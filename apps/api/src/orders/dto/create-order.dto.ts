@@ -61,10 +61,11 @@ export class CreateOrderDto {
   @IsOptional()
   payerCpf?: string
 
-  // Device fingerprint do MP (security.js) — reduz cc_rejected_high_risk no cartão
+  // Device fingerprint do MP (security.js) — reduz cc_rejected_high_risk no cartão.
+  // O MP_DEVICE_SESSION_ID costuma passar de 200 chars, então o limite é folgado.
   @IsString()
   @IsOptional()
-  @MaxLength(200)
+  @MaxLength(2048)
   deviceId?: string
 
   @IsString()
