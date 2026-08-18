@@ -118,7 +118,11 @@ export default function PedidosPage() {
             const canCancel = ['PENDING', 'CONFIRMED', 'PREPARING'].includes(o.status)
             const late = isOrderLate(o)
             return (
-              <div key={o.id} className={`${styles.card} ${late ? styles.cardLate : ''}`}>
+              <div
+                key={o.id}
+                className={`${styles.card} ${late ? styles.cardLate : ''}`}
+                style={!late ? { borderLeftColor: STATUS_COLOR[o.status] } : undefined}
+              >
                 <div className={styles.cardHead}>
                   <div className={styles.headLeft}>
                     <span className={styles.orderId}>#{o.id.slice(-6).toUpperCase()}</span>

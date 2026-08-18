@@ -39,9 +39,11 @@
 
 .card {
   background: var(--card); border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
   border-radius: var(--radius); padding: 16px 18px;
   display: flex; flex-direction: column; gap: 8px;
   box-shadow: var(--shadow-sm);
+  transition: border-left-color 0.15s;
 }
 .cardLate {
   background: #FFF6F6; border: 2px solid #EF4444;
