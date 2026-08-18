@@ -291,15 +291,15 @@ function ProductCard({ product, onAdd }: {
 
   return (
     <div className={`${styles.productCard} ${outOfStock ? styles.cardOut : ''}`}>
-      <div className={styles.productImg}>
+      <Link href={`/product/${product.id}`} className={styles.productImg}>
         {product.imageUrl
           ? <Image src={product.imageUrl} alt={product.name} fill style={{ objectFit: 'cover' }} />
           : <div className={styles.productImgFallback}>📦</div>
         }
         {outOfStock && <span className={styles.outRibbon}>Esgotado</span>}
-      </div>
+      </Link>
       <div className={styles.productInfo}>
-        <h3 className={styles.productName}>{product.name}</h3>
+        <Link href={`/product/${product.id}`} className={styles.nameLink}><h3 className={styles.productName}>{product.name}</h3></Link>
         {product.description && <p className={styles.productDesc}>{product.description}</p>}
 
         {hasVars && (
