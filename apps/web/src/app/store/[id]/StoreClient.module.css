@@ -11,13 +11,16 @@
 .headerScrim {
   position: absolute; inset: 0; z-index: 0;
   background:
-    linear-gradient(90deg, rgba(15,6,0,0.88) 0%, rgba(15,6,0,0.55) 42%, rgba(15,6,0,0.32) 100%),
-    linear-gradient(180deg, rgba(10,4,0,0.22) 0%, rgba(10,4,0,0.3) 40%, rgba(8,3,0,0.94) 100%);
+    /* escurece só o canto onde o texto fica (inferior-esquerdo) — o resto da foto respira */
+    radial-gradient(58% 95% at 16% 100%, rgba(10,4,0,0.78) 0%, rgba(10,4,0,0.4) 45%, rgba(10,4,0,0) 78%),
+    /* wash bem leve na foto toda + escurece só a faixa de baixo, pra costurar com o card branco */
+    linear-gradient(180deg, rgba(10,4,0,0.05) 0%, rgba(10,4,0,0.1) 55%, rgba(8,3,0,0.6) 100%);
 }
 .topRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; flex-wrap: wrap; }
 .backLink {
   display: inline-flex; align-items: center; gap: 6px;
-  color: rgba(255,255,255,0.75); font-size: 13.5px; font-weight: 600;
+  color: rgba(255,255,255,0.9); font-size: 13.5px; font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
   transition: color 0.14s;
 }
 .backLink:hover { color: #fff; }
@@ -44,7 +47,7 @@
 .storeName {
   font-family: var(--display); font-size: 32px; font-weight: 800; color: #fff;
   letter-spacing: -0.025em; margin-bottom: 6px; line-height: 1.15;
-  text-shadow: 0 2px 14px rgba(0,0,0,0.45);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6), 0 4px 18px rgba(0,0,0,0.5);
 }
 .storeDesc {
   display: inline-block; font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.85);
