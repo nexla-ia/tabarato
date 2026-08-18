@@ -48,6 +48,42 @@ function Stars({ n, size = 14 }: { n: number; size?: number }) {
   )
 }
 
+// Rail de produtos da mesma categoria (em qualquer loja) — reaproveitado em
+// duas posições da página (acima e abaixo da descrição), mesmos dados.
+function SuggestionRail({ title, items }: { title: string; items: Suggestion[] }) {
+  if (items.length === 0) return null
+  return (
+    <section className={styles.relatedSection}>
+      <h2 className={styles.sectionTitle}>{title}</h2>
+      <div className={`hideScroll ${styles.relatedRail}`}>
+        {items.map((p, i) => {
+          const out = isOut(p.stock)
+          return (
+            <Link
+              key={p.id}
+              href={`/product/${p.id}`}
+              className={`${styles.relatedCard} reveal`}
+              style={{ animationDelay: `${Math.min(i, 8) * 0.05}s` }}
+            >
+              <div className={styles.relatedImg}>
+                {p.imageUrl ? (
+                  <Image src={p.imageUrl} alt={p.name} fill sizes="150px" style={{ objectFit: 'cover' }} />
+                ) : (
+                  <div className={styles.relatedImgFallback}><Package size={22} strokeWidth={1.3} /></div>
+                )}
+                {out && <span className={styles.relatedOut}>Esgotado</span>}
+              </div>
+              {p.storeName && <span className={styles.relatedStore}>{p.storeName}</span>}
+              <span className={styles.relatedName}>{p.name}</span>
+              <span className={styles.relatedPrice}>{fmtBRL(p.basePrice)}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 export function ProductClient({
   product, store, storeRating, storeReviewCount, reviews = [], storeSuggestions = [], marketSuggestions = [],
 }: {
@@ -175,6 +211,8 @@ export function ProductClient({
             </div>
           </div>
 
+          <SuggestionRail title="Produtos relacionados" items={marketSuggestions} />
+
           {product.description && (
             <section className={styles.descSection}>
               <h2 className={styles.sectionTitle}>Descrição</h2>
@@ -182,37 +220,7 @@ export function ProductClient({
             </section>
           )}
 
-          {/* Sugestões de todas as lojas */}
-          {marketSuggestions.length > 0 && (
-            <section className={styles.relatedSection}>
-              <h2 className={styles.sectionTitle}>Você também pode gostar</h2>
-              <div className={`hideScroll ${styles.relatedRail}`}>
-                {marketSuggestions.map((p, i) => {
-                  const out = isOut(p.stock)
-                  return (
-                    <Link
-                      key={p.id}
-                      href={`/product/${p.id}`}
-                      className={`${styles.relatedCard} reveal`}
-                      style={{ animationDelay: `${Math.min(i, 8) * 0.05}s` }}
-                    >
-                      <div className={styles.relatedImg}>
-                        {p.imageUrl ? (
-                          <Image src={p.imageUrl} alt={p.name} fill sizes="150px" style={{ objectFit: 'cover' }} />
-                        ) : (
-                          <div className={styles.relatedImgFallback}><Package size={22} strokeWidth={1.3} /></div>
-                        )}
-                        {out && <span className={styles.relatedOut}>Esgotado</span>}
-                      </div>
-                      {p.storeName && <span className={styles.relatedStore}>{p.storeName}</span>}
-                      <span className={styles.relatedName}>{p.name}</span>
-                      <span className={styles.relatedPrice}>{fmtBRL(p.basePrice)}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </section>
-          )}
+          <SuggestionRail title="Você também pode gostar" items={marketSuggestions} />
 
           {/* Avaliações da loja — não existe avaliação por produto, só por pedido/loja.
               Sempre visível: mostra estado vazio quando ainda não há nenhuma. */}
