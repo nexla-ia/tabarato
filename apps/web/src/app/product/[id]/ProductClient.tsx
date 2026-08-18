@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Clock, MapPin, Minus, Plus, ShoppingCart, Package, Star } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronRight, Clock, MapPin, Minus, Plus, ShoppingCart, Package, Star } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
 import { ProductGallery } from './ProductGallery'
@@ -94,13 +94,20 @@ export function ProductClient({
         <ArrowLeft size={15} /> Voltar para {store.name}
       </Link>
 
+      {product.category && (
+        <div className={styles.topBreadcrumb}>
+          <Link href={`/store/${store.id}`}>{store.name}</Link>
+          <ChevronRight size={13} />
+          <span>{product.category.name}</span>
+        </div>
+      )}
+
       <div className={styles.pageGrid}>
         <div className={styles.mainCol}>
           <div className={styles.layout}>
             <ProductGallery photos={photos} alt={product.name} outOfStock={outOfStock} />
 
             <div className={styles.info}>
-              {product.category && <span className={styles.breadcrumb}>{store.name} · {product.category.name}</span>}
               <h1 className={styles.name}>{product.name}</h1>
 
               {(hasRating || hasSoldCount) && (
@@ -144,13 +151,6 @@ export function ProductClient({
                       )
                     })}
                   </div>
-                </div>
-              )}
-
-              {product.description && (
-                <div className={styles.descSection}>
-                  <span className={styles.varLabel}>Descrição</span>
-                  <p className={styles.desc}>{product.description}</p>
                 </div>
               )}
 
@@ -204,6 +204,13 @@ export function ProductClient({
                   )
                 })}
               </div>
+            </section>
+          )}
+
+          {product.description && (
+            <section className={styles.descSection}>
+              <h2 className={styles.sectionTitle}>Descrição</h2>
+              <p className={styles.desc}>{product.description}</p>
             </section>
           )}
 

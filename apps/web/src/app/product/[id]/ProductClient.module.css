@@ -5,6 +5,16 @@
 }
 .backLink:hover { color: var(--orange); }
 
+.topBreadcrumb {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--muted); font-weight: 600;
+  padding-bottom: 14px; margin-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.topBreadcrumb a { color: var(--muted); transition: color 0.12s; }
+.topBreadcrumb a:hover { color: var(--orange-dark); }
+.topBreadcrumb svg { color: var(--faint); flex-shrink: 0; }
+.topBreadcrumb span { color: var(--text); }
+
 .pageGrid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 30px; align-items: start; margin-top: 6px; }
 .mainCol { min-width: 0; }
 .sidebar {
@@ -21,7 +31,6 @@
 @media (max-width: 720px) { .layout { grid-template-columns: 1fr; gap: 20px; } }
 
 .info { display: flex; flex-direction: column; gap: 4px; }
-.breadcrumb { font-size: 12.5px; color: var(--muted); font-weight: 600; }
 .name { font-family: var(--display); font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin: 4px 0 6px; line-height: 1.25; }
 
 .productMeta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
@@ -33,7 +42,7 @@
 
 .price { font-family: var(--display); font-size: 28px; font-weight: 800; color: var(--orange-dark); margin-bottom: 8px; }
 
-.varSection, .descSection { margin-top: 14px; }
+.varSection { margin-top: 14px; }
 .varLabel { display: block; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
 .varRow { display: flex; gap: 8px; flex-wrap: wrap; }
 .varChip { padding: 7px 14px; border-radius: 9px; font-size: 13.5px; font-weight: 600; border: 1.5px solid var(--border); background: var(--bg); color: var(--muted); transition: all 0.1s; }
@@ -41,7 +50,8 @@
 .varChipOut { opacity: 0.5; cursor: not-allowed; text-decoration: line-through; }
 .varChipOut:hover { border-color: var(--border); background: var(--bg); color: var(--muted); }
 
-.desc { font-size: 14px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
+.descSection { margin-top: 48px; }
+.desc { font-size: 14px; color: var(--text); line-height: 1.7; white-space: pre-wrap; max-width: 720px; }
 
 .outBox {
   margin-top: 18px; padding: 13px 16px; border-radius: 12px;
