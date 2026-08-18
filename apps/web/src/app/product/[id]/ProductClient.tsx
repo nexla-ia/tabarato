@@ -87,82 +87,158 @@ export function ProductClient({
   }
 
   return (
-    <div className="container" style={{ padding: '24px 20px 80px', maxWidth: 1100 }}>
+    <div className="container" style={{ padding: '24px 20px 80px', maxWidth: 1280 }}>
       <Link href={`/store/${store.id}`} className={styles.backLink}>
         <ArrowLeft size={15} /> Voltar para {store.name}
       </Link>
 
-      <div className={styles.layout}>
-        <ProductGallery photos={photos} alt={product.name} outOfStock={outOfStock} />
+      <div className={styles.pageGrid}>
+        <div className={styles.mainCol}>
+          <div className={styles.layout}>
+            <ProductGallery photos={photos} alt={product.name} outOfStock={outOfStock} />
 
-        <div className={styles.info}>
-          {product.category && <span className={styles.breadcrumb}>{store.name} · {product.category.name}</span>}
-          <h1 className={styles.name}>{product.name}</h1>
+            <div className={styles.info}>
+              {product.category && <span className={styles.breadcrumb}>{store.name} · {product.category.name}</span>}
+              <h1 className={styles.name}>{product.name}</h1>
 
-          {product.avgRating != null && product.avgRating > 0 && (
-            <div className={styles.productRating}>
-              <Stars n={Math.round(product.avgRating)} size={15} />
-              <strong>{product.avgRating.toFixed(1)}</strong>
-              <span className={styles.productRatingCount}>
-                ({product.reviewCount} avaliaç{product.reviewCount === 1 ? 'ão' : 'ões'})
-              </span>
-            </div>
-          )}
+              {product.avgRating != null && product.avgRating > 0 && (
+                <div className={styles.productRating}>
+                  <Stars n={Math.round(product.avgRating)} size={15} />
+                  <strong>{product.avgRating.toFixed(1)}</strong>
+                  <span className={styles.productRatingCount}>
+                    ({product.reviewCount} avaliaç{product.reviewCount === 1 ? 'ão' : 'ões'})
+                  </span>
+                </div>
+              )}
 
-          <div className={styles.price}>{fmtBRL(price)}</div>
+              <div className={styles.price}>{fmtBRL(price)}</div>
 
-          {hasVars && (
-            <div className={styles.varSection}>
-              <span className={styles.varLabel}>Opções</span>
-              <div className={styles.varRow}>
-                {product.variations!.map(v => {
-                  const vOut = isOut(v.stock)
-                  return (
-                    <button
-                      key={v.id}
-                      className={`${styles.varChip} ${selectedVar?.id === v.id ? styles.varChipActive : ''} ${vOut ? styles.varChipOut : ''}`}
-                      onClick={() => setSelectedVar(v)}
-                      disabled={vOut}
-                      title={vOut ? 'Sem estoque' : undefined}
-                    >
-                      {v.name}{vOut ? ' · esgotado' : ''}
+              {hasVars && (
+                <div className={styles.varSection}>
+                  <span className={styles.varLabel}>Opções</span>
+                  <div className={styles.varRow}>
+                    {product.variations!.map(v => {
+                      const vOut = isOut(v.stock)
+                      return (
+                        <button
+                          key={v.id}
+                          className={`${styles.varChip} ${selectedVar?.id === v.id ? styles.varChipActive : ''} ${vOut ? styles.varChipOut : ''}`}
+                          onClick={() => setSelectedVar(v)}
+                          disabled={vOut}
+                          title={vOut ? 'Sem estoque' : undefined}
+                        >
+                          {v.name}{vOut ? ' · esgotado' : ''}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {product.description && (
+                <div className={styles.descSection}>
+                  <span className={styles.varLabel}>Descrição</span>
+                  <p className={styles.desc}>{product.description}</p>
+                </div>
+              )}
+
+              {selectionOut ? (
+                <div className={styles.outBox}>Produto indisponível no momento.</div>
+              ) : (
+                <div className={styles.buyBox}>
+                  <div className={styles.qtyControl}>
+                    <button className={styles.qtyBtn} onClick={() => setQty(q => Math.max(1, q - 1))} title="Diminuir">
+                      <Minus size={14} />
                     </button>
+                    <span className={styles.qtyNum}>{qty}</span>
+                    <button className={styles.qtyBtn} onClick={() => setQty(q => q + 1)} title="Aumentar">
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                  <button className={styles.addBtn} onClick={handleAdd}>
+                    <ShoppingCart size={16} /> {added ? 'Adicionado ✓' : 'Adicionar ao carrinho'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Sugestões de todas as lojas */}
+          {marketSuggestions.length > 0 && (
+            <section className={styles.relatedSection}>
+              <h2 className={styles.sectionTitle}>Você também pode gostar</h2>
+              <div className={`hideScroll ${styles.relatedRail}`}>
+                {marketSuggestions.map((p, i) => {
+                  const out = isOut(p.stock)
+                  return (
+                    <Link
+                      key={p.id}
+                      href={`/product/${p.id}`}
+                      className={`${styles.relatedCard} reveal`}
+                      style={{ animationDelay: `${Math.min(i, 8) * 0.05}s` }}
+                    >
+                      <div className={styles.relatedImg}>
+                        {p.imageUrl ? (
+                          <Image src={p.imageUrl} alt={p.name} fill sizes="150px" style={{ objectFit: 'cover' }} />
+                        ) : (
+                          <div className={styles.relatedImgFallback}><Package size={22} strokeWidth={1.3} /></div>
+                        )}
+                        {out && <span className={styles.relatedOut}>Esgotado</span>}
+                      </div>
+                      {p.storeName && <span className={styles.relatedStore}>{p.storeName}</span>}
+                      <span className={styles.relatedName}>{p.name}</span>
+                      <span className={styles.relatedPrice}>{fmtBRL(p.basePrice)}</span>
+                    </Link>
                   )
                 })}
               </div>
-            </div>
+            </section>
           )}
 
-          {product.description && (
-            <div className={styles.descSection}>
-              <span className={styles.varLabel}>Descrição</span>
-              <p className={styles.desc}>{product.description}</p>
-            </div>
-          )}
-
-          {selectionOut ? (
-            <div className={styles.outBox}>Produto indisponível no momento.</div>
-          ) : (
-            <div className={styles.buyBox}>
-              <div className={styles.qtyControl}>
-                <button className={styles.qtyBtn} onClick={() => setQty(q => Math.max(1, q - 1))} title="Diminuir">
-                  <Minus size={14} />
-                </button>
-                <span className={styles.qtyNum}>{qty}</span>
-                <button className={styles.qtyBtn} onClick={() => setQty(q => q + 1)} title="Aumentar">
-                  <Plus size={14} />
-                </button>
+          {/* Avaliações da loja — não existe avaliação por produto, só por pedido/loja */}
+          {reviews.length > 0 && (
+            <section className={styles.reviewsSection}>
+              <div className={styles.reviewsHead}>
+                <div>
+                  <h2 className={styles.sectionTitle}>Avaliações de {store.name}</h2>
+                  <p className={styles.reviewsSub}>Com base nos pedidos entregues pela loja</p>
+                </div>
+                {storeRating != null && storeRating > 0 && (
+                  <div className={styles.reviewsScore}>
+                    <Star size={18} fill="#F59E0B" color="#F59E0B" />
+                    <strong>{Number(storeRating).toFixed(1)}</strong>
+                    <span className={styles.reviewsCount}>· {storeReviewCount} avaliaç{storeReviewCount === 1 ? 'ão' : 'ões'}</span>
+                  </div>
+                )}
               </div>
-              <button className={styles.addBtn} onClick={handleAdd}>
-                <ShoppingCart size={16} /> {added ? 'Adicionado ✓' : 'Adicionar ao carrinho'}
-              </button>
-            </div>
+              <div className={styles.reviewGrid}>
+                {reviews.map((r, i) => (
+                  <div key={r.id} className={`${styles.reviewCard} reveal`} style={{ animationDelay: `${Math.min(i, 6) * 0.06}s` }}>
+                    <div className={styles.reviewTop}>
+                      <span className={styles.reviewAvatar}>{initials(r.user?.name)}</span>
+                      <div className={styles.reviewWho}>
+                        <span className={styles.reviewName}>{r.user?.name?.split(' ')[0] ?? 'Cliente'}</span>
+                        <span className={styles.reviewDateText}>{reviewDate(r.createdAt)}</span>
+                      </div>
+                      <Stars n={r.rating} />
+                    </div>
+                    {r.comment && <p className={styles.reviewComment}>{r.comment}</p>}
+                  </div>
+                ))}
+              </div>
+              <Link href={`/store/${store.id}`} className={styles.seeAllLink}>
+                Ver loja e todas as avaliações <ArrowRight size={14} />
+              </Link>
+            </section>
           )}
+        </div>
 
+        {/* Loja + sugestões — fixo na lateral, acompanha a rolagem */}
+        <aside className={styles.sidebar}>
           <div className={styles.storeCard}>
             <div className={styles.storeCardHead}>
               {store.logoUrl
-                ? <Image src={store.logoUrl} alt={store.name} width={40} height={40} style={{ borderRadius: 10, objectFit: 'cover' }} />
+                ? <Image src={store.logoUrl} alt={store.name} width={44} height={44} style={{ borderRadius: 11, objectFit: 'cover' }} />
                 : <div className={styles.storeLogoFallback}>🏪</div>
               }
               <div>
@@ -178,100 +254,34 @@ export function ProductClient({
             </div>
           </div>
 
-          {/* Sugestões da loja — a lateral, curadoria simples (mesma categoria) */}
           {storeSuggestions.length > 0 && (
             <div className={styles.sideSuggestions}>
-              <span className={styles.varLabel}>Sugestões de {store.name}</span>
+              <span className={styles.sideSuggestionsTitle}>Sugestões de {store.name}</span>
               <div className={styles.sideList}>
-                {storeSuggestions.slice(0, 4).map((p) => (
-                  <Link key={p.id} href={`/product/${p.id}`} className={styles.sideItem}>
-                    <div className={styles.sideItemImg}>
-                      {p.imageUrl ? (
-                        <Image src={p.imageUrl} alt={p.name} fill sizes="46px" style={{ objectFit: 'cover' }} />
-                      ) : (
-                        <Package size={16} strokeWidth={1.4} />
-                      )}
-                    </div>
-                    <div className={styles.sideItemInfo}>
-                      <span className={styles.sideItemName}>{p.name}</span>
-                      <span className={styles.sideItemPrice}>{fmtBRL(p.basePrice)}</span>
-                    </div>
-                  </Link>
-                ))}
+                {storeSuggestions.slice(0, 5).map((p) => {
+                  const out = isOut(p.stock)
+                  return (
+                    <Link key={p.id} href={`/product/${p.id}`} className={styles.sideItem}>
+                      <div className={styles.sideItemImg}>
+                        {p.imageUrl ? (
+                          <Image src={p.imageUrl} alt={p.name} fill sizes="72px" style={{ objectFit: 'cover' }} />
+                        ) : (
+                          <Package size={22} strokeWidth={1.4} />
+                        )}
+                        {out && <span className={styles.sideItemOut}>Esgotado</span>}
+                      </div>
+                      <div className={styles.sideItemInfo}>
+                        <span className={styles.sideItemName}>{p.name}</span>
+                        <span className={styles.sideItemPrice}>{fmtBRL(p.basePrice)}</span>
+                      </div>
+                    </Link>
+                  )
+                })}
               </div>
             </div>
           )}
-        </div>
+        </aside>
       </div>
-
-      {/* Sugestões de todas as lojas */}
-      {marketSuggestions.length > 0 && (
-        <section className={styles.relatedSection}>
-          <h2 className={styles.sectionTitle}>Você também pode gostar</h2>
-          <div className={`hideScroll ${styles.relatedRail}`}>
-            {marketSuggestions.map((p, i) => {
-              const out = isOut(p.stock)
-              return (
-                <Link
-                  key={p.id}
-                  href={`/product/${p.id}`}
-                  className={`${styles.relatedCard} reveal`}
-                  style={{ animationDelay: `${Math.min(i, 8) * 0.05}s` }}
-                >
-                  <div className={styles.relatedImg}>
-                    {p.imageUrl ? (
-                      <Image src={p.imageUrl} alt={p.name} fill sizes="150px" style={{ objectFit: 'cover' }} />
-                    ) : (
-                      <div className={styles.relatedImgFallback}><Package size={22} strokeWidth={1.3} /></div>
-                    )}
-                    {out && <span className={styles.relatedOut}>Esgotado</span>}
-                  </div>
-                  {p.storeName && <span className={styles.relatedStore}>{p.storeName}</span>}
-                  <span className={styles.relatedName}>{p.name}</span>
-                  <span className={styles.relatedPrice}>{fmtBRL(p.basePrice)}</span>
-                </Link>
-              )
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Avaliações da loja — não existe avaliação por produto, só por pedido/loja */}
-      {reviews.length > 0 && (
-        <section className={styles.reviewsSection}>
-          <div className={styles.reviewsHead}>
-            <div>
-              <h2 className={styles.sectionTitle}>Avaliações de {store.name}</h2>
-              <p className={styles.reviewsSub}>Com base nos pedidos entregues pela loja</p>
-            </div>
-            {storeRating != null && storeRating > 0 && (
-              <div className={styles.reviewsScore}>
-                <Star size={18} fill="#F59E0B" color="#F59E0B" />
-                <strong>{Number(storeRating).toFixed(1)}</strong>
-                <span className={styles.reviewsCount}>· {storeReviewCount} avaliaç{storeReviewCount === 1 ? 'ão' : 'ões'}</span>
-              </div>
-            )}
-          </div>
-          <div className={styles.reviewGrid}>
-            {reviews.map((r, i) => (
-              <div key={r.id} className={`${styles.reviewCard} reveal`} style={{ animationDelay: `${Math.min(i, 6) * 0.06}s` }}>
-                <div className={styles.reviewTop}>
-                  <span className={styles.reviewAvatar}>{initials(r.user?.name)}</span>
-                  <div className={styles.reviewWho}>
-                    <span className={styles.reviewName}>{r.user?.name?.split(' ')[0] ?? 'Cliente'}</span>
-                    <span className={styles.reviewDateText}>{reviewDate(r.createdAt)}</span>
-                  </div>
-                  <Stars n={r.rating} />
-                </div>
-                {r.comment && <p className={styles.reviewComment}>{r.comment}</p>}
-              </div>
-            ))}
-          </div>
-          <Link href={`/store/${store.id}`} className={styles.seeAllLink}>
-            Ver loja e todas as avaliações <ArrowRight size={14} />
-          </Link>
-        </section>
-      )}
 
       {confirmClear && (
         <div className={styles.overlay} onClick={() => setConfirmClear(false)}>

@@ -5,7 +5,19 @@
 }
 .backLink:hover { color: var(--orange); }
 
-.layout { display: grid; grid-template-columns: minmax(0, 480px) 1fr; gap: 36px; align-items: start; }
+.pageGrid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 30px; align-items: start; margin-top: 6px; }
+.mainCol { min-width: 0; }
+.sidebar {
+  position: sticky; top: 84px;
+  display: flex; flex-direction: column; gap: 16px;
+  max-height: calc(100vh - 100px); overflow-y: auto;
+}
+@media (max-width: 900px) {
+  .pageGrid { grid-template-columns: 1fr; }
+  .sidebar { position: static; max-height: none; }
+}
+
+.layout { display: grid; grid-template-columns: minmax(0, 400px) 1fr; gap: 32px; align-items: start; }
 @media (max-width: 720px) { .layout { grid-template-columns: 1fr; gap: 20px; } }
 
 .info { display: flex; flex-direction: column; gap: 4px; }
@@ -48,11 +60,11 @@
 .addBtn:hover { background: var(--orange-dark); transform: translateY(-1px); }
 
 .storeCard {
-  margin-top: 26px; padding: 16px; border-radius: var(--radius);
+  padding: 16px; border-radius: var(--radius);
   background: var(--card); border: 1px solid var(--border);
 }
 .storeCardHead { display: flex; align-items: center; gap: 12px; }
-.storeLogoFallback { width: 40px; height: 40px; border-radius: 10px; background: var(--bg-warm); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.storeLogoFallback { width: 44px; height: 44px; border-radius: 11px; background: var(--bg-warm); display: flex; align-items: center; justify-content: center; font-size: 19px; flex-shrink: 0; }
 .storeName { font-weight: 700; font-size: 14.5px; color: var(--text); }
 .statusChip { display: inline-block; margin-top: 2px; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 .open { background: var(--green-bg); color: var(--green); }
@@ -60,22 +72,33 @@
 .storeMeta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
 .metaItem { font-size: 12.5px; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 4px; }
 
-/* Sugestões da loja — lateral */
-.sideSuggestions { margin-top: 22px; }
-.sideList { display: flex; flex-direction: column; gap: 4px; }
-.sideItem {
-  display: flex; align-items: center; gap: 10px; padding: 7px;
-  border-radius: 11px; color: inherit; text-decoration: none; transition: background 0.12s;
+/* Sugestões da loja — lateral, fixa na rolagem */
+.sideSuggestions {
+  padding: 16px; border-radius: var(--radius);
+  background: var(--card); border: 1px solid var(--border);
 }
-.sideItem:hover { background: var(--bg-warm); }
+.sideSuggestionsTitle {
+  display: block; font-family: var(--display); font-size: 15px; font-weight: 800;
+  color: var(--text); margin-bottom: 12px;
+}
+.sideList { display: flex; flex-direction: column; gap: 10px; }
+.sideItem {
+  display: flex; align-items: center; gap: 12px; padding: 6px;
+  border-radius: 12px; color: inherit; text-decoration: none; transition: background 0.12s, transform 0.12s;
+}
+.sideItem:hover { background: var(--bg-warm); transform: translateX(2px); }
 .sideItemImg {
-  position: relative; width: 46px; height: 46px; flex-shrink: 0; border-radius: 9px; overflow: hidden;
+  position: relative; width: 72px; height: 72px; flex-shrink: 0; border-radius: 12px; overflow: hidden;
   background: var(--bg-warm); border: 1px solid var(--border);
   display: flex; align-items: center; justify-content: center; color: var(--faint);
 }
-.sideItemInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.sideItemName { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sideItemPrice { font-size: 12.5px; font-weight: 800; color: var(--orange-dark); margin-top: 1px; }
+.sideItemOut {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(26,10,0,0.6); color: #fff; font-size: 9.5px; font-weight: 800; text-align: center;
+}
+.sideItemInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.sideItemName { font-size: 13.5px; font-weight: 700; color: var(--text); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sideItemPrice { font-size: 14px; font-weight: 800; color: var(--orange-dark); }
 
 .sectionTitle {
   font-family: var(--display); font-size: 21px; font-weight: 800;

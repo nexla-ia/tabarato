@@ -256,7 +256,7 @@ export default function ProdutosPage() {
               onChange={categoryId => setForm({ ...form, categoryId })}
             />
 
-            <label className={styles.label}>Foto do produto</label>
+            <label className={styles.label}>Foto principal</label>
             <div className={styles.imgUploadRow}>
               <div className={styles.imgPreview}>
                 {form.imageUrl ? <img src={form.imageUrl} alt="" /> : <Package size={22} strokeWidth={1.5} />}
@@ -276,7 +276,7 @@ export default function ProdutosPage() {
 
             {GALLERY_ENABLED && (
               <>
-                <label className={styles.label}>Mais fotos ({form.images.length}/{MAX_GALLERY_IMAGES})</label>
+                <label className={styles.label}>Outras fotos do produto ({form.images.length}/{MAX_GALLERY_IMAGES})</label>
                 <div className={styles.galleryRow}>
                   {form.images.map((url) => (
                     <div key={url} className={styles.galleryThumb}>
