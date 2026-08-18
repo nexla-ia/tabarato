@@ -58,9 +58,28 @@ export class ProductsService {
    * Filtra por categoria (categoria da LOJA, many-to-many) e/ou busca no nome.
    * Ordena lojas abertas primeiro. Retorna preço de exibição (base ou menor variação).
    */
-  async findAll(opts: { categoryId?: string; productCategoryId?: string; excludeId?: string; search?: string; limit?: number }) {
-    const { categoryId, productCategoryId, excludeId, search } = opts
+  async findAll(opts: {
+    categoryId?: string; productCategoryId?: string; excludeId?: string; search?: string; limit?: number
+    minPrice?: number; maxPrice?: number; minRating?: number; sort?: 'rating' | 'price_asc' | 'price_desc'
+  }) {
+    const { categoryId, productCategoryId, excludeId, search, minPrice, maxPrice, minRating, sort } = opts
     const limit = Math.min(Math.max(opts.limit ?? 40, 1), 100)
+
+    // Preço: casa se o preço-base OU alguma variação ativa estiver na faixa.
+    const priceFilter = (minPrice != null || maxPrice != null)
+      ? {
+          OR: [
+            { basePrice: { gte: minPrice, lte: maxPrice } },
+            { variations: { some: { isActive: true, price: { gte: minPrice, lte: maxPrice } } } },
+          ],
+        }
+      : {}
+
+    const orderBy =
+      sort === 'rating'     ? [{ store: { rating: { sort: 'desc', nulls: 'last' } } }, { name: 'asc' }]
+      : sort === 'price_asc'  ? [{ basePrice: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }]
+      : sort === 'price_desc' ? [{ basePrice: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }]
+      : [{ store: { isOpen: 'desc' } }, { name: 'asc' }]
 
     const products = await this.prisma.product.findMany({
       where: {
@@ -70,14 +89,16 @@ export class ProductsService {
         store: {
           status: 'APPROVED',
           ...(categoryId ? { categories: { some: { id: categoryId } } } : {}),
+          ...(minRating != null ? { rating: { gte: minRating } } : {}),
         },
         ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
+        ...priceFilter,
       },
       include: {
-        store: { select: { id: true, name: true, logoUrl: true, isOpen: true, prepTimeMin: true } },
+        store: { select: { id: true, name: true, logoUrl: true, isOpen: true, prepTimeMin: true, rating: true, reviewCount: true } },
         variations: { where: { isActive: true }, select: { price: true }, take: 1, orderBy: { price: 'asc' } },
       },
-      orderBy: [{ store: { isOpen: 'desc' } }, { name: 'asc' }],
+      orderBy: orderBy as any,
       take: limit,
     })
 

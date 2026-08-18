@@ -19,7 +19,7 @@ export class ReviewsService {
     const existing = await this.prisma.review.findUnique({ where: { orderId: dto.orderId } })
     if (existing) throw new ConflictException('Este pedido já foi avaliado')
 
-    return this.prisma.review.create({
+    const review = await this.prisma.review.create({
       data: {
         userId,
         storeId: order.storeId,
@@ -32,6 +32,25 @@ export class ReviewsService {
         user: { select: { id: true, name: true, avatarUrl: true } },
       },
     })
+
+    await this.recomputeStoreRating(order.storeId)
+    return review
+  }
+
+  /** Recalcula e persiste a nota média + quantidade de reviews da loja (alimenta filtro/ordenação). */
+  private async recomputeStoreRating(storeId: string) {
+    const agg = await this.prisma.review.aggregate({
+      where: { storeId },
+      _avg: { rating: true },
+      _count: true,
+    })
+    await this.prisma.store.update({
+      where: { id: storeId },
+      data: {
+        rating: agg._avg.rating != null ? Math.round(agg._avg.rating * 100) / 100 : null,
+        reviewCount: agg._count,
+      },
+    }).catch(() => {})
   }
 
   async findByStore(storeId: string, page = 1, limit = 10) {

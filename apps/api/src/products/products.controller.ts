@@ -31,14 +31,26 @@ export class ProductsController {
     @Query('excludeId') excludeId?: string,
     @Query('search') search?: string,
     @Query('limit') limit?: string,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('minRating') minRating?: string,
+    @Query('sort') sort?: string,
   ) {
     const n = parseInt(limit ?? '', 10)
+    const min = parseFloat(minPrice ?? '')
+    const max = parseFloat(maxPrice ?? '')
+    const rating = parseFloat(minRating ?? '')
+    const validSort = sort === 'rating' || sort === 'price_asc' || sort === 'price_desc' ? sort : undefined
     return this.productsService.findAll({
       categoryId: categoryId || undefined,
       productCategoryId: productCategoryId || undefined,
       excludeId: excludeId || undefined,
       search: search?.trim() || undefined,
       limit: Number.isFinite(n) ? n : undefined,
+      minPrice: Number.isFinite(min) ? min : undefined,
+      maxPrice: Number.isFinite(max) ? max : undefined,
+      minRating: Number.isFinite(rating) ? rating : undefined,
+      sort: validSort,
     })
   }
 

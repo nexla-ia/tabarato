@@ -179,6 +179,9 @@ model Store {
   isOpen               Boolean  @default(false) @map("is_open")
   isPaused             Boolean  @default(false) @map("is_paused")
   maxConcurrentOrders  Int?     @map("max_concurrent_orders")
+  // Avaliação agregada (recalculada quando um review é criado) — alimenta filtro/ordenação
+  rating               Decimal? @db.Decimal(3, 2)
+  reviewCount          Int      @default(0) @map("review_count")
   // Mercado Pago — split de pagamento (marketplace)
   mpUserId          String?   @map("mp_user_id")
   mpAccessToken     String?   @map("mp_access_token")
