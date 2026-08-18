@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '**.supabase.co' },
       { protocol: 'https', hostname: '**.supabase.storage.co' },
     ],
+    // Padrão (75) só pra miniaturas — capa da loja, lightbox e foto principal
+    // do produto pedem qualidade mais alta pra não ficar borrada.
+    qualities: [75, 90, 92, 95],
   },
 }
 

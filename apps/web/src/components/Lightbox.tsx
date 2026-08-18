@@ -38,7 +38,7 @@ export function Lightbox({ photos, index, alt, onClose, onNavigate }: {
         </button>
       )}
       <div className={styles.lightboxImgWrap} onClick={(e) => e.stopPropagation()}>
-        <Image src={current} alt={alt} fill sizes="90vw" style={{ objectFit: 'contain' }} />
+        <Image src={current} alt={alt} fill quality={95} sizes="90vw" style={{ objectFit: 'contain' }} />
       </div>
       {photos.length > 1 && (
         <button

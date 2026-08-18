@@ -88,7 +88,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
       >
         {photos.length > 0 && (
           <>
-            <Image src={photos[0]} alt="" fill priority sizes="100vw" className={styles.headerBg} style={{ objectFit: 'cover' }} />
+            <Image src={photos[0]} alt="" fill priority quality={90} sizes="100vw" className={styles.headerBg} style={{ objectFit: 'cover' }} />
             <div className={styles.headerScrim} />
           </>
         )}

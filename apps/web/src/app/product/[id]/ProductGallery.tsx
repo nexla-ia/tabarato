@@ -55,6 +55,7 @@ export function ProductGallery({ photos, alt, outOfStock }: { photos: string[]; 
             src={current}
             alt={alt}
             fill
+            quality={92}
             sizes="(max-width: 720px) 100vw, 420px"
             style={{
               objectFit: 'cover',
