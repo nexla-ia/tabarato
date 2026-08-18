@@ -75,6 +75,55 @@ export class AuthService {
     return { user: this.sanitizeUser(user), ...tokens }
   }
 
+  // ── Login social: Google ──────────────────────────────────────────────────
+  // Verifica o ID token no endpoint oficial do Google (valida assinatura/expiração),
+  // confere a audiência (nosso client id) e o e-mail verificado. Cria o usuário na
+  // 1ª vez (sem senha utilizável — login só via Google). Casa por e-mail (verificado).
+  async authGoogle(idToken: string) {
+    if (!idToken) throw new UnauthorizedException('Token do Google ausente.')
+
+    let payload: any
+    try {
+      const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`)
+      if (!res.ok) throw new Error('invalid')
+      payload = await res.json()
+    } catch {
+      throw new UnauthorizedException('Não foi possível validar o login com o Google.')
+    }
+
+    // aud = o client id do Google (Web). Se configurado, exige bater (senão o token
+    // poderia ser de outro app). Aceita a lista separada por vírgula (Web/Android/iOS).
+    const audEnv = this.config.get<string>('GOOGLE_CLIENT_IDS') ?? this.config.get<string>('GOOGLE_WEB_CLIENT_ID')
+    if (audEnv) {
+      const allowed = audEnv.split(',').map((s) => s.trim()).filter(Boolean)
+      if (!allowed.includes(payload.aud)) throw new UnauthorizedException('Token do Google inválido (audiência).')
+    }
+    const emailVerified = payload.email_verified === true || payload.email_verified === 'true'
+    if (!emailVerified) throw new UnauthorizedException('E-mail do Google não verificado.')
+    const email = (payload.email as string | undefined)?.toLowerCase()
+    if (!email) throw new UnauthorizedException('O Google não retornou um e-mail.')
+
+    let user = await this.prisma.user.findUnique({ where: { email } })
+    if (!user) {
+      // Usuário social não tem senha utilizável: grava um hash aleatório.
+      const randomHash = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10)
+      user = await this.prisma.user.create({
+        data: {
+          name: payload.name || email.split('@')[0],
+          email,
+          avatarUrl: payload.picture || undefined,
+          passwordHash: randomHash,
+          role: 'CONSUMER',
+          referralCode: generateReferralCode(),
+        },
+      })
+    }
+    if (!user.isActive) throw new UnauthorizedException('Conta desativada')
+
+    const tokens = this.generateTokens(user.id, user.email, user.role)
+    return { user: this.sanitizeUser(user), ...tokens }
+  }
+
   async refreshToken(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } })
     if (!user || !user.isActive) throw new UnauthorizedException()

@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler'
 import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
+import { GoogleAuthDto } from './dto/google-auth.dto'
 
 @Controller('auth')
 export class AuthController {
@@ -19,5 +20,12 @@ export class AuthController {
   @Post('login')
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto)
+  }
+
+  // Login social — Google (verifica o ID token no servidor).
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @Post('google')
+  google(@Body() dto: GoogleAuthDto) {
+    return this.auth.authGoogle(dto.idToken)
   }
 }
