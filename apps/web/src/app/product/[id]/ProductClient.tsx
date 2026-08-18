@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, Clock, MapPin, Minus, Plus, ShoppingCart, Package } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Clock, MapPin, Minus, Plus, ShoppingCart, Package, Star } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
 import styles from './ProductClient.module.css'
@@ -19,12 +19,36 @@ interface Store {
   id: string; name: string; logoUrl?: string | null; isOpen: boolean
   deliveryRadiusKm: number; prepTimeMin: number
 }
+interface Review {
+  id: string; rating: number; comment?: string | null
+  createdAt: string; user?: { name?: string } | null
+}
+interface RelatedProduct {
+  id: string; name: string; imageUrl?: string | null
+  basePrice?: number | string | null; stock?: number | null
+}
 
 function fmtBRL(v: number | string | null | undefined) { return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}` }
 // estoque null = ilimitado; <= 0 = esgotado
 function isOut(stock?: number | null) { return stock != null && stock <= 0 }
+function initials(name?: string) { return (name ?? '?').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() }
+function reviewDate(d: string) { return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) }
 
-export function ProductClient({ product, store }: { product: Product; store: Store }) {
+function Stars({ n, size = 14 }: { n: number; size?: number }) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 1 }}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star key={i} size={size} fill={i <= n ? '#F59E0B' : 'none'} color={i <= n ? '#F59E0B' : '#D6C9BF'} />
+      ))}
+    </span>
+  )
+}
+
+export function ProductClient({ product, store, rating, reviewCount, reviews = [], relatedProducts = [] }: {
+  product: Product; store: Store
+  rating?: number | null; reviewCount?: number
+  reviews?: Review[]; relatedProducts?: RelatedProduct[]
+}) {
   const { addItem, storeId } = useCartStore()
   const { user } = useAuth()
   const [selectedVar, setSelectedVar] = useState(
@@ -144,6 +168,74 @@ export function ProductClient({ product, store }: { product: Product; store: Sto
           </div>
         </div>
       </div>
+
+      {/* Você também pode gostar */}
+      {relatedProducts.length > 0 && (
+        <section className={styles.relatedSection}>
+          <h2 className={styles.sectionTitle}>Você também pode gostar</h2>
+          <div className={`hideScroll ${styles.relatedRail}`}>
+            {relatedProducts.map((p, i) => {
+              const out = isOut(p.stock)
+              return (
+                <Link
+                  key={p.id}
+                  href={`/product/${p.id}`}
+                  className={`${styles.relatedCard} reveal`}
+                  style={{ animationDelay: `${Math.min(i, 8) * 0.05}s` }}
+                >
+                  <div className={styles.relatedImg}>
+                    {p.imageUrl ? (
+                      <Image src={p.imageUrl} alt={p.name} fill sizes="150px" style={{ objectFit: 'cover' }} />
+                    ) : (
+                      <div className={styles.relatedImgFallback}><Package size={22} strokeWidth={1.3} /></div>
+                    )}
+                    {out && <span className={styles.relatedOut}>Esgotado</span>}
+                  </div>
+                  <span className={styles.relatedName}>{p.name}</span>
+                  <span className={styles.relatedPrice}>{fmtBRL(p.basePrice)}</span>
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Avaliações da loja — não existe avaliação por produto, só por pedido/loja */}
+      {reviews.length > 0 && (
+        <section className={styles.reviewsSection}>
+          <div className={styles.reviewsHead}>
+            <div>
+              <h2 className={styles.sectionTitle}>Avaliações de {store.name}</h2>
+              <p className={styles.reviewsSub}>Com base nos pedidos entregues pela loja</p>
+            </div>
+            {rating != null && rating > 0 && (
+              <div className={styles.reviewsScore}>
+                <Star size={18} fill="#F59E0B" color="#F59E0B" />
+                <strong>{Number(rating).toFixed(1)}</strong>
+                <span className={styles.reviewsCount}>· {reviewCount} avaliaç{reviewCount === 1 ? 'ão' : 'ões'}</span>
+              </div>
+            )}
+          </div>
+          <div className={styles.reviewGrid}>
+            {reviews.map((r, i) => (
+              <div key={r.id} className={`${styles.reviewCard} reveal`} style={{ animationDelay: `${Math.min(i, 6) * 0.06}s` }}>
+                <div className={styles.reviewTop}>
+                  <span className={styles.reviewAvatar}>{initials(r.user?.name)}</span>
+                  <div className={styles.reviewWho}>
+                    <span className={styles.reviewName}>{r.user?.name?.split(' ')[0] ?? 'Cliente'}</span>
+                    <span className={styles.reviewDateText}>{reviewDate(r.createdAt)}</span>
+                  </div>
+                  <Stars n={r.rating} />
+                </div>
+                {r.comment && <p className={styles.reviewComment}>{r.comment}</p>}
+              </div>
+            ))}
+          </div>
+          <Link href={`/store/${store.id}`} className={styles.seeAllLink}>
+            Ver loja e todas as avaliações <ArrowRight size={14} />
+          </Link>
+        </section>
+      )}
 
       {confirmClear && (
         <div className={styles.overlay} onClick={() => setConfirmClear(false)}>
