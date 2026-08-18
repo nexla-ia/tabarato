@@ -269,7 +269,6 @@ model Product {
   name          String
   description   String?
   imageUrl      String?  @map("image_url")
-  images        String[] @default([])
   hasVariations  Boolean  @default(false) @map("has_variations")
   basePrice      Decimal? @map("base_price")
   maxDeliveryKm  Float?   @map("max_delivery_km")
