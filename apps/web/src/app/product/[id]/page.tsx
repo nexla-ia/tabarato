@@ -27,31 +27,50 @@ async function getReviews(storeId: string) {
   } catch { return { avgRating: null, total: 0, reviews: [] } }
 }
 
+async function getMarketSuggestions(productCategoryId: string | null, excludeId: string) {
+  if (!productCategoryId) return []
+  try {
+    const qs = new URLSearchParams({ productCategoryId, excludeId, limit: '10' })
+    const res = await fetch(`${BASE}/products?${qs}`, { next: { revalidate: 60 } })
+    if (!res.ok) return []
+    return res.json()
+  } catch { return [] }
+}
+
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const product = await getProduct(id)
   if (!product || !product.isActive) notFound()
 
-  const store = await getStore(product.storeId)
+  const [store, marketSuggestions] = await Promise.all([
+    getStore(product.storeId),
+    getMarketSuggestions(product.categoryId ?? null, product.id),
+  ])
   if (!store) notFound()
 
   const reviews = await getReviews(store.id)
 
-  // "Você também pode gostar": outros produtos ativos da mesma loja — mesma
-  // categoria primeiro. Não existe endpoint de relacionados nem review por
-  // produto (só por loja/pedido), então a base é o catálogo que já veio
-  // embutido em /stores/:id.
-  const relatedProducts = (store.products ?? [])
+  // "Sugestões da loja": outros produtos ativos da MESMA loja — mesma categoria
+  // primeiro. Não existe endpoint de relacionados por loja, então a base é o
+  // catálogo que já veio embutido em /stores/:id.
+  const storeSuggestions = (store.products ?? [])
     .filter((p: any) => p.isActive && p.id !== product.id)
     .sort((a: any, b: any) => {
       const aMatch = a.categoryId === product.categoryId ? 0 : 1
       const bMatch = b.categoryId === product.categoryId ? 0 : 1
       return aMatch - bMatch
     })
-    .slice(0, 8)
+    .slice(0, 6)
     .map((p: any) => ({
       id: p.id, name: p.name, imageUrl: p.imageUrl, basePrice: p.basePrice, stock: p.stock,
     }))
+
+  // "Sugestões de todas as lojas": mesma categoria de produto, em qualquer loja
+  // aprovada (GET /products?productCategoryId=&excludeId=).
+  const safeMarketSuggestions = (marketSuggestions ?? []).slice(0, 8).map((p: any) => ({
+    id: p.id, name: p.name, imageUrl: p.imageUrl, basePrice: p.displayPrice ?? p.basePrice, stock: p.stock,
+    storeName: p.store?.name ?? null,
+  }))
 
   // WHITELIST: todos os endpoints usados aqui são públicos — só passamos campos
   // de EXIBIÇÃO ao cliente. Nunca serializar dados de bastidor (pixKey, cnpj,
@@ -61,9 +80,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     name: product.name,
     description: product.description,
     imageUrl: product.imageUrl,
+    images: product.images ?? [],
     basePrice: product.basePrice,
     stock: product.stock,
     hasVariations: product.hasVariations,
+    avgRating: product.avgRating ?? null,
+    reviewCount: product.reviewCount ?? 0,
     category: product.category ? { id: product.category.id, name: product.category.name } : null,
     variations: (product.variations ?? []).map((v: any) => ({
       id: v.id, name: v.name, price: v.price, stock: v.stock,
@@ -84,10 +106,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <ProductClient
         product={safeProduct}
         store={safeStore}
-        rating={reviews?.avgRating ?? null}
-        reviewCount={reviews?.total ?? 0}
+        storeRating={reviews?.avgRating ?? null}
+        storeReviewCount={reviews?.total ?? 0}
         reviews={reviews?.reviews ?? []}
-        relatedProducts={relatedProducts}
+        storeSuggestions={storeSuggestions}
+        marketSuggestions={safeMarketSuggestions}
       />
     </>
   )

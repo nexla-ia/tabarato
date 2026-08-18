@@ -9,6 +9,8 @@ import { CategorySelect } from '@/components/CategorySelect'
 import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 
+const MAX_GALLERY_IMAGES = 8
+
 interface FormState {
   id?: string
   name: string
@@ -17,10 +19,11 @@ interface FormState {
   stock: string
   categoryId: string
   imageUrl: string
+  images: string[]
   isActive: boolean
 }
 
-const EMPTY: FormState = { name: '', description: '', basePrice: '', stock: '', categoryId: '', imageUrl: '', isActive: true }
+const EMPTY: FormState = { name: '', description: '', basePrice: '', stock: '', categoryId: '', imageUrl: '', images: [], isActive: true }
 
 export default function ProdutosPage() {
   const qc = useQueryClient()
@@ -28,6 +31,9 @@ export default function ProdutosPage() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imageError, setImageError] = useState('')
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingGallery, setUploadingGallery] = useState(false)
+  const [galleryError, setGalleryError] = useState('')
+  const galleryInputRef = useRef<HTMLInputElement>(null)
 
   const storeQ = useQuery<Store>({ queryKey: ['store-my'], queryFn: async () => (await api.get('/stores/my')).data })
   const productsQ = useQuery<Product[]>({ queryKey: ['products-my'], queryFn: async () => (await api.get('/products/my')).data })
@@ -42,6 +48,7 @@ export default function ProdutosPage() {
         stock: f.stock === '' ? null : Number(f.stock),
         categoryId: f.categoryId || undefined,
         imageUrl: f.imageUrl || undefined,
+        images: f.images,
         isActive: f.isActive,
       }
       if (f.id) return (await api.patch(`/products/${f.id}`, payload)).data
@@ -64,6 +71,24 @@ export default function ProdutosPage() {
       setUploadingImage(false)
     }
   }
+
+  async function handleGalleryFile(file: File) {
+    setGalleryError('')
+    setUploadingGallery(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const { data } = await api.post<{ url: string }>('/uploads/image', formData)
+      setForm((f) => f && { ...f, images: [...f.images, data.url] })
+    } catch {
+      setGalleryError('Não foi possível enviar a imagem. Use JPEG, PNG ou WEBP de até 10MB.')
+    } finally {
+      setUploadingGallery(false)
+    }
+  }
+  function removeGalleryImage(url: string) {
+    setForm((f) => f && { ...f, images: f.images.filter((u) => u !== url) })
+  }
   const toggle = useMutation({
     mutationFn: async (id: string) => (await api.patch(`/products/${id}/toggle`)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products-my'] }),
@@ -84,6 +109,7 @@ export default function ProdutosPage() {
         stock,
         categoryId: p.categoryId,
         imageUrl: p.imageUrl || undefined,
+        images: p.images ?? [],
         isActive: p.isActive,
       })).data,
     onMutate: async ({ p, stock }) => {
@@ -103,7 +129,7 @@ export default function ProdutosPage() {
     setForm({
       id: p.id, name: p.name, description: p.description ?? '',
       basePrice: String(Math.round(Number(p.basePrice) * 100)), stock: p.stock == null ? '' : String(p.stock),
-      categoryId: p.categoryId ?? '', imageUrl: p.imageUrl ?? '', isActive: p.isActive,
+      categoryId: p.categoryId ?? '', imageUrl: p.imageUrl ?? '', images: p.images ?? [], isActive: p.isActive,
     })
   }
 
@@ -243,6 +269,37 @@ export default function ProdutosPage() {
                 {imageError && <p className={styles.imgErr}>{imageError}</p>}
               </div>
             </div>
+
+            <label className={styles.label}>Mais fotos ({form.images.length}/{MAX_GALLERY_IMAGES})</label>
+            <div className={styles.galleryRow}>
+              {form.images.map((url) => (
+                <div key={url} className={styles.galleryThumb}>
+                  <img src={url} alt="" />
+                  <button type="button" className={styles.galleryRemove} onClick={() => removeGalleryImage(url)} title="Remover">
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              {form.images.length < MAX_GALLERY_IMAGES && (
+                <>
+                  <input
+                    ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleGalleryFile(f); e.target.value = '' }}
+                  />
+                  <button
+                    type="button" className={styles.galleryAdd}
+                    onClick={() => galleryInputRef.current?.click()}
+                    disabled={uploadingGallery}
+                    title="Adicionar foto"
+                  >
+                    {uploadingGallery ? <Loader2 size={16} className={styles.spin} /> : <Camera size={16} />}
+                  </button>
+                </>
+              )}
+            </div>
+            {galleryError && <p className={styles.imgErr}>{galleryError}</p>}
+            <p className={styles.hint}>A primeira foto (acima) é a capa exibida nas listagens. Estas aparecem na galeria da página do produto.</p>
 
             <label className={styles.checkRow}>
               <input type="checkbox" checked={form.isActive} onChange={e => setForm({ ...form, isActive: e.target.checked })} />

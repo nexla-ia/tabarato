@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsNumber, IsOptional, IsString, IsUrl, Min } from 'class-validator'
 
 export class CreateProductDto {
   @IsString()
@@ -14,6 +14,14 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   imageUrl?: string
+
+  // Fotos adicionais da galeria (a imageUrl continua sendo a capa/thumbnail
+  // usada nas listagens). Máx. 8 pra não virar upload infinito.
+  @IsArray()
+  @ArrayMaxSize(8)
+  @IsUrl({}, { each: true })
+  @IsOptional()
+  images?: string[]
 
   @IsNumber()
   @IsOptional()

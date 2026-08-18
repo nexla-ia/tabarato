@@ -24,12 +24,19 @@ export class ProductsController {
   @Get()
   findAll(
     @Query('categoryId') categoryId?: string,
+    // Categoria do PRÓPRIO produto (ex.: "Luvas") — diferente de categoryId,
+    // que é a categoria da LOJA (ex.: "Informática"). Usado pra sugestão de
+    // produtos parecidos entre lojas diferentes na página de produto.
+    @Query('productCategoryId') productCategoryId?: string,
+    @Query('excludeId') excludeId?: string,
     @Query('search') search?: string,
     @Query('limit') limit?: string,
   ) {
     const n = parseInt(limit ?? '', 10)
     return this.productsService.findAll({
       categoryId: categoryId || undefined,
+      productCategoryId: productCategoryId || undefined,
+      excludeId: excludeId || undefined,
       search: search?.trim() || undefined,
       limit: Number.isFinite(n) ? n : undefined,
     })

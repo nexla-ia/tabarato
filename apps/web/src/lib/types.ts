@@ -52,6 +52,7 @@ export interface Product {
   description?: string | null
   basePrice: number | string
   imageUrl?: string | null
+  images?: string[] | null
   stock?: number | null
   isActive: boolean
   categoryId?: string | null

@@ -58,13 +58,15 @@ export class ProductsService {
    * Filtra por categoria (categoria da LOJA, many-to-many) e/ou busca no nome.
    * Ordena lojas abertas primeiro. Retorna preço de exibição (base ou menor variação).
    */
-  async findAll(opts: { categoryId?: string; search?: string; limit?: number }) {
-    const { categoryId, search } = opts
+  async findAll(opts: { categoryId?: string; productCategoryId?: string; excludeId?: string; search?: string; limit?: number }) {
+    const { categoryId, productCategoryId, excludeId, search } = opts
     const limit = Math.min(Math.max(opts.limit ?? 40, 1), 100)
 
     const products = await this.prisma.product.findMany({
       where: {
         isActive: true,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+        ...(productCategoryId ? { categoryId: productCategoryId } : {}),
         store: {
           status: 'APPROVED',
           ...(categoryId ? { categories: { some: { id: categoryId } } } : {}),
@@ -123,7 +125,28 @@ export class ProductsService {
       },
     })
     if (!product) throw new NotFoundException('Product not found')
-    return product
+
+    // Não existe avaliação por item — a "nota do produto" é a média das
+    // avaliações da loja nos pedidos que continham este produto.
+    const orders = await this.prisma.orderItem.findMany({
+      where: { productId: id },
+      select: { orderId: true },
+      distinct: ['orderId'],
+    })
+    const orderIds = orders.map((o) => o.orderId)
+    const agg = orderIds.length
+      ? await this.prisma.review.aggregate({
+          where: { orderId: { in: orderIds } },
+          _avg: { rating: true },
+          _count: { rating: true },
+        })
+      : null
+
+    return {
+      ...product,
+      avgRating: agg?._avg.rating ?? null,
+      reviewCount: agg?._count.rating ?? 0,
+    }
   }
 
   async update(userId: string, productId: string, dto: Partial<CreateProductDto>) {

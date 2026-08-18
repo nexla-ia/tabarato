@@ -1,0 +1,59 @@
+.gallery { display: flex; gap: 10px; }
+
+.thumbRail { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 420px; flex-shrink: 0; }
+.thumb {
+  position: relative; width: 58px; height: 58px; border-radius: 10px; flex-shrink: 0;
+  overflow: hidden; border: 1.5px solid var(--border); background: var(--bg-warm);
+  transition: border-color 0.12s;
+}
+.thumb:hover { border-color: var(--faint); }
+.thumbActive { border-color: var(--orange); border-width: 2px; }
+
+.mainImg {
+  position: relative; flex: 1; aspect-ratio: 1 / 1; overflow: hidden;
+  background: var(--bg-warm); border: 1px solid var(--border); border-radius: var(--radius);
+  cursor: zoom-in;
+}
+.mainImgFallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--faint); }
+.outRibbon {
+  position: absolute; top: 14px; left: 14px; z-index: 2;
+  background: rgba(26,10,0,0.82); color: #fff;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.02em;
+  padding: 6px 13px; border-radius: 999px; backdrop-filter: blur(4px);
+}
+
+@media (max-width: 720px) {
+  .gallery { flex-direction: column-reverse; }
+  .thumbRail { flex-direction: row; max-height: none; overflow-x: auto; overflow-y: visible; padding-bottom: 2px; }
+}
+
+.lightbox {
+  position: fixed; inset: 0; background: rgba(10,4,0,0.92); z-index: 200;
+  display: flex; align-items: center; justify-content: center; padding: 40px 20px;
+  animation: fade 0.15s ease both;
+}
+.lightboxClose {
+  position: absolute; top: 18px; right: 20px; color: #fff; opacity: 0.8;
+  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; transition: background 0.12s, opacity 0.12s;
+}
+.lightboxClose:hover { background: rgba(255,255,255,0.1); opacity: 1; }
+.lightboxImgWrap { position: relative; width: min(90vw, 720px); height: min(80vh, 720px); }
+.lightboxNav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 48px; height: 48px; border-radius: 50%; color: #fff;
+  background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s;
+}
+.lightboxNav:hover { background: rgba(255,255,255,0.2); }
+.lightboxPrev { left: 10px; }
+.lightboxNext { right: 10px; }
+@media (max-width: 640px) {
+  .lightboxPrev { left: 4px; }
+  .lightboxNext { right: 4px; }
+}
+.lightboxCount {
+  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+  color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 700;
+  background: rgba(255,255,255,0.12); padding: 5px 14px; border-radius: 999px;
+}

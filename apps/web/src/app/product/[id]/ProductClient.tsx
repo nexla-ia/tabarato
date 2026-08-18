@@ -5,14 +5,17 @@ import Link from 'next/link'
 import { ArrowLeft, ArrowRight, Clock, MapPin, Minus, Plus, ShoppingCart, Package, Star } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
+import { ProductGallery } from './ProductGallery'
 import styles from './ProductClient.module.css'
 
 interface Variation { id: string; name: string; price: number | string; stock?: number | null }
 interface Category { id: string; name: string }
 interface Product {
   id: string; name: string; description?: string | null
-  imageUrl?: string | null; basePrice?: number | string | null
+  imageUrl?: string | null; images?: string[] | null
+  basePrice?: number | string | null
   stock?: number | null; hasVariations?: boolean
+  avgRating?: number | null; reviewCount?: number
   variations?: Variation[]; category?: Category | null
 }
 interface Store {
@@ -23,9 +26,10 @@ interface Review {
   id: string; rating: number; comment?: string | null
   createdAt: string; user?: { name?: string } | null
 }
-interface RelatedProduct {
+interface Suggestion {
   id: string; name: string; imageUrl?: string | null
   basePrice?: number | string | null; stock?: number | null
+  storeName?: string | null
 }
 
 function fmtBRL(v: number | string | null | undefined) { return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}` }
@@ -44,10 +48,12 @@ function Stars({ n, size = 14 }: { n: number; size?: number }) {
   )
 }
 
-export function ProductClient({ product, store, rating, reviewCount, reviews = [], relatedProducts = [] }: {
+export function ProductClient({
+  product, store, storeRating, storeReviewCount, reviews = [], storeSuggestions = [], marketSuggestions = [],
+}: {
   product: Product; store: Store
-  rating?: number | null; reviewCount?: number
-  reviews?: Review[]; relatedProducts?: RelatedProduct[]
+  storeRating?: number | null; storeReviewCount?: number
+  reviews?: Review[]; storeSuggestions?: Suggestion[]; marketSuggestions?: Suggestion[]
 }) {
   const { addItem, storeId } = useCartStore()
   const { user } = useAuth()
@@ -64,6 +70,7 @@ export function ProductClient({ product, store, rating, reviewCount, reviews = [
   const outOfStock = productOut || allVarsOut
   const selectionOut = outOfStock || (selectedVar ? isOut(selectedVar.stock) : isOut(product.stock))
   const price = Number(selectedVar?.price ?? product.basePrice ?? 0)
+  const photos = Array.from(new Set([product.imageUrl, ...(product.images ?? [])].filter(Boolean))) as string[]
 
   function doAdd() {
     addItem(store.id, store.name, {
@@ -80,24 +87,28 @@ export function ProductClient({ product, store, rating, reviewCount, reviews = [
   }
 
   return (
-    <div className="container" style={{ padding: '24px 20px 80px', maxWidth: 1000 }}>
+    <div className="container" style={{ padding: '24px 20px 80px', maxWidth: 1100 }}>
       <Link href={`/store/${store.id}`} className={styles.backLink}>
         <ArrowLeft size={15} /> Voltar para {store.name}
       </Link>
 
       <div className={styles.layout}>
-        <div className={styles.imageBox}>
-          {product.imageUrl ? (
-            <Image src={product.imageUrl} alt={product.name} fill sizes="(max-width: 720px) 100vw, 420px" style={{ objectFit: 'cover' }} />
-          ) : (
-            <div className={styles.imageFallback}><Package size={48} strokeWidth={1.2} /></div>
-          )}
-          {outOfStock && <span className={styles.outRibbon}>Esgotado</span>}
-        </div>
+        <ProductGallery photos={photos} alt={product.name} outOfStock={outOfStock} />
 
         <div className={styles.info}>
           {product.category && <span className={styles.breadcrumb}>{store.name} · {product.category.name}</span>}
           <h1 className={styles.name}>{product.name}</h1>
+
+          {product.avgRating != null && product.avgRating > 0 && (
+            <div className={styles.productRating}>
+              <Stars n={Math.round(product.avgRating)} size={15} />
+              <strong>{product.avgRating.toFixed(1)}</strong>
+              <span className={styles.productRatingCount}>
+                ({product.reviewCount} avaliaç{product.reviewCount === 1 ? 'ão' : 'ões'})
+              </span>
+            </div>
+          )}
+
           <div className={styles.price}>{fmtBRL(price)}</div>
 
           {hasVars && (
@@ -166,15 +177,39 @@ export function ProductClient({ product, store, rating, reviewCount, reviews = [
               <span className={styles.metaItem}><MapPin size={13} /> até {store.deliveryRadiusKm} km</span>
             </div>
           </div>
+
+          {/* Sugestões da loja — a lateral, curadoria simples (mesma categoria) */}
+          {storeSuggestions.length > 0 && (
+            <div className={styles.sideSuggestions}>
+              <span className={styles.varLabel}>Sugestões de {store.name}</span>
+              <div className={styles.sideList}>
+                {storeSuggestions.slice(0, 4).map((p) => (
+                  <Link key={p.id} href={`/product/${p.id}`} className={styles.sideItem}>
+                    <div className={styles.sideItemImg}>
+                      {p.imageUrl ? (
+                        <Image src={p.imageUrl} alt={p.name} fill sizes="46px" style={{ objectFit: 'cover' }} />
+                      ) : (
+                        <Package size={16} strokeWidth={1.4} />
+                      )}
+                    </div>
+                    <div className={styles.sideItemInfo}>
+                      <span className={styles.sideItemName}>{p.name}</span>
+                      <span className={styles.sideItemPrice}>{fmtBRL(p.basePrice)}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Você também pode gostar */}
-      {relatedProducts.length > 0 && (
+      {/* Sugestões de todas as lojas */}
+      {marketSuggestions.length > 0 && (
         <section className={styles.relatedSection}>
           <h2 className={styles.sectionTitle}>Você também pode gostar</h2>
           <div className={`hideScroll ${styles.relatedRail}`}>
-            {relatedProducts.map((p, i) => {
+            {marketSuggestions.map((p, i) => {
               const out = isOut(p.stock)
               return (
                 <Link
@@ -191,6 +226,7 @@ export function ProductClient({ product, store, rating, reviewCount, reviews = [
                     )}
                     {out && <span className={styles.relatedOut}>Esgotado</span>}
                   </div>
+                  {p.storeName && <span className={styles.relatedStore}>{p.storeName}</span>}
                   <span className={styles.relatedName}>{p.name}</span>
                   <span className={styles.relatedPrice}>{fmtBRL(p.basePrice)}</span>
                 </Link>
@@ -208,11 +244,11 @@ export function ProductClient({ product, store, rating, reviewCount, reviews = [
               <h2 className={styles.sectionTitle}>Avaliações de {store.name}</h2>
               <p className={styles.reviewsSub}>Com base nos pedidos entregues pela loja</p>
             </div>
-            {rating != null && rating > 0 && (
+            {storeRating != null && storeRating > 0 && (
               <div className={styles.reviewsScore}>
                 <Star size={18} fill="#F59E0B" color="#F59E0B" />
-                <strong>{Number(rating).toFixed(1)}</strong>
-                <span className={styles.reviewsCount}>· {reviewCount} avaliaç{reviewCount === 1 ? 'ão' : 'ões'}</span>
+                <strong>{Number(storeRating).toFixed(1)}</strong>
+                <span className={styles.reviewsCount}>· {storeReviewCount} avaliaç{storeReviewCount === 1 ? 'ão' : 'ões'}</span>
               </div>
             )}
           </div>
