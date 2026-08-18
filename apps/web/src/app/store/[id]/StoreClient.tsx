@@ -100,7 +100,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
           <div className={styles.headerInner}>
             <div className={styles.logoWrap}>
               {store.logoUrl
-                ? <Image src={store.logoUrl} alt={store.name} width={80} height={80} style={{ borderRadius: 16, objectFit: 'cover' }} />
+                ? <Image src={store.logoUrl} alt={store.name} width={84} height={84} style={{ borderRadius: 15.5, objectFit: 'cover' }} />
                 : <div className={styles.logoFallback}>🏪</div>
               }
             </div>
