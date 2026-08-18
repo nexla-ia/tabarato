@@ -175,6 +175,13 @@ export function ProductClient({
             </div>
           </div>
 
+          {product.description && (
+            <section className={styles.descSection}>
+              <h2 className={styles.sectionTitle}>Descrição</h2>
+              <p className={styles.desc}>{product.description}</p>
+            </section>
+          )}
+
           {/* Sugestões de todas as lojas */}
           {marketSuggestions.length > 0 && (
             <section className={styles.relatedSection}>
@@ -204,13 +211,6 @@ export function ProductClient({
                   )
                 })}
               </div>
-            </section>
-          )}
-
-          {product.description && (
-            <section className={styles.descSection}>
-              <h2 className={styles.sectionTitle}>Descrição</h2>
-              <p className={styles.desc}>{product.description}</p>
             </section>
           )}
 
