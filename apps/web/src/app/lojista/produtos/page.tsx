@@ -10,6 +10,10 @@ import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 
 const MAX_GALLERY_IMAGES = 8
+// Desligado até a migração de products.images ser aplicada no banco de
+// produção (a API ignora esse campo silenciosamente sem ela) — reativar
+// assim que a coluna existir.
+const GALLERY_ENABLED = false
 
 interface FormState {
   id?: string
@@ -270,36 +274,40 @@ export default function ProdutosPage() {
               </div>
             </div>
 
-            <label className={styles.label}>Mais fotos ({form.images.length}/{MAX_GALLERY_IMAGES})</label>
-            <div className={styles.galleryRow}>
-              {form.images.map((url) => (
-                <div key={url} className={styles.galleryThumb}>
-                  <img src={url} alt="" />
-                  <button type="button" className={styles.galleryRemove} onClick={() => removeGalleryImage(url)} title="Remover">
-                    <X size={12} />
-                  </button>
+            {GALLERY_ENABLED && (
+              <>
+                <label className={styles.label}>Mais fotos ({form.images.length}/{MAX_GALLERY_IMAGES})</label>
+                <div className={styles.galleryRow}>
+                  {form.images.map((url) => (
+                    <div key={url} className={styles.galleryThumb}>
+                      <img src={url} alt="" />
+                      <button type="button" className={styles.galleryRemove} onClick={() => removeGalleryImage(url)} title="Remover">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  {form.images.length < MAX_GALLERY_IMAGES && (
+                    <>
+                      <input
+                        ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+                        style={{ display: 'none' }}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleGalleryFile(f); e.target.value = '' }}
+                      />
+                      <button
+                        type="button" className={styles.galleryAdd}
+                        onClick={() => galleryInputRef.current?.click()}
+                        disabled={uploadingGallery}
+                        title="Adicionar foto"
+                      >
+                        {uploadingGallery ? <Loader2 size={16} className={styles.spin} /> : <Camera size={16} />}
+                      </button>
+                    </>
+                  )}
                 </div>
-              ))}
-              {form.images.length < MAX_GALLERY_IMAGES && (
-                <>
-                  <input
-                    ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp"
-                    style={{ display: 'none' }}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleGalleryFile(f); e.target.value = '' }}
-                  />
-                  <button
-                    type="button" className={styles.galleryAdd}
-                    onClick={() => galleryInputRef.current?.click()}
-                    disabled={uploadingGallery}
-                    title="Adicionar foto"
-                  >
-                    {uploadingGallery ? <Loader2 size={16} className={styles.spin} /> : <Camera size={16} />}
-                  </button>
-                </>
-              )}
-            </div>
-            {galleryError && <p className={styles.imgErr}>{galleryError}</p>}
-            <p className={styles.hint}>A primeira foto (acima) é a capa exibida nas listagens. Estas aparecem na galeria da página do produto.</p>
+                {galleryError && <p className={styles.imgErr}>{galleryError}</p>}
+                <p className={styles.hint}>A primeira foto (acima) é a capa exibida nas listagens. Estas aparecem na galeria da página do produto.</p>
+              </>
+            )}
 
             <label className={styles.checkRow}>
               <input type="checkbox" checked={form.isActive} onChange={e => setForm({ ...form, isActive: e.target.checked })} />
