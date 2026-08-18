@@ -5,6 +5,7 @@ import { Star, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import { ReviewsPage, Review } from '@/lib/types'
 import { Spinner } from '@/components/Spinner'
+import { Lightbox } from '@/components/Lightbox'
 import styles from './page.module.css'
 
 function Stars({ n, size = 14 }: { n: number; size?: number }) {
@@ -23,6 +24,7 @@ function initials(name?: string) {
 
 export default function AvaliacoesPage() {
   const [page, setPage] = useState(1)
+  const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null)
   const reviewsQ = useQuery<ReviewsPage>({
     queryKey: ['store-reviews', page],
     queryFn: async () => (await api.get('/stores/my/reviews', { params: { page } })).data,
@@ -71,9 +73,14 @@ export default function AvaliacoesPage() {
                 {r.photos && r.photos.length > 0 && (
                   <div className={styles.photos}>
                     {r.photos.map((url, i) => (
-                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" className={styles.photo}>
+                      <button
+                        key={i}
+                        type="button"
+                        className={styles.photo}
+                        onClick={() => setLightbox({ photos: r.photos!, index: i })}
+                      >
                         <img src={url} alt={`Foto ${i + 1}`} />
-                      </a>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -93,6 +100,16 @@ export default function AvaliacoesPage() {
             </div>
           )}
         </>
+      )}
+
+      {lightbox && (
+        <Lightbox
+          photos={lightbox.photos}
+          index={lightbox.index}
+          alt="Foto da avaliação"
+          onClose={() => setLightbox(null)}
+          onNavigate={(index) => setLightbox((l) => l && { ...l, index })}
+        />
       )}
     </div>
   )

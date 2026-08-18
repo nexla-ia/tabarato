@@ -27,7 +27,9 @@ export default function LoginPage() {
       const redirect = typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search).get('redirect')
         : null
-      if (redirect && redirect.startsWith('/')) {
+      // startsWith('/') sozinho deixaria passar "//evil.com" (URL protocol-relative);
+      // exige uma barra e não duas, pra garantir que é sempre um caminho interno.
+      if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
         router.push(redirect)
       } else {
         // Route by role: store owners land on the lojista panel
