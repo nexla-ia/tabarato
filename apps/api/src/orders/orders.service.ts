@@ -118,9 +118,14 @@ export class OrdersService {
       }
     }
 
+    // Caminho legado (1 loja). O multi-loja é roteado pra createMulti no controller.
+    const storeId = dto.storeId
+    const items = dto.items
+    if (!storeId || !items || !items.length) throw new BadRequestException('Pedido inválido: informe a loja e os itens.')
+
     const [store, payer] = await Promise.all([
       this.prisma.store.findUnique({
-        where: { id: dto.storeId },
+        where: { id: storeId },
         include: { user: { select: { pushToken: true } } },
       }),
       this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true, phone: true, createdAt: true } }),
@@ -192,7 +197,7 @@ export class OrdersService {
     const mpItems: { id: string; title: string; quantity: number; unit_price: number }[] = []
     const stockDecrements: { id: string; type: 'variation' | 'product'; by: number }[] = []
 
-    for (const item of dto.items) {
+    for (const item of items) {
       const product = await this.prisma.product.findUnique({
         where: { id: item.productId },
         include: { variations: true },
@@ -253,7 +258,7 @@ export class OrdersService {
     let couponMaxUses: number | null = null
     let couponFreeShipping = false
     if (dto.couponCode) {
-      const result = await this.coupons.validate(dto.couponCode, userId, subtotal, dto.storeId)
+      const result = await this.coupons.validate(dto.couponCode, userId, subtotal, storeId)
       couponDiscount = result.discount
       couponId = result.coupon.id
       couponMaxUses = (result.coupon as any).maxUses ?? null
@@ -310,7 +315,7 @@ export class OrdersService {
       const order = await tx.order.create({
         data: {
           userId,
-          storeId: dto.storeId,
+          storeId,
           addressId: dto.addressId,
           paymentId: payment.id,
           couponId,
@@ -527,6 +532,295 @@ export class OrdersService {
     ).catch((err) => this.logger.warn('Store notification failed', err))
 
     return order
+  }
+
+  // ─── Preparação (validação + preço) de UM grupo (1 loja) do carrinho multi-loja ───
+  private async prepareStoreGroup(
+    userId: string,
+    group: { storeId: string; items: { productId: string; variationId?: string; quantity: number; notes?: string }[]; couponCode?: string },
+    address: { lat: number; lng: number },
+    scheduledDate: Date | undefined,
+    marketplaceOn: boolean,
+  ) {
+    const store = await this.prisma.store.findUnique({
+      where: { id: group.storeId },
+      include: { user: { select: { id: true, pushToken: true } } },
+    })
+    if (!store) throw new BadRequestException('Loja não encontrada')
+    if ((store as any).status !== 'APPROVED') throw new BadRequestException(`A loja "${store.name}" não está disponível para pedidos.`)
+    if (marketplaceOn && !(store as any).mpConnected) {
+      throw new BadRequestException(`A loja "${store.name}" está finalizando a configuração de pagamentos e ainda não pode receber pedidos.`)
+    }
+    if (!scheduledDate) {
+      const openNow = isStoreOpenNow(store.openingHours, (store as any).scheduleExceptions)
+      const closed = (openNow !== null ? !openNow : !store.isOpen) || (store as any).isPaused
+      if (closed) throw new BadRequestException(`A loja "${store.name}" está fechada no momento.`)
+    }
+    const maxConcurrent = (store as any).maxConcurrentOrders
+    if (maxConcurrent != null && maxConcurrent > 0) {
+      const activeCount = await this.prisma.order.count({
+        where: { storeId: store.id, status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] } },
+      })
+      if (activeCount >= maxConcurrent) throw new BadRequestException(`A loja "${store.name}" está com capacidade máxima no momento.`)
+    }
+
+    const distToAddress = haversineKm(store.lat, store.lng, address.lat, address.lng)
+    let subtotal = 0
+    const orderItems: { productId: string; variationId?: string; quantity: number; unitPrice: number; notes?: string }[] = []
+    const mpItems: { id: string; title: string; quantity: number; unit_price: number }[] = []
+    const stockDecrements: { id: string; type: 'variation' | 'product'; by: number }[] = []
+
+    for (const item of group.items) {
+      const product = await this.prisma.product.findUnique({ where: { id: item.productId }, include: { variations: true } })
+      if (!product || !product.isActive) throw new BadRequestException(`Um item da loja "${store.name}" não está disponível.`)
+      if (product.storeId !== store.id) throw new BadRequestException('Um item não pertence à loja informada.')
+      if (product.stock !== null && product.stock < item.quantity) throw new BadRequestException(`Produto "${product.name}" tem apenas ${product.stock} unidade(s) disponível(is).`)
+      const productMaxKm = (product as any).maxDeliveryKm
+      if (productMaxKm != null && productMaxKm > 0 && distToAddress > productMaxKm) {
+        throw new BadRequestException(`"${product.name}" não pode ser entregue a ${distToAddress.toFixed(1)} km — limite deste produto é ${productMaxKm} km.`)
+      }
+      let unitPrice = Number(product.basePrice ?? 0)
+      if (item.variationId) {
+        const variation = product.variations.find((v) => v.id === item.variationId)
+        if (!variation || !variation.isActive) throw new BadRequestException('Variação não disponível.')
+        if (variation.stock !== null && variation.stock < item.quantity) throw new BadRequestException(`Variação "${variation.name}" tem apenas ${variation.stock} unidade(s) disponível(is).`)
+        unitPrice = Number(variation.price)
+        stockDecrements.push({ id: variation.id, type: 'variation', by: item.quantity })
+      } else {
+        if (product.stock !== null) stockDecrements.push({ id: product.id, type: 'product', by: item.quantity })
+      }
+      subtotal += unitPrice * item.quantity
+      orderItems.push({ productId: item.productId, variationId: item.variationId, quantity: item.quantity, unitPrice, notes: item.notes })
+      mpItems.push({ id: item.productId, title: product.name, quantity: item.quantity, unit_price: unitPrice })
+    }
+    subtotal = Math.round(subtotal * 100) / 100
+    const deliveryFee = calcCourierFee(distToAddress)
+
+    let couponDiscount = 0, couponId: string | undefined, couponMaxUses: number | null = null, couponFreeShipping = false
+    if (group.couponCode) {
+      const result = await this.coupons.validate(group.couponCode, userId, subtotal, store.id)
+      couponDiscount = result.discount
+      couponId = result.coupon.id
+      couponMaxUses = (result.coupon as any).maxUses ?? null
+      couponFreeShipping = Boolean(result.freeShipping)
+    }
+
+    return { store, subtotal, deliveryFee, orderItems, mpItems, stockDecrements, couponDiscount, couponId, couponMaxUses, couponFreeShipping, loyaltyDiscount: 0 }
+  }
+
+  // ─── Checkout MULTI-LOJA: cria N pedidos (1 por loja) sob 1 pagamento único ───
+  // Também atende 1 loja (groups.length === 1). Não mexe no create() legado.
+  async createMulti(userId: string, dto: CreateOrderDto) {
+    // Idempotência: devolve os pedidos do pagamento se a tentativa ainda estiver viva.
+    if (dto.idempotencyKey) {
+      const existing = await this.prisma.payment.findUnique({
+        where: { idempotencyKey: dto.idempotencyKey },
+        include: { orders: { include: { items: { include: { product: true, variation: true } }, payment: true, address: true, store: { select: { id: true, name: true, logoUrl: true } } } } },
+      })
+      if (existing?.orders?.length) {
+        const dead = (existing as any).status === 'FAILED' || existing.orders.every((o) => o.status === 'CANCELLED')
+        if (!dead) return { orders: existing.orders, payment: existing }
+        throw new BadRequestException('A tentativa de pagamento anterior não foi concluída. Refaça o pedido.')
+      }
+    }
+
+    const rawGroups = (dto.groups && dto.groups.length)
+      ? dto.groups
+      : (dto.storeId && dto.items ? [{ storeId: dto.storeId, items: dto.items, couponCode: dto.couponCode }] : [])
+    if (!rawGroups.length) throw new BadRequestException('Carrinho vazio.')
+
+    const payer = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true, phone: true, createdAt: true } })
+
+    let scheduledDate: Date | undefined
+    if (dto.scheduledFor) {
+      scheduledDate = new Date(dto.scheduledFor)
+      if (isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now()) throw new BadRequestException('O horário de agendamento deve ser uma data futura válida.')
+    }
+
+    const address = await this.prisma.address.findFirst({ where: { id: dto.addressId, userId } })
+    if (!address) throw new NotFoundException('Address not found')
+
+    const marketplaceOn = this.mpOauth.isEnabled()
+    const multiStore = rawGroups.length > 1
+
+    // Prepara todos os grupos (validação + preço) ANTES de qualquer escrita.
+    const prepared: Awaited<ReturnType<typeof this.prepareStoreGroup>>[] = []
+    for (const g of rawGroups) prepared.push(await this.prepareStoreGroup(userId, g, address, scheduledDate, marketplaceOn))
+
+    // Fidelidade (global): distribui o desconto entre os grupos, proporcional ao (subtotal − cupom).
+    let loyaltyRedeem = 0, loyaltyAccountId: string | undefined
+    if (dto.pointsToRedeem && dto.pointsToRedeem > 0) {
+      const pts = Math.floor(dto.pointsToRedeem)
+      if (pts < 100 || pts % 100 !== 0) throw new BadRequestException('Resgate de pontos deve ser em múltiplos de 100 (mínimo 100).')
+      const account = await this.prisma.loyaltyAccount.findUnique({ where: { userId } })
+      if (!account || account.points < pts) throw new BadRequestException('Saldo de pontos insuficiente para o resgate.')
+      const totalPayable = prepared.reduce((s, g) => s + Math.max(0, g.subtotal - g.couponDiscount), 0)
+      let desired = (pts / 100) * 10
+      if (desired > totalPayable) {
+        const usableBlocks = Math.floor(totalPayable / 10)
+        loyaltyRedeem = usableBlocks * 100
+        desired = usableBlocks * 10
+      } else {
+        loyaltyRedeem = pts
+      }
+      if (loyaltyRedeem > 0 && totalPayable > 0) {
+        loyaltyAccountId = account.id
+        let allocated = 0
+        prepared.forEach((g, i) => {
+          const gPayable = Math.max(0, g.subtotal - g.couponDiscount)
+          let share = i === prepared.length - 1
+            ? Math.round((desired - allocated) * 100) / 100
+            : Math.round(desired * (gPayable / totalPayable) * 100) / 100
+          share = Math.min(share, gPayable)
+          g.loyaltyDiscount = share
+          allocated += share
+        })
+      }
+    }
+
+    // Totais por grupo + total geral (o pagamento único cobre o total).
+    const deliveryCodes = prepared.map(() => String(randomInt(100000, 1000000)))
+    const groupTotals = prepared.map((g) => {
+      let discount = Math.round((g.couponDiscount + g.loyaltyDiscount) * 100) / 100
+      if (discount > g.subtotal) discount = g.subtotal
+      const deliveryWaived = g.couponFreeShipping ? g.deliveryFee : 0
+      const total = Math.round((g.subtotal + g.deliveryFee - discount - deliveryWaived) * 100) / 100
+      return { discount, total }
+    })
+    const grandTotal = Math.round(groupTotals.reduce((s, t) => s + t.total, 0) * 100) / 100
+
+    // Split só faz sentido em loja única (não dá pra dividir 1 pagamento entre N vendedores).
+    const paidViaSplit = !multiStore && marketplaceOn && ['PIX', 'CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod)
+
+    const { payment, orders } = await this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.create({
+        data: { method: dto.paymentMethod, amount: grandTotal, status: 'PENDING', idempotencyKey: dto.idempotencyKey },
+      })
+      const orders: any[] = []
+      for (let i = 0; i < prepared.length; i++) {
+        const g = prepared[i]
+        const gt = groupTotals[i]
+        const order = await tx.order.create({
+          data: {
+            userId, storeId: g.store.id, addressId: dto.addressId, paymentId: payment.id,
+            couponId: g.couponId,
+            subtotal: g.subtotal, deliveryFee: g.deliveryFee, discount: gt.discount,
+            couponDiscount: g.couponDiscount, loyaltyDiscount: g.loyaltyDiscount,
+            freeShipping: g.couponFreeShipping, total: gt.total,
+            notes: dto.notes, scheduledFor: scheduledDate, deliveryCode: deliveryCodes[i],
+            paidViaSplit,
+            items: { create: g.orderItems },
+          },
+          include: { items: { include: { product: true, variation: true } }, payment: true, address: true, store: { select: { id: true, name: true, logoUrl: true } } },
+        })
+        await tx.orderStatusHistory.create({ data: { orderId: order.id, status: 'PENDING', changedBy: userId, note: 'Pedido criado' } })
+        if (g.couponId) {
+          await tx.couponUse.create({ data: { couponId: g.couponId, userId, orderId: order.id } })
+          const upd = await tx.coupon.updateMany({
+            where: g.couponMaxUses != null ? { id: g.couponId, usedCount: { lt: g.couponMaxUses } } : { id: g.couponId },
+            data: { usedCount: { increment: 1 } },
+          })
+          if (upd.count === 0) throw new BadRequestException('Um dos cupons atingiu o limite de usos.')
+        }
+        for (const { id, type, by } of g.stockDecrements) {
+          const res = type === 'variation'
+            ? await tx.productVariation.updateMany({ where: { id, stock: { gte: by } }, data: { stock: { decrement: by } } })
+            : await tx.product.updateMany({ where: { id, stock: { gte: by } }, data: { stock: { decrement: by } } })
+          if (res.count === 0) throw new BadRequestException('Estoque insuficiente para um dos itens. Revise seu carrinho.')
+        }
+        orders.push(order)
+      }
+      // Fidelidade (global): decremento atômico + ledger (referencia o 1º pedido).
+      if (loyaltyAccountId && loyaltyRedeem > 0) {
+        const res = await tx.loyaltyAccount.updateMany({ where: { id: loyaltyAccountId, points: { gte: loyaltyRedeem } }, data: { points: { decrement: loyaltyRedeem } } })
+        if (res.count === 0) throw new BadRequestException('Saldo de pontos insuficiente para o resgate.')
+        await tx.loyaltyTransaction.create({
+          data: { accountId: loyaltyAccountId, points: -loyaltyRedeem, type: 'REDEEM', description: `Resgate de ${loyaltyRedeem} pontos (R$ ${((loyaltyRedeem / 100) * 10).toFixed(2)} de desconto)`, orderId: orders[0].id },
+        })
+      }
+      return { payment, orders }
+    })
+
+    const firstOrder = orders[0]
+    const allMpItems = prepared.flatMap((g) => g.mpItems)
+
+    let splitOpts: { sellerToken?: string | null; applicationFee?: number } | undefined
+    if (!multiStore && marketplaceOn) {
+      const g = prepared[0]
+      const sellerToken = await this.mpOauth.getValidSellerToken(g.store as any)
+      const platformCommission = Math.round(g.subtotal * 0.10 * 100) / 100
+      const rawFee = platformCommission + g.deliveryFee - g.loyaltyDiscount
+      const applicationFee = Math.max(0, Math.min(Math.round(rawFee * 100) / 100, grandTotal))
+      splitOpts = { sellerToken, applicationFee }
+    }
+
+    const cancelAll = async () => {
+      await this.prisma.order.updateMany({ where: { paymentId: payment.id }, data: { status: 'CANCELLED' } }).catch(() => {})
+      await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } }).catch(() => {})
+      for (const o of orders) await this.restoreOrderConsumption(o.id)
+    }
+
+    let paymentOut: any = payment
+
+    if (dto.paymentMethod === 'PIX') {
+      try {
+        const pixResult = await this.payments.createPixPayment(payment.id, grandTotal, firstOrder.id, safePayerEmail(payer?.email), splitOpts)
+        if (pixResult.splitFellBack) await this.prisma.order.updateMany({ where: { paymentId: payment.id }, data: { paidViaSplit: false } }).catch(() => {})
+        paymentOut = { ...payment, gatewayId: pixResult.gatewayId, pixCode: pixResult.pixCode, pixQrBase64: pixResult.pixQrBase64, pixExpiresAt: new Date(Date.now() + 30 * 60 * 1000) }
+        orders.forEach((o) => { if (o.payment) Object.assign(o.payment, paymentOut) })
+      } catch (err: any) {
+        this.logger.error('PIX (multi) creation failed after orders were saved', err)
+        await cancelAll()
+        const raw = typeof err?.message === 'string' ? err.message : ''
+        const semChavePix = /without key enabled for QR|key enabled|sem chave|no pix key/i.test(raw)
+        throw new BadRequestException(semChavePix ? 'Esta loja ainda não habilitou o PIX na conta de pagamento. Pague com cartão ou tente novamente mais tarde.' : 'Não foi possível gerar o QR Code PIX agora. Tente pagar com cartão.')
+      }
+    }
+
+    if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && dto.cardToken) {
+      try {
+        const nameParts = (payer?.name ?? '').trim().split(/\s+/).filter(Boolean)
+        const result = await this.payments.createCardPayment(payment.id, grandTotal, firstOrder.id, dto.cardToken, dto.installments ?? 1, safePayerEmail(payer?.email), dto.payerCpf, {
+          ...splitOpts,
+          payerFirstName: nameParts[0],
+          payerLastName: nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined,
+          payerPhone: (payer?.phone ?? '').replace(/\D/g, '') || undefined,
+          payerRegDate: payer?.createdAt ? payer.createdAt.toISOString() : undefined,
+          items: allMpItems,
+          deviceId: dto.deviceId,
+          payerAddress: { zip_code: address.zipCode?.replace(/\D/g, ''), street_name: address.street, street_number: address.number },
+        })
+        if (result.splitFellBack) await this.prisma.order.updateMany({ where: { paymentId: payment.id }, data: { paidViaSplit: false } }).catch(() => {})
+        if (result.status === 'PAID') {
+          await this.prisma.order.updateMany({ where: { paymentId: payment.id }, data: { status: 'CONFIRMED' } })
+          orders.forEach((o) => { o.status = 'CONFIRMED' })
+          for (const g of prepared) {
+            const o = orders.find((x) => x.storeId === g.store.id)!
+            if (g.store.user?.pushToken) this.push.send(g.store.user.pushToken, '✅ Pedido pago!', `Pedido #${o.id.slice(0, 8)} pago com cartão.`, { orderId: o.id })
+            this.notifications.create(g.store.user.id, 'ORDER_UPDATE', '✅ Pedido pago!', `Pedido #${o.id.slice(0, 8)} · R$ ${Number(o.total).toFixed(2)}`, { orderId: o.id }).catch((e) => this.logger.warn('Store notification failed', e))
+          }
+        } else if (result.status === 'FAILED') {
+          await cancelAll()
+          throw new BadRequestException(`Pagamento recusado. Motivo: ${result.statusDetail ?? 'cartão não autorizado'}. Verifique os dados e tente novamente.`)
+        }
+      } catch (err: any) {
+        if (err instanceof HttpException) throw err
+        this.logger.error('Card (multi) payment failed', err)
+        await cancelAll()
+        const cause = Array.isArray(err?.cause) ? err.cause.map((c: any) => c?.description).filter(Boolean).join('; ') : ''
+        const raw = (cause || err?.message || '').toString().slice(0, 160)
+        throw new BadRequestException(`Não foi possível processar o pagamento com cartão${raw ? ` (${raw})` : ''}. Verifique os dados ou pague com PIX.`)
+      }
+    }
+
+    // Notifica cada loja do novo pedido (PIX fica PENDING; cartão pago já avisou acima também).
+    for (const g of prepared) {
+      const o = orders.find((x) => x.storeId === g.store.id)!
+      if (g.store.user?.pushToken) this.push.send(g.store.user.pushToken, '🛒 Novo pedido!', 'Você recebeu um novo pedido. Toque para ver.', { orderId: o.id })
+      this.notifications.create(g.store.user.id, 'ORDER_UPDATE', '🛒 Novo pedido!', `Pedido #${o.id.slice(0, 8)} · R$ ${Number(o.total).toFixed(2)}`, { orderId: o.id }).catch((e) => this.logger.warn('Store notification failed', e))
+    }
+
+    return { orders, payment: paymentOut }
   }
 
   async findByUser(userId: string) {

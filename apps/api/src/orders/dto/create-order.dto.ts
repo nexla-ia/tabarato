@@ -21,18 +21,46 @@ export class OrderItemDto {
   notes?: string
 }
 
-export class CreateOrderDto {
+// Um grupo = itens (e cupom opcional) de UMA loja. O carrinho multi-loja envia
+// vários grupos; o checkout cria 1 pedido por grupo, todos sob 1 pagamento.
+export class StoreGroupDto {
   @IsString()
   storeId: string
-
-  @IsString()
-  addressId: string
 
   @IsArray()
   @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[]
+
+  @IsString()
+  @IsOptional()
+  couponCode?: string
+}
+
+export class CreateOrderDto {
+  // Formato multi-loja (preferido). Se ausente, cai no formato antigo (storeId+items).
+  @IsArray()
+  @IsOptional()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => StoreGroupDto)
+  groups?: StoreGroupDto[]
+
+  // ── Formato antigo (1 loja) — mantido por compatibilidade ──
+  @IsString()
+  @IsOptional()
+  storeId?: string
+
+  @IsArray()
+  @IsOptional()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => OrderItemDto)
+  items?: OrderItemDto[]
+
+  @IsString()
+  addressId: string
 
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod

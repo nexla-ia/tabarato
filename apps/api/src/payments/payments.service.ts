@@ -311,8 +311,9 @@ export class PaymentsService {
           return
         }
 
-        await this.prisma.order.update({
-          where: { id: orderId },
+        // Confirma TODOS os pedidos desse pagamento (multi-loja: N pedidos, 1 pagamento).
+        await this.prisma.order.updateMany({
+          where: { paymentId: order.payment.id, status: 'PENDING' },
           data: { status: 'CONFIRMED' },
         })
 
@@ -320,7 +321,7 @@ export class PaymentsService {
           this.push.send(
             order.user.pushToken,
             '✅ Pagamento confirmado!',
-            `Seu pedido em ${order.store.name} foi pago e já está sendo preparado.`,
+            `Seu pedido foi pago e já está sendo preparado.`,
             { orderId },
           )
         }
@@ -375,7 +376,8 @@ export class PaymentsService {
           where: { id: order.payment.id },
           data: { status: 'PAID', paidAt: new Date() },
         })
-        await this.prisma.order.update({ where: { id: orderId }, data: { status: 'CONFIRMED' } })
+        // Confirma TODOS os pedidos do pagamento (multi-loja: N pedidos, 1 pagamento).
+        await this.prisma.order.updateMany({ where: { paymentId: order.payment.id, status: 'PENDING' }, data: { status: 'CONFIRMED' } })
         return updated
       }
     } catch {}

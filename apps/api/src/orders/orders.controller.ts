@@ -14,6 +14,9 @@ export class OrdersController {
 
   @Post()
   create(@CurrentUser() user: any, @Body() dto: CreateOrderDto) {
+    // App novo manda `groups` (carrinho multi-loja) → createMulti (N pedidos, 1 pagamento).
+    // App antigo manda storeId+items → create legado (1 pedido).
+    if (dto.groups && dto.groups.length) return this.ordersService.createMulti(user.sub, dto)
     return this.ordersService.create(user.sub, dto)
   }
 
