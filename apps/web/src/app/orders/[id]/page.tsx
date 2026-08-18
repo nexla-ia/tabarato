@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Navbar } from '@/components/Navbar'
 import { OrderChat } from '@/components/OrderChat'
+import { OrderReview } from '@/components/OrderReview'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import styles from './page.module.css'
@@ -161,6 +162,16 @@ export default function OrderDetailPage() {
           <div className={styles.card} style={{ marginTop: 14 }}>
             <h3 className={styles.sectionLabel}>Foto de entrega</h3>
             <Image src={order.delivery.photoUrl} alt="Entrega" width={600} height={300} style={{ borderRadius: 10, objectFit: 'cover', width: '100%', height: 'auto' }} />
+          </div>
+        )}
+
+        {/* Avaliação — só depois de entregue */}
+        {order.status === 'DELIVERED' && (
+          <div className={styles.card} style={{ marginTop: 14 }}>
+            <h3 className={styles.sectionLabel}>Avalie sua compra</h3>
+            <div style={{ marginTop: 10 }}>
+              <OrderReview orderId={order.id} />
+            </div>
           </div>
         )}
 
