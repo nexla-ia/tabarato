@@ -86,6 +86,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     hasVariations: product.hasVariations,
     avgRating: product.avgRating ?? null,
     reviewCount: product.reviewCount ?? 0,
+    soldCount: product.soldCount ?? 0,
     category: product.category ? { id: product.category.id, name: product.category.name } : null,
     variations: (product.variations ?? []).map((v: any) => ({
       id: v.id, name: v.name, price: v.price, stock: v.stock,

@@ -142,10 +142,19 @@ export class ProductsService {
         })
       : null
 
+    // "X pessoas compraram" — clientes distintos com pedido ENTREGUE contendo
+    // este produto (não é soma de unidades, é gente diferente que já recebeu).
+    const buyers = await this.prisma.order.findMany({
+      where: { status: 'DELIVERED', items: { some: { productId: id } } },
+      select: { userId: true },
+      distinct: ['userId'],
+    })
+
     return {
       ...product,
       avgRating: agg?._avg.rating ?? null,
       reviewCount: agg?._count.rating ?? 0,
+      soldCount: buyers.length,
     }
   }
 

@@ -24,9 +24,12 @@
 .breadcrumb { font-size: 12.5px; color: var(--muted); font-weight: 600; }
 .name { font-family: var(--display); font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin: 4px 0 6px; line-height: 1.25; }
 
-.productRating { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+.productMeta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.productRating { display: inline-flex; align-items: center; gap: 7px; }
 .productRating strong { font-size: 14px; font-weight: 800; color: var(--text); }
 .productRatingCount { font-size: 12.5px; color: var(--muted); }
+.productMetaDot { color: var(--faint); }
+.soldCount { font-size: 12.5px; color: var(--muted); font-weight: 600; }
 
 .price { font-family: var(--display); font-size: 28px; font-weight: 800; color: var(--orange-dark); margin-bottom: 8px; }
 
@@ -162,6 +165,14 @@
   color: var(--orange-dark); font-weight: 700; font-size: 13.5px; transition: gap 0.15s;
 }
 .seeAllLink:hover { gap: 9px; }
+
+.reviewsEmpty {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+  background: var(--card); border: 1px dashed var(--border); border-radius: var(--radius);
+  padding: 32px 20px; color: var(--faint);
+}
+.reviewsEmptyTitle { font-size: 14px; font-weight: 700; color: var(--text); margin-top: 4px; }
+.reviewsEmptySub { font-size: 12.5px; color: var(--muted); }
 
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .modal { background: var(--card); border-radius: 20px; padding: 28px; max-width: 380px; width: 100%; }

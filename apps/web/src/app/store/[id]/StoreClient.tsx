@@ -205,19 +205,19 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
           </>
         )}
 
-        {/* Avaliações */}
-        {reviews.length > 0 && (
-          <section className={styles.reviews}>
-            <div className={styles.reviewsHead}>
-              <h2 className={styles.menuTitle}>Avaliações</h2>
-              {rating != null && rating > 0 && (
-                <div className={styles.reviewsScore}>
-                  <Star size={16} fill="#F59E0B" color="#F59E0B" />
-                  <strong>{Number(rating).toFixed(1)}</strong>
-                  <span className={styles.menuCount}>· {reviewCount} avaliaç{reviewCount === 1 ? 'ão' : 'ões'}</span>
-                </div>
-              )}
-            </div>
+        {/* Avaliações — sempre visível, com estado vazio quando ainda não há nenhuma */}
+        <section className={styles.reviews}>
+          <div className={styles.reviewsHead}>
+            <h2 className={styles.menuTitle}>Avaliações</h2>
+            {rating != null && rating > 0 && (
+              <div className={styles.reviewsScore}>
+                <Star size={16} fill="#F59E0B" color="#F59E0B" />
+                <strong>{Number(rating).toFixed(1)}</strong>
+                <span className={styles.menuCount}>· {reviewCount} avaliaç{reviewCount === 1 ? 'ão' : 'ões'}</span>
+              </div>
+            )}
+          </div>
+          {reviews.length > 0 ? (
             <div className={styles.reviewGrid}>
               {reviews.map(r => (
                 <div key={r.id} className={styles.reviewCard}>
@@ -233,8 +233,14 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
                 </div>
               ))}
             </div>
-          </section>
-        )}
+          ) : (
+            <div className={styles.reviewsEmpty}>
+              <Star size={24} strokeWidth={1.3} />
+              <p className={styles.reviewsEmptyTitle}>Ainda não há avaliações de {store.name}.</p>
+              <span className={styles.reviewsEmptySub}>Seja o primeiro a avaliar depois da sua compra!</span>
+            </div>
+          )}
+        </section>
       </div>
 
       {/* Floating cart bar */}

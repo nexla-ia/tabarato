@@ -15,7 +15,7 @@ interface Product {
   imageUrl?: string | null; images?: string[] | null
   basePrice?: number | string | null
   stock?: number | null; hasVariations?: boolean
-  avgRating?: number | null; reviewCount?: number
+  avgRating?: number | null; reviewCount?: number; soldCount?: number
   variations?: Variation[]; category?: Category | null
 }
 interface Store {
@@ -71,6 +71,8 @@ export function ProductClient({
   const selectionOut = outOfStock || (selectedVar ? isOut(selectedVar.stock) : isOut(product.stock))
   const price = Number(selectedVar?.price ?? product.basePrice ?? 0)
   const photos = Array.from(new Set([product.imageUrl, ...(product.images ?? [])].filter(Boolean))) as string[]
+  const hasRating = product.avgRating != null && product.avgRating > 0
+  const hasSoldCount = !!product.soldCount && product.soldCount > 0
 
   function doAdd() {
     addItem(store.id, store.name, {
@@ -101,13 +103,23 @@ export function ProductClient({
               {product.category && <span className={styles.breadcrumb}>{store.name} · {product.category.name}</span>}
               <h1 className={styles.name}>{product.name}</h1>
 
-              {product.avgRating != null && product.avgRating > 0 && (
-                <div className={styles.productRating}>
-                  <Stars n={Math.round(product.avgRating)} size={15} />
-                  <strong>{product.avgRating.toFixed(1)}</strong>
-                  <span className={styles.productRatingCount}>
-                    ({product.reviewCount} avaliaç{product.reviewCount === 1 ? 'ão' : 'ões'})
-                  </span>
+              {(hasRating || hasSoldCount) && (
+                <div className={styles.productMeta}>
+                  {hasRating && (
+                    <span className={styles.productRating}>
+                      <Stars n={Math.round(product.avgRating!)} size={15} />
+                      <strong>{product.avgRating!.toFixed(1)}</strong>
+                      <span className={styles.productRatingCount}>
+                        ({product.reviewCount} avaliaç{product.reviewCount === 1 ? 'ão' : 'ões'})
+                      </span>
+                    </span>
+                  )}
+                  {hasRating && hasSoldCount && <span className={styles.productMetaDot}>·</span>}
+                  {hasSoldCount && (
+                    <span className={styles.soldCount}>
+                      {product.soldCount} pessoa{product.soldCount === 1 ? '' : 's'} já compr{product.soldCount === 1 ? 'ou' : 'aram'} este produto
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -195,42 +207,52 @@ export function ProductClient({
             </section>
           )}
 
-          {/* Avaliações da loja — não existe avaliação por produto, só por pedido/loja */}
-          {reviews.length > 0 && (
-            <section className={styles.reviewsSection}>
-              <div className={styles.reviewsHead}>
-                <div>
-                  <h2 className={styles.sectionTitle}>Avaliações de {store.name}</h2>
-                  <p className={styles.reviewsSub}>Com base nos pedidos entregues pela loja</p>
+          {/* Avaliações da loja — não existe avaliação por produto, só por pedido/loja.
+              Sempre visível: mostra estado vazio quando ainda não há nenhuma. */}
+          <section className={styles.reviewsSection}>
+            <div className={styles.reviewsHead}>
+              <div>
+                <h2 className={styles.sectionTitle}>Avaliações de {store.name}</h2>
+                <p className={styles.reviewsSub}>Com base nos pedidos entregues pela loja</p>
+              </div>
+              {storeRating != null && storeRating > 0 && (
+                <div className={styles.reviewsScore}>
+                  <Star size={18} fill="#F59E0B" color="#F59E0B" />
+                  <strong>{Number(storeRating).toFixed(1)}</strong>
+                  <span className={styles.reviewsCount}>· {storeReviewCount} avaliaç{storeReviewCount === 1 ? 'ão' : 'ões'}</span>
                 </div>
-                {storeRating != null && storeRating > 0 && (
-                  <div className={styles.reviewsScore}>
-                    <Star size={18} fill="#F59E0B" color="#F59E0B" />
-                    <strong>{Number(storeRating).toFixed(1)}</strong>
-                    <span className={styles.reviewsCount}>· {storeReviewCount} avaliaç{storeReviewCount === 1 ? 'ão' : 'ões'}</span>
-                  </div>
-                )}
-              </div>
-              <div className={styles.reviewGrid}>
-                {reviews.map((r, i) => (
-                  <div key={r.id} className={`${styles.reviewCard} reveal`} style={{ animationDelay: `${Math.min(i, 6) * 0.06}s` }}>
-                    <div className={styles.reviewTop}>
-                      <span className={styles.reviewAvatar}>{initials(r.user?.name)}</span>
-                      <div className={styles.reviewWho}>
-                        <span className={styles.reviewName}>{r.user?.name?.split(' ')[0] ?? 'Cliente'}</span>
-                        <span className={styles.reviewDateText}>{reviewDate(r.createdAt)}</span>
+              )}
+            </div>
+
+            {reviews.length > 0 ? (
+              <>
+                <div className={styles.reviewGrid}>
+                  {reviews.map((r, i) => (
+                    <div key={r.id} className={`${styles.reviewCard} reveal`} style={{ animationDelay: `${Math.min(i, 6) * 0.06}s` }}>
+                      <div className={styles.reviewTop}>
+                        <span className={styles.reviewAvatar}>{initials(r.user?.name)}</span>
+                        <div className={styles.reviewWho}>
+                          <span className={styles.reviewName}>{r.user?.name?.split(' ')[0] ?? 'Cliente'}</span>
+                          <span className={styles.reviewDateText}>{reviewDate(r.createdAt)}</span>
+                        </div>
+                        <Stars n={r.rating} />
                       </div>
-                      <Stars n={r.rating} />
+                      {r.comment && <p className={styles.reviewComment}>{r.comment}</p>}
                     </div>
-                    {r.comment && <p className={styles.reviewComment}>{r.comment}</p>}
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <Link href={`/store/${store.id}`} className={styles.seeAllLink}>
+                  Ver loja e todas as avaliações <ArrowRight size={14} />
+                </Link>
+              </>
+            ) : (
+              <div className={styles.reviewsEmpty}>
+                <Star size={24} strokeWidth={1.3} />
+                <p className={styles.reviewsEmptyTitle}>Ainda não há avaliações de {store.name}.</p>
+                <span className={styles.reviewsEmptySub}>Seja o primeiro a avaliar depois da sua compra!</span>
               </div>
-              <Link href={`/store/${store.id}`} className={styles.seeAllLink}>
-                Ver loja e todas as avaliações <ArrowRight size={14} />
-              </Link>
-            </section>
-          )}
+            )}
+          </section>
         </div>
 
         {/* Loja + sugestões — fixo na lateral, acompanha a rolagem */}
