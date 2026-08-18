@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Phone, Store as StoreIcon } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Phone, Store as StoreIcon, Images } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
 import { formatPhone } from '@/lib/masks'
@@ -80,10 +80,23 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
 
   return (
     <>
-      {/* Store header */}
+      {/* Store header — a primeira foto da loja vira a capa (atrás do nome) */}
       <div className={styles.header}>
-        <div className="container">
-          <Link href="/" className={styles.backLink}><ArrowLeft size={16} /> Voltar às lojas</Link>
+        {photos.length > 0 && (
+          <>
+            <Image src={photos[0]} alt="" fill priority sizes="100vw" className={styles.headerBg} style={{ objectFit: 'cover' }} />
+            <div className={styles.headerScrim} />
+          </>
+        )}
+        <div className="container" style={{ position: 'relative', zIndex: 1 }}>
+          <div className={styles.topRow}>
+            <Link href="/" className={styles.backLink}><ArrowLeft size={16} /> Voltar às lojas</Link>
+            {photos.length > 0 && (
+              <button type="button" className={styles.photosBtn} onClick={() => setLightboxIndex(0)}>
+                <Images size={14} /> Ver fotos ({photos.length})
+              </button>
+            )}
+          </div>
           <div className={styles.headerInner}>
             <div className={styles.logoWrap}>
               {store.logoUrl
@@ -114,22 +127,6 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
 
       {/* Info + Products */}
       <div className="container" style={{ padding: '24px 20px 120px' }}>
-        {/* Galeria de fotos */}
-        {photos.length > 0 && (
-          <div className={`hideScroll ${styles.gallery}`}>
-            {photos.map((url, i) => (
-              <button
-                key={i}
-                type="button"
-                className={styles.galleryItem}
-                onClick={() => setLightboxIndex(i)}
-              >
-                <Image src={url} alt={`${store.name} foto ${i + 1}`} fill sizes="220px" style={{ objectFit: 'cover' }} />
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Sobre a loja */}
         {(store.address || store.phone) && (
           <div className={styles.infoCard}>
