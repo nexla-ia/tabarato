@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Phone, Store as StoreIcon, Images } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Phone, Store as StoreIcon } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
 import { formatPhone } from '@/lib/masks'
@@ -80,8 +80,12 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
 
   return (
     <>
-      {/* Store header — a primeira foto da loja vira a capa (atrás do nome) */}
-      <div className={styles.header}>
+      {/* Store header — a primeira foto da loja vira a capa (atrás do nome); clicar nela abre o visualizador */}
+      <div
+        className={styles.header}
+        onClick={() => photos.length > 0 && setLightboxIndex(0)}
+        style={{ cursor: photos.length > 0 ? 'pointer' : 'default' }}
+      >
         {photos.length > 0 && (
           <>
             <Image src={photos[0]} alt="" fill priority sizes="100vw" className={styles.headerBg} style={{ objectFit: 'cover' }} />
@@ -90,12 +94,9 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
         )}
         <div className="container" style={{ position: 'relative', zIndex: 1 }}>
           <div className={styles.topRow}>
-            <Link href="/" className={styles.backLink}><ArrowLeft size={16} /> Voltar às lojas</Link>
-            {photos.length > 0 && (
-              <button type="button" className={styles.photosBtn} onClick={() => setLightboxIndex(0)}>
-                <Images size={14} /> Ver fotos ({photos.length})
-              </button>
-            )}
+            <Link href="/" className={styles.backLink} onClick={(e) => e.stopPropagation()}>
+              <ArrowLeft size={16} /> Voltar às lojas
+            </Link>
           </div>
           <div className={styles.headerInner}>
             <div className={styles.logoWrap}>
