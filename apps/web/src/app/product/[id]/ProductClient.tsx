@@ -91,13 +91,12 @@ export function ProductClient({
   storeRating?: number | null; storeReviewCount?: number
   reviews?: Review[]; storeSuggestions?: Suggestion[]; marketSuggestions?: Suggestion[]
 }) {
-  const { addItem, storeId } = useCartStore()
+  const { addItem } = useCartStore()
   const { user } = useAuth()
   const [selectedVar, setSelectedVar] = useState(
     product.variations?.find(v => !isOut(v.stock)) ?? product.variations?.[0],
   )
   const [qty, setQty] = useState(1)
-  const [confirmClear, setConfirmClear] = useState(false)
   const [added, setAdded] = useState(false)
 
   const hasVars = !!(product.variations && product.variations.length > 0)
@@ -110,18 +109,13 @@ export function ProductClient({
   const hasRating = product.avgRating != null && product.avgRating > 0
   const hasSoldCount = !!product.soldCount && product.soldCount > 0
 
-  function doAdd() {
+  function handleAdd() {
     addItem(store.id, store.name, {
       productId: product.id, variationId: selectedVar?.id, name: product.name,
       price, quantity: qty, imageUrl: product.imageUrl ?? undefined, variationName: selectedVar?.name,
     }, user?.id)
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
-  }
-
-  function handleAdd() {
-    if (storeId && storeId !== store.id) { setConfirmClear(true); return }
-    doAdd()
   }
 
   return (
@@ -319,24 +313,6 @@ export function ProductClient({
           )}
         </aside>
       </div>
-
-      {confirmClear && (
-        <div className={styles.overlay} onClick={() => setConfirmClear(false)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>Esvaziar carrinho?</h3>
-            <p className={styles.modalText}>Você já tem itens de outra loja. Deseja limpar o carrinho e adicionar este item?</p>
-            <div className={styles.modalActions}>
-              <button className={styles.modalCancel} onClick={() => setConfirmClear(false)}>Cancelar</button>
-              <button
-                className={styles.modalConfirm}
-                onClick={() => { useCartStore.getState().clear(); doAdd(); setConfirmClear(false) }}
-              >
-                Sim, limpar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

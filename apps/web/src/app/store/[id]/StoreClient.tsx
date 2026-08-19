@@ -53,14 +53,14 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
   store: Store; products: Product[]; rating?: number | null; reviewCount?: number
   reviews?: Review[]; photos?: string[]
 }) {
-  const { items, addItem, total, storeId } = useCartStore()
+  const { addItem, storeTotal } = useCartStore()
+  const storeItems = useCartStore(s => s.stores.find(g => g.storeId === store.id)?.items ?? [])
   const [query, setQuery] = useState('')
   const { user } = useAuth()
-  const [confirmClear, setConfirmClear] = useState<(() => void) | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
   const [favLoading, setFavLoading] = useState(false)
-  const cartCount = items.reduce((a, i) => a + i.quantity, 0)
+  const cartCount = storeItems.reduce((a, i) => a + i.quantity, 0)
 
   useEffect(() => {
     if (!user) { setIsFavorite(false); return }
@@ -86,21 +86,10 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
 
   function handleAdd(product: Product, variation?: { id: string; name: string; price: number | string }) {
     const price = Number(variation?.price ?? product.basePrice ?? 0)
-    const cartItem = {
+    addItem(store.id, store.name, {
       productId: product.id, variationId: variation?.id, name: product.name,
       price, quantity: 1, imageUrl: product.imageUrl ?? undefined, variationName: variation?.name,
-    }
-
-    if (storeId && storeId !== store.id) {
-      setConfirmClear(() => () => {
-        useCartStore.getState().clear()
-        addItem(store.id, store.name, cartItem, user?.id)
-        setConfirmClear(null)
-      })
-      return
-    }
-
-    addItem(store.id, store.name, cartItem, user?.id)
+    }, user?.id)
   }
 
   return (
@@ -239,7 +228,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
                 <section key={g.name} className={styles.catSection}>
                   <h3 className={styles.catTitle}>{g.name}</h3>
                   <div className={styles.grid}>
-                    {g.items.map(p => <ProductCard key={p.id} product={p} onAdd={handleAdd} />)}
+                    {g.items.map(p => <ProductCard key={p.id} product={p} storeId={store.id} onAdd={handleAdd} />)}
                   </div>
                 </section>
               ))
@@ -286,13 +275,13 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
       </div>
 
       {/* Floating cart bar */}
-      {cartCount > 0 && storeId === store.id && (
+      {cartCount > 0 && (
         <div className={styles.cartBar}>
           <div className={styles.cartBarLeft}>
             <ShoppingCart size={18} />
             <span>{cartCount} {cartCount === 1 ? 'item' : 'itens'}</span>
           </div>
-          <div className={styles.cartBarCenter}>{fmtBRL(total())}</div>
+          <div className={styles.cartBarCenter}>{fmtBRL(storeTotal(store.id))}</div>
           <Link href="/cart" className={styles.cartBarBtn}>
             Ver carrinho <ChevronRight size={16} />
           </Link>
@@ -309,33 +298,20 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
           onNavigate={setLightboxIndex}
         />
       )}
-
-      {/* Confirm clear cart modal */}
-      {confirmClear && (
-        <div className={styles.overlay} onClick={() => setConfirmClear(null)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>Esvaziar carrinho?</h3>
-            <p className={styles.modalText}>Você já tem itens de outra loja. Deseja limpar o carrinho e adicionar este item?</p>
-            <div className={styles.modalActions}>
-              <button className={styles.modalCancel} onClick={() => setConfirmClear(null)}>Cancelar</button>
-              <button className={styles.modalConfirm} onClick={confirmClear}>Sim, limpar</button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }
 
-function ProductCard({ product, onAdd }: {
+function ProductCard({ product, storeId, onAdd }: {
   product: Product
+  storeId: string
   onAdd: (p: Product, v?: Variation) => void
 }) {
   const [selectedVar, setSelectedVar] = useState(
     product.variations?.find(v => !isOut(v.stock)) ?? product.variations?.[0],
   )
   const price = Number(selectedVar?.price ?? product.basePrice ?? 0)
-  const items = useCartStore(s => s.items)
+  const items = useCartStore(s => s.stores.find(g => g.storeId === storeId)?.items ?? [])
   const qty = items.filter(
     i => i.productId === product.id && i.variationId === selectedVar?.id
   ).reduce((a, i) => a + i.quantity, 0)
@@ -386,7 +362,7 @@ function ProductCard({ product, onAdd }: {
             <span className={styles.outLabel}>Indisponível</span>
           ) : qty > 0 ? (
             <div className={styles.qtyControl}>
-              <button className={styles.qtyBtn} onClick={() => useCartStore.getState().updateQty(product.id, selectedVar?.id, qty - 1)}>
+              <button className={styles.qtyBtn} onClick={() => useCartStore.getState().updateQty(storeId, product.id, selectedVar?.id, qty - 1)}>
                 <Minus size={14} />
               </button>
               <span className={styles.qtyNum}>{qty}</span>

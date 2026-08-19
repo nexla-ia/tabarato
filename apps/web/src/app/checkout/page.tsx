@@ -45,8 +45,10 @@ async function tokenizeCard(data: { cardNumber: string; cvv: string; expiryMonth
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { items, storeId, total, clear, coupon } = useCartStore()
+  const { stores, clear } = useCartStore()
   const { user, ready } = useAuth()
+
+  const total = () => stores.reduce((acc, s) => acc + s.items.reduce((a, i) => a + i.price * i.quantity, 0), 0)
 
   // Chave de idempotência: estável entre retries do mesmo checkout (evita pedido duplicado)
   const idemKey = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`)
@@ -79,8 +81,8 @@ export default function CheckoutPage() {
   const [addrForm, setAddrForm] = useState({ label: 'Casa', street: '', number: '', district: '', city: 'Vilhena', state: 'RO', zipCode: '', lat: -12.7406, lng: -60.1478 })
   const [savingAddr, setSavingAddr] = useState(false)
 
-  // PIX result
-  const [pixOrder, setPixOrder] = useState<{ id: string; payment: { pixCode: string; pixQrBase64?: string } } | null>(null)
+  // PIX result — 1 pagamento pode cobrir vários pedidos (1 por loja)
+  const [pixResult, setPixResult] = useState<{ orderIds: string[]; pixCode: string; pixQrBase64?: string } | null>(null)
   const [pixCopied, setPixCopied] = useState(false)
   const [polling, setPolling] = useState(false)
 
@@ -123,7 +125,7 @@ export default function CheckoutPage() {
 
   async function handleSubmit() {
     if (!selectedAddr) { setError('Selecione um endereço de entrega'); return }
-    if (!storeId) { setError('Carrinho vazio'); return }
+    if (stores.length === 0) { setError('Carrinho vazio'); return }
 
     if (isCard) {
       if (!cardHolder.trim()) { setError('Nome no cartão obrigatório'); return }
@@ -140,28 +142,34 @@ export default function CheckoutPage() {
         cardToken = await tokenizeCard({ cardNumber, cvv: cardCvv, expiryMonth: month.trim(), expiryYear: year.trim(), holderName: cardHolder, cpf: cardCpf })
       }
 
-      const { data: order } = await api.post('/orders', {
-        storeId,
+      // Carrinho multi-loja: 1 grupo por loja, todos sob 1 pagamento (createMulti no back).
+      const { data } = await api.post('/orders', {
+        groups: stores.map(s => ({
+          storeId: s.storeId,
+          items: s.items.map(i => ({ productId: i.productId, variationId: i.variationId, quantity: i.quantity })),
+          couponCode: s.coupon?.code,
+        })),
         addressId: selectedAddr,
         paymentMethod: payMethod,
         cardToken,
         installments: isCard ? installments : undefined,
         payerCpf: isCard ? cardCpf : undefined,
         idempotencyKey: idemKey.current,
-        items: items.map(i => ({ productId: i.productId, variationId: i.variationId, quantity: i.quantity })),
-        couponCode: coupon?.code,
         // Fingerprint do dispositivo (security.js do MP) — reduz recusa de cartão
         // por antifraude (cc_rejected_high_risk). Só existe depois do script carregar.
         deviceId: typeof window !== 'undefined' ? window.MP_DEVICE_SESSION_ID : undefined,
         pointsToRedeem: pointsToRedeem > 0 ? pointsToRedeem : undefined,
       })
 
+      const orders: { id: string }[] = data.orders
       clear()
 
-      if (payMethod === 'PIX' && order.payment?.pixCode) {
-        setPixOrder(order)
+      if (payMethod === 'PIX' && data.payment?.pixCode) {
+        setPixResult({ orderIds: orders.map(o => o.id), pixCode: data.payment.pixCode, pixQrBase64: data.payment.pixQrBase64 })
+      } else if (orders.length === 1) {
+        router.push(`/orders/${orders[0].id}`)
       } else {
-        router.push(`/orders/${order.id}`)
+        router.push('/orders')
       }
     } catch (err: any) {
       setError(err.response?.data?.message ?? err.message ?? 'Não foi possível finalizar o pedido')
@@ -169,33 +177,37 @@ export default function CheckoutPage() {
   }
 
   async function handleCheckPix() {
-    if (!pixOrder) return
+    if (!pixResult) return
     setPolling(true)
     try {
-      const { data } = await api.get(`/payments/orders/${pixOrder.id}/sync`)
-      if (data?.status === 'PAID') router.push(`/orders/${pixOrder.id}`)
-      else setError('Pagamento ainda não confirmado. Aguarde alguns instantes.')
+      const { data } = await api.get(`/payments/orders/${pixResult.orderIds[0]}/sync`)
+      if (data?.status === 'PAID') {
+        router.push(pixResult.orderIds.length === 1 ? `/orders/${pixResult.orderIds[0]}` : '/orders')
+      } else {
+        setError('Pagamento ainda não confirmado. Aguarde alguns instantes.')
+      }
     } catch {} finally { setPolling(false) }
   }
 
   function copyPix() {
-    navigator.clipboard.writeText(pixOrder?.payment.pixCode ?? '')
+    navigator.clipboard.writeText(pixResult?.pixCode ?? '')
     setPixCopied(true)
     setTimeout(() => setPixCopied(false), 2500)
   }
 
   // PIX screen
-  if (pixOrder) {
+  if (pixResult) {
+    const orderHref = pixResult.orderIds.length === 1 ? `/orders/${pixResult.orderIds[0]}` : '/orders'
     return (
       <>
         <Navbar />
         <div className={styles.pixPage}>
           <div className={styles.pixCard}>
             <div className={styles.pixIcon}>⚡</div>
-            <h2 className={styles.pixTitle}>Pedido criado!</h2>
+            <h2 className={styles.pixTitle}>{pixResult.orderIds.length > 1 ? `${pixResult.orderIds.length} pedidos criados!` : 'Pedido criado!'}</h2>
             <p className={styles.pixSub}>Escaneie o QR Code ou copie o código PIX para pagar</p>
-            {pixOrder.payment.pixQrBase64 && (
-              <Image src={`data:image/png;base64,${pixOrder.payment.pixQrBase64}`} alt="QR Code PIX" width={220} height={220} style={{ borderRadius: 12, margin: '16px auto' }} />
+            {pixResult.pixQrBase64 && (
+              <Image src={`data:image/png;base64,${pixResult.pixQrBase64}`} alt="QR Code PIX" width={220} height={220} style={{ borderRadius: 12, margin: '16px auto' }} />
             )}
             <button className={styles.copyBtn} onClick={copyPix}>
               {pixCopied ? '✓ Copiado!' : '📋 Copiar código PIX'}
@@ -204,7 +216,7 @@ export default function CheckoutPage() {
             <button className={styles.confirmBtn} onClick={handleCheckPix} disabled={polling}>
               {polling ? 'Verificando...' : 'Já paguei — verificar pagamento'}
             </button>
-            <a href={`/orders/${pixOrder.id}`} className={styles.laterLink}>Ver pedido depois</a>
+            <a href={orderHref} className={styles.laterLink}>Ver pedido depois</a>
           </div>
         </div>
       </>
@@ -317,25 +329,31 @@ export default function CheckoutPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}><span className={styles.stepNum}>3</span> Resumo</h2>
           <div className={styles.summaryCard}>
-            {items.map(i => (
-              <div key={`${i.productId}-${i.variationId}`} className={styles.summaryItem}>
-                <span className={styles.summaryQty}>{i.quantity}x</span>
-                <span className={styles.summaryName}>{i.name}{i.variationName ? ` · ${i.variationName}` : ''}</span>
-                <span>{fmtBRL(i.price * i.quantity)}</span>
+            {stores.map(s => (
+              <div key={s.storeId}>
+                {stores.length > 1 && <div className={styles.summaryStoreLabel}>{s.storeName}</div>}
+                {s.items.map(i => (
+                  <div key={`${i.productId}-${i.variationId}`} className={styles.summaryItem}>
+                    <span className={styles.summaryQty}>{i.quantity}x</span>
+                    <span className={styles.summaryName}>{i.name}{i.variationName ? ` · ${i.variationName}` : ''}</span>
+                    <span>{fmtBRL(i.price * i.quantity)}</span>
+                  </div>
+                ))}
+                {s.coupon && (
+                  <div className={styles.summaryRow}>
+                    <span>Cupom {s.coupon.code}</span>
+                    <span>{s.coupon.discount > 0 ? `-${fmtBRL(s.coupon.discount)}` : ''}{s.coupon.freeShipping ? (s.coupon.discount > 0 ? ' + frete grátis' : 'Frete grátis') : ''}</span>
+                  </div>
+                )}
               </div>
             ))}
             <div className={styles.summaryDivider} />
             <div className={styles.summaryRow}>
               <span>Subtotal</span><span>{fmtBRL(total())}</span>
             </div>
-            {coupon && (
-              <div className={styles.summaryRow}>
-                <span>Cupom {coupon.code}</span>
-                <span>{coupon.discount > 0 ? `-${fmtBRL(coupon.discount)}` : ''}{coupon.freeShipping ? (coupon.discount > 0 ? ' + frete grátis' : 'Frete grátis') : ''}</span>
-              </div>
-            )}
             <div className={styles.summaryRow}>
-              <span>Entrega</span><span>{coupon?.freeShipping ? 'Grátis' : 'calculado no pedido'}</span>
+              <span>Entrega{stores.length > 1 ? ` (${stores.length} lojas)` : ''}</span>
+              <span>{stores.length > 0 && stores.every(s => s.coupon?.freeShipping) ? 'Grátis' : 'calculado no pedido'}</span>
             </div>
 
             {maxRedeemable >= 100 && (

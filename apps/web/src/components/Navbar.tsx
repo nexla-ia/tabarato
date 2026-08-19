@@ -12,7 +12,7 @@ export function Navbar() {
   const router = useRouter()
   const pathname = usePathname()
   const { user, logout } = useAuth()
-  const cartCount = useCartStore(s => s.items.reduce((a, i) => a + i.quantity, 0))
+  const cartCount = useCartStore(s => s.itemCount())
 
   function handleLogout() {
     logout()
