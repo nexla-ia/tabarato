@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import { Zap, CreditCard } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useCartStore } from '@/stores/cart'
@@ -270,25 +271,42 @@ export default function CheckoutPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}><span className={styles.stepNum}>2</span> Forma de pagamento</h2>
           <div className={styles.pmGrid}>
-            {([
-              { val: 'PIX' as PayMethod, label: 'PIX', desc: 'Instantâneo', emoji: '⚡', color: '#059669', bg: '#D1FAE5' },
-              { val: 'CREDIT_CARD' as PayMethod, label: 'Crédito', desc: 'Online via MP', emoji: '💳', color: '#2563EB', bg: '#DBEAFE' },
-              { val: 'DEBIT_CARD' as PayMethod, label: 'Débito', desc: 'Online via MP', emoji: '🏦', color: '#7C3AED', bg: '#EDE9FE' },
-            ]).map(pm => (
-              <button
-                key={pm.val}
-                className={`${styles.pmCard} ${payMethod === pm.val ? styles.pmCardActive : ''}`}
-                onClick={() => setPayMethod(pm.val)}
-              >
-                <div className={styles.pmIcon} style={{ background: pm.bg }}>{pm.emoji}</div>
-                <div className={styles.pmLabel}>{pm.label}</div>
-                <div className={styles.pmDesc}>{pm.desc}</div>
-              </button>
-            ))}
+            <button
+              className={`${styles.pmCard} ${payMethod === 'PIX' ? styles.pmCardActive : ''}`}
+              onClick={() => setPayMethod('PIX')}
+            >
+              <div className={styles.pmIcon} style={{ background: '#D1FAE5', color: '#059669' }}><Zap size={22} /></div>
+              <div className={styles.pmLabel}>PIX</div>
+              <div className={styles.pmDesc}>Aprovação na hora</div>
+            </button>
+            <button
+              className={`${styles.pmCard} ${isCard ? styles.pmCardActive : ''}`}
+              onClick={() => setPayMethod(isCard ? payMethod : 'CREDIT_CARD')}
+            >
+              <div className={styles.pmIcon} style={{ background: '#DBEAFE', color: '#2563EB' }}><CreditCard size={22} /></div>
+              <div className={styles.pmLabel}>Cartão</div>
+              <div className={styles.pmDesc}>Crédito ou débito</div>
+            </button>
           </div>
 
           {isCard && (
             <div className={styles.cardForm}>
+              <div className={styles.cardTypeToggle}>
+                <button
+                  type="button"
+                  className={`${styles.cardTypeBtn} ${payMethod === 'CREDIT_CARD' ? styles.cardTypeBtnActive : ''}`}
+                  onClick={() => setPayMethod('CREDIT_CARD')}
+                >
+                  Crédito
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.cardTypeBtn} ${payMethod === 'DEBIT_CARD' ? styles.cardTypeBtnActive : ''}`}
+                  onClick={() => setPayMethod('DEBIT_CARD')}
+                >
+                  Débito
+                </button>
+              </div>
               <div className={styles.field}>
                 <label className={styles.fieldLabel}>Número do cartão</label>
                 <input className={styles.input} value={cardNumber} onChange={e => setCardNumber(fmtCard(e.target.value))} placeholder="0000 0000 0000 0000" maxLength={19} />

@@ -22,13 +22,18 @@
 .input:focus { border-color: var(--orange); }
 .saveAddrBtn { background: var(--orange); color: #fff; border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 4px; }
 
-.pmGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
-.pmCard { display: flex; flex-direction: column; align-items: center; gap: 6px; background: var(--card); border: 2px solid var(--border); border-radius: 14px; padding: 16px 10px; cursor: pointer; transition: all 0.15s; }
+.pmGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
+.pmCard { display: flex; flex-direction: column; align-items: center; gap: 8px; background: var(--card); border: 2px solid var(--border); border-radius: 14px; padding: 18px 10px; cursor: pointer; transition: all 0.15s; }
 .pmCard:hover { border-color: var(--orange); }
 .pmCardActive { border-color: var(--orange); background: var(--orange-light); }
-.pmIcon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-.pmLabel { font-size: 14px; font-weight: 800; color: var(--text); }
-.pmDesc { font-size: 11px; color: var(--muted); }
+.pmIcon { width: 46px; height: 46px; border-radius: 13px; display: flex; align-items: center; justify-content: center; }
+.pmLabel { font-size: 15px; font-weight: 800; color: var(--text); }
+.pmDesc { font-size: 11.5px; color: var(--muted); }
+
+.cardTypeToggle { display: flex; gap: 8px; margin-bottom: 14px; }
+.cardTypeBtn { flex: 1; padding: 9px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg); font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.cardTypeBtn:hover { border-color: var(--orange); color: var(--text); }
+.cardTypeBtnActive { border-color: var(--orange); background: var(--orange-light); color: var(--orange-dark); }
 
 .cardForm { background: var(--card); border: 1.5px solid #DBEAFE; border-radius: 14px; padding: 16px; margin-top: 8px; }
 .installRow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
