@@ -1,10 +1,11 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Phone, Store as StoreIcon } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Phone, Store as StoreIcon, Heart } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
+import { api } from '@/lib/api'
 import { formatPhone } from '@/lib/masks'
 import { Lightbox } from '@/components/Lightbox'
 import styles from './StoreClient.module.css'
@@ -57,7 +58,31 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
   const { user } = useAuth()
   const [confirmClear, setConfirmClear] = useState<(() => void) | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [isFavorite, setIsFavorite] = useState(false)
+  const [favLoading, setFavLoading] = useState(false)
   const cartCount = items.reduce((a, i) => a + i.quantity, 0)
+
+  useEffect(() => {
+    if (!user) { setIsFavorite(false); return }
+    api.get<string[]>('/users/me/favorites/ids')
+      .then((r) => setIsFavorite(r.data.includes(store.id)))
+      .catch(() => {})
+  }, [user, store.id])
+
+  async function toggleFavorite() {
+    if (!user) { setIsFavorite(false); return }
+    setFavLoading(true)
+    const next = !isFavorite
+    setIsFavorite(next) // otimista
+    try {
+      if (next) await api.post(`/users/me/favorites/${store.id}`)
+      else await api.delete(`/users/me/favorites/${store.id}`)
+    } catch {
+      setIsFavorite(!next) // desfaz se falhar
+    } finally {
+      setFavLoading(false)
+    }
+  }
 
   function handleAdd(product: Product, variation?: { id: string; name: string; price: number | string }) {
     const price = Number(variation?.price ?? product.basePrice ?? 0)
@@ -97,6 +122,18 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
             <Link href="/" className={styles.backLink} onClick={(e) => e.stopPropagation()}>
               <ArrowLeft size={16} /> Voltar às lojas
             </Link>
+            {user && (
+              <button
+                type="button"
+                className={`${styles.favBtn} ${isFavorite ? styles.favBtnActive : ''}`}
+                onClick={(e) => { e.stopPropagation(); toggleFavorite() }}
+                disabled={favLoading}
+                title={isFavorite ? 'Remover dos favoritos' : 'Favoritar loja'}
+              >
+                <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
+                {isFavorite ? 'Favoritada' : 'Favoritar'}
+              </button>
+            )}
           </div>
           <div className={styles.headerInner}>
             <div className={styles.logoWrap}>

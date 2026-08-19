@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { ShoppingBag, LogOut, ShoppingCart, MapPin, ChevronDown } from 'lucide-react'
+import { ShoppingBag, LogOut, ShoppingCart, MapPin, ChevronDown, Heart } from 'lucide-react'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
 import { useCartStore } from '@/stores/cart'
@@ -40,6 +40,9 @@ export function Navbar() {
 
           {user ? (
             <>
+              <Link href="/favorites" className={`${styles.iconBtn} ${pathname.startsWith('/favorites') ? styles.iconBtnActive : ''}`} title="Lojas favoritas">
+                <Heart size={20} />
+              </Link>
               <Link href="/orders" className={`${styles.iconBtn} ${pathname.startsWith('/orders') ? styles.iconBtnActive : ''}`} title="Meus pedidos">
                 <ShoppingBag size={20} />
               </Link>
