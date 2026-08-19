@@ -3,12 +3,17 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Phone, Store as StoreIcon, Heart } from 'lucide-react'
-import { useCartStore } from '@/stores/cart'
+import { useCartStore, CartItem } from '@/stores/cart'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import { formatPhone } from '@/lib/masks'
 import { Lightbox } from '@/components/Lightbox'
 import styles from './StoreClient.module.css'
+
+// Referência estável: se o seletor devolvesse `[]` inline a cada chamada, o
+// zustand nunca veria o valor como "igual" ao anterior e entraria em loop de
+// re-render infinito (React #185) sempre que a loja não tivesse itens no carrinho.
+const EMPTY_ITEMS: CartItem[] = []
 
 interface Variation { id: string; name: string; price: number | string; stock?: number | null }
 interface Category { id: string; name: string; icon?: string | null }
@@ -54,7 +59,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
   reviews?: Review[]; photos?: string[]
 }) {
   const { addItem, storeTotal } = useCartStore()
-  const storeItems = useCartStore(s => s.stores.find(g => g.storeId === store.id)?.items ?? [])
+  const storeItems = useCartStore(s => s.stores.find(g => g.storeId === store.id)?.items ?? EMPTY_ITEMS)
   const [query, setQuery] = useState('')
   const { user } = useAuth()
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
@@ -311,7 +316,7 @@ function ProductCard({ product, storeId, onAdd }: {
     product.variations?.find(v => !isOut(v.stock)) ?? product.variations?.[0],
   )
   const price = Number(selectedVar?.price ?? product.basePrice ?? 0)
-  const items = useCartStore(s => s.stores.find(g => g.storeId === storeId)?.items ?? [])
+  const items = useCartStore(s => s.stores.find(g => g.storeId === storeId)?.items ?? EMPTY_ITEMS)
   const qty = items.filter(
     i => i.productId === product.id && i.variationId === selectedVar?.id
   ).reduce((a, i) => a + i.quantity, 0)
