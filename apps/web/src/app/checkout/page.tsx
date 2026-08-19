@@ -8,7 +8,12 @@ import { useAuth } from '@/hooks/useAuth'
 import { validateCardForm } from '@/lib/cardValidation'
 import { geocodeAddress } from '@/lib/geocoding'
 import Image from 'next/image'
+import Script from 'next/script'
 import styles from './page.module.css'
+
+declare global {
+  interface Window { MP_DEVICE_SESSION_ID?: string }
+}
 
 const MP_PUBLIC_KEY = process.env.NEXT_PUBLIC_MP_PUBLIC_KEY ?? ''
 
@@ -136,6 +141,9 @@ export default function CheckoutPage() {
         idempotencyKey: idemKey.current,
         items: items.map(i => ({ productId: i.productId, variationId: i.variationId, quantity: i.quantity })),
         couponCode: coupon?.code,
+        // Fingerprint do dispositivo (security.js do MP) — reduz recusa de cartão
+        // por antifraude (cc_rejected_high_risk). Só existe depois do script carregar.
+        deviceId: typeof window !== 'undefined' ? window.MP_DEVICE_SESSION_ID : undefined,
       })
 
       clear()
@@ -196,6 +204,8 @@ export default function CheckoutPage() {
   return (
     <>
       <Navbar />
+      {/* Fingerprint do dispositivo pro antifraude do MP — carrega assim que a tela de pagamento abre */}
+      <Script src="https://www.mercadopago.com/v2/security.js" strategy="afterInteractive" {...{ view: 'checkout' }} />
       <div className="container" style={{ padding: '32px 20px 60px', maxWidth: 680 }}>
         <h1 className={styles.title}>Finalizar pedido</h1>
 
