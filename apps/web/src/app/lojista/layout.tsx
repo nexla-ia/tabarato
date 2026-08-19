@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { LayoutDashboard, ReceiptText, Package, Ticket, Wallet, Star, Settings, LogOut, Lock } from 'lucide-react'
+import { LayoutDashboard, ReceiptText, Package, Ticket, Wallet, Star, BarChart3, Settings, LogOut, Lock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import { Store, Order, isOrderLate } from '@/lib/types'
@@ -21,12 +21,13 @@ const NAV = [
   { href: '/lojista/cupons',   label: 'Cupons',         Icon: Ticket, lockable: true },
   { href: '/lojista/carteira', label: 'Carteira',       Icon: Wallet, lockable: true },
   { href: '/lojista/avaliacoes', label: 'Avaliações',   Icon: Star, lockable: true },
+  { href: '/lojista/analytics', label: 'Analytics',     Icon: BarChart3, lockable: true },
   { href: '/lojista/config',   label: 'Configurações',  Icon: Settings },
 ]
 
-// Só libera Pedidos/Produtos/Cupons/Carteira/Avaliações com a loja aprovada —
+// Só libera Pedidos/Produtos/Cupons/Carteira/Avaliações/Analytics com a loja aprovada —
 // antes disso não tem pedido, saldo nem avaliação de verdade ainda.
-const LOCKED_PATHS = ['/lojista/pedidos', '/lojista/produtos', '/lojista/cupons', '/lojista/carteira', '/lojista/avaliacoes']
+const LOCKED_PATHS = ['/lojista/pedidos', '/lojista/produtos', '/lojista/cupons', '/lojista/carteira', '/lojista/avaliacoes', '/lojista/analytics']
 
 export default function LojistaLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
