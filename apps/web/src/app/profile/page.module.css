@@ -93,6 +93,24 @@
 .loyaltyTxPos { font-size: 13.5px; font-weight: 800; color: var(--green); flex-shrink: 0; }
 .loyaltyTxNeg { font-size: 13.5px; font-weight: 800; color: #DC2626; flex-shrink: 0; }
 
+.referralRow {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px;
+}
+.referralCode {
+  flex: 1;
+  font-family: var(--display); font-size: 20px; font-weight: 800; letter-spacing: 2px;
+  color: var(--orange-dark); background: var(--orange-light);
+  border-radius: 12px; padding: 14px 18px; text-align: center;
+}
+.referralIconBtn {
+  width: 46px; height: 46px; flex-shrink: 0;
+  border-radius: 12px; border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); transition: border-color 0.15s, color 0.15s;
+}
+.referralIconBtn:hover { border-color: var(--orange); color: var(--orange); }
+
 .label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 .input {
   width: 100%;

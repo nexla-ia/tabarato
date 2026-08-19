@@ -33,4 +33,9 @@ export class RegisterDto {
   @IsEnum(UserRole)
   @IsOptional()
   role?: UserRole
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  referralCode?: string
 }

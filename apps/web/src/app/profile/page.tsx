@@ -2,7 +2,7 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ShoppingBag, LayoutDashboard, Store as StoreIcon, ChevronRight, Eye, EyeOff, Award } from 'lucide-react'
+import { ShoppingBag, LayoutDashboard, Store as StoreIcon, ChevronRight, Eye, EyeOff, Award, Gift, Copy, Check, Share2 } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -22,6 +22,7 @@ interface Address {
 interface UserProfile { id: string; name: string; email: string; phone?: string; role: string }
 interface LoyaltyTx { id: string; points: number; type: string; description?: string | null; createdAt: string }
 interface LoyaltyAccount { points: number; lifetimePoints: number; transactions: LoyaltyTx[] }
+interface Referral { referralCode: string; shareText: string }
 
 const TX_LABEL: Record<string, string> = { EARN: 'Ganhou', REDEEM: 'Resgatou', BONUS: 'Bônus' }
 function fmtDate(d: string) { return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) }
@@ -33,6 +34,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [addresses, setAddresses] = useState<Address[]>([])
   const [loyalty, setLoyalty] = useState<LoyaltyAccount | null>(null)
+  const [referral, setReferral] = useState<Referral | null>(null)
+  const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
 
@@ -72,7 +75,28 @@ export default function ProfilePage() {
     api.get<LoyaltyAccount>('/users/me/loyalty')
       .then((l) => setLoyalty(l.data))
       .catch(() => {})
+
+    api.get<Referral>('/users/me/referral')
+      .then((r) => setReferral(r.data))
+      .catch(() => {})
   }, [user, ready])
+
+  async function handleCopyReferral() {
+    if (!referral) return
+    try {
+      await navigator.clipboard.writeText(referral.referralCode)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {}
+  }
+
+  async function handleShareReferral() {
+    if (!referral) return
+    if (navigator.share) {
+      try { await navigator.share({ text: referral.shareText }); return } catch { return }
+    }
+    handleCopyReferral()
+  }
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
@@ -238,6 +262,25 @@ export default function ProfilePage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Indicação */}
+            {referral && (
+              <div className={styles.card}>
+                <div className={styles.sectionTitle}><Gift size={16} style={{ verticalAlign: -2, marginRight: 6 }} /> Indique amigos</div>
+                <p className={styles.loyaltyHint}>
+                  Compartilhe seu código com amigos. Quando eles se cadastrarem, vocês dois ganham 50 pontos de bônus.
+                </p>
+                <div className={styles.referralRow}>
+                  <div className={styles.referralCode}>{referral.referralCode}</div>
+                  <button className={styles.referralIconBtn} onClick={handleCopyReferral} title="Copiar código">
+                    {copied ? <Check size={16} /> : <Copy size={16} />}
+                  </button>
+                </div>
+                <button className={styles.saveBtn} onClick={handleShareReferral} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <Share2 size={16} /> Compartilhar convite
+                </button>
               </div>
             )}
 

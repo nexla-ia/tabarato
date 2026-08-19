@@ -1,7 +1,7 @@
 'use client'
-import { useState, FormEvent } from 'react'
+import { useState, useEffect, Suspense, FormEvent } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { ArrowLeft, ShoppingBag, Store, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -10,15 +10,30 @@ import { formatPhone, onlyDigits } from '@/lib/masks'
 import styles from '../login/page.module.css'
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
+  )
+}
+
+function RegisterForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { login } = useAuth()
   const [name, setName]         = useState('')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [phone, setPhone]       = useState('')
+  const [referralCode, setReferralCode] = useState('')
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
+
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref) setReferralCode(ref.toUpperCase())
+  }, [searchParams])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -26,6 +41,7 @@ export default function RegisterPage() {
     try {
       const { data } = await api.post('/auth/register', {
         name, email, password, phone: onlyDigits(phone) || undefined, role: 'CONSUMER',
+        referralCode: referralCode.trim() || undefined,
       })
       login(data.accessToken, data.user)
       router.push('/')
@@ -76,6 +92,13 @@ export default function RegisterPage() {
 
           <label className={styles.label}>Telefone (opcional)</label>
           <input className={styles.input} type="tel" value={phone} onChange={e => setPhone(formatPhone(e.target.value))} placeholder="(69) 99999-9999" />
+
+          <label className={styles.label}>Código de indicação (opcional)</label>
+          <input
+            className={styles.input} type="text" value={referralCode}
+            onChange={e => setReferralCode(e.target.value.toUpperCase())}
+            placeholder="Ex: A1B2C3D4" maxLength={20}
+          />
 
           <label className={styles.label}>Senha</label>
           <div className={styles.passField}>

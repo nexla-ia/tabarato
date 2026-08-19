@@ -25,9 +25,9 @@ export class AuthService {
 
     // Find referrer if referral code provided
     let referrerId: string | undefined
-    if ((dto as any).referralCode) {
+    if (dto.referralCode) {
       const referrer = await this.prisma.user.findUnique({
-        where: { referralCode: (dto as any).referralCode.toUpperCase() },
+        where: { referralCode: dto.referralCode.toUpperCase() },
       })
       if (referrer) referrerId = referrer.id
     }
