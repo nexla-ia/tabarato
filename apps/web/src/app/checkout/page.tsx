@@ -62,6 +62,10 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Fidelidade: 100 pontos = R$10, resgate só em blocos de 100.
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0)
+  const [pointsToRedeem, setPointsToRedeem] = useState(0)
+
   // Card fields
   const [cardNumber, setCardNumber] = useState('')
   const [cardHolder, setCardHolder] = useState('')
@@ -81,12 +85,17 @@ export default function CheckoutPage() {
   const [polling, setPolling] = useState(false)
 
   const isCard = payMethod === 'CREDIT_CARD' || payMethod === 'DEBIT_CARD'
+  // Teto do cliente é só uma estimativa (o back é quem valida de verdade): não
+  // deixa resgatar mais pontos do que o saldo, nem mais que ~o subtotal em blocos de 100.
+  const maxRedeemable = Math.min(loyaltyPoints, Math.floor(total() / 10) * 100)
 
   useEffect(() => {
     api.get<Address[]>('/users/me/addresses').then(r => {
       setAddresses(r.data)
       if (r.data.length > 0) setSelectedAddr(r.data.find(a => (a as any).isDefault)?.id ?? r.data[0].id)
     }).catch(() => {})
+
+    api.get<{ points: number }>('/users/me/loyalty').then(r => setLoyaltyPoints(r.data.points)).catch(() => {})
   }, [])
 
   async function saveAddress(e: FormEvent) {
@@ -144,6 +153,7 @@ export default function CheckoutPage() {
         // Fingerprint do dispositivo (security.js do MP) — reduz recusa de cartão
         // por antifraude (cc_rejected_high_risk). Só existe depois do script carregar.
         deviceId: typeof window !== 'undefined' ? window.MP_DEVICE_SESSION_ID : undefined,
+        pointsToRedeem: pointsToRedeem > 0 ? pointsToRedeem : undefined,
       })
 
       clear()
@@ -327,6 +337,36 @@ export default function CheckoutPage() {
             <div className={styles.summaryRow}>
               <span>Entrega</span><span>{coupon?.freeShipping ? 'Grátis' : 'calculado no pedido'}</span>
             </div>
+
+            {maxRedeemable >= 100 && (
+              <>
+                <div className={styles.summaryDivider} />
+                <div className={styles.loyaltyRow}>
+                  <div className={styles.loyaltyInfo}>
+                    <span className={styles.loyaltyLabel}>Usar pontos de fidelidade</span>
+                    <span className={styles.loyaltyBalance}>Saldo: {loyaltyPoints} pts (100 pts = R$10)</span>
+                  </div>
+                  <div className={styles.loyaltyStepper}>
+                    <button
+                      type="button" className={styles.loyaltyStepBtn}
+                      onClick={() => setPointsToRedeem(p => Math.max(0, p - 100))}
+                      disabled={pointsToRedeem <= 0}
+                    >−</button>
+                    <span className={styles.loyaltyStepVal}>{pointsToRedeem}</span>
+                    <button
+                      type="button" className={styles.loyaltyStepBtn}
+                      onClick={() => setPointsToRedeem(p => Math.min(maxRedeemable, p + 100))}
+                      disabled={pointsToRedeem >= maxRedeemable}
+                    >+</button>
+                  </div>
+                </div>
+                {pointsToRedeem > 0 && (
+                  <div className={styles.summaryRow}>
+                    <span>Desconto por pontos</span><span>-{fmtBRL(pointsToRedeem / 100 * 10)}</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </section>
 

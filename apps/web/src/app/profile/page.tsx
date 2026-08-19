@@ -2,7 +2,7 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ShoppingBag, LayoutDashboard, Store as StoreIcon, ChevronRight, Eye, EyeOff } from 'lucide-react'
+import { ShoppingBag, LayoutDashboard, Store as StoreIcon, ChevronRight, Eye, EyeOff, Award } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -20,6 +20,11 @@ interface Address {
 }
 
 interface UserProfile { id: string; name: string; email: string; phone?: string; role: string }
+interface LoyaltyTx { id: string; points: number; type: string; description?: string | null; createdAt: string }
+interface LoyaltyAccount { points: number; lifetimePoints: number; transactions: LoyaltyTx[] }
+
+const TX_LABEL: Record<string, string> = { EARN: 'Ganhou', REDEEM: 'Resgatou', BONUS: 'Bônus' }
+function fmtDate(d: string) { return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) }
 
 export default function ProfilePage() {
   const { user, ready, logout } = useAuth()
@@ -27,6 +32,7 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [addresses, setAddresses] = useState<Address[]>([])
+  const [loyalty, setLoyalty] = useState<LoyaltyAccount | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
 
@@ -61,6 +67,10 @@ export default function ProfilePage() {
 
     api.get<Address[]>('/users/me/addresses')
       .then((a) => setAddresses(a.data))
+      .catch(() => {})
+
+    api.get<LoyaltyAccount>('/users/me/loyalty')
+      .then((l) => setLoyalty(l.data))
       .catch(() => {})
   }, [user, ready])
 
@@ -196,6 +206,40 @@ export default function ProfilePage() {
                 <ChevronRight size={18} className={styles.quickChev} />
               </Link>
             </div>
+
+            {/* Fidelidade */}
+            {loyalty && (
+              <div className={styles.card}>
+                <div className={styles.sectionTitle}><Award size={16} style={{ verticalAlign: -2, marginRight: 6 }} /> Fidelidade</div>
+                <div className={styles.loyaltyHero}>
+                  <div>
+                    <div className={styles.loyaltyPoints}>{loyalty.points}</div>
+                    <div className={styles.loyaltyPointsLabel}>pontos disponíveis</div>
+                  </div>
+                  <div className={styles.loyaltyWorth}>
+                    ≈ {(loyalty.points / 100 * 10).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em desconto
+                  </div>
+                </div>
+                <p className={styles.loyaltyHint}>
+                  Ganhe 1 ponto pra cada R$1 em pedidos entregues. A cada 100 pontos, resgate R$10 de desconto no checkout.
+                </p>
+                {loyalty.transactions.length > 0 && (
+                  <div className={styles.loyaltyList}>
+                    {loyalty.transactions.slice(0, 6).map((tx) => (
+                      <div key={tx.id} className={styles.loyaltyTx}>
+                        <div>
+                          <div className={styles.loyaltyTxDesc}>{tx.description ?? TX_LABEL[tx.type] ?? tx.type}</div>
+                          <div className={styles.loyaltyTxDate}>{fmtDate(tx.createdAt)}</div>
+                        </div>
+                        <span className={tx.type === 'REDEEM' ? styles.loyaltyTxNeg : styles.loyaltyTxPos}>
+                          {tx.type === 'REDEEM' ? '−' : '+'}{Math.abs(tx.points)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Edit profile */}
             <div className={styles.card}>
