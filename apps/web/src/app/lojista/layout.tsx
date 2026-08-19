@@ -9,6 +9,7 @@ import { api } from '@/lib/api'
 import { Store, Order, isOrderLate } from '@/lib/types'
 import { playNewOrderSound, playLateOrderAlert } from '@/lib/notifySound'
 import { Spinner } from '@/components/Spinner'
+import { NotificationBell } from '@/components/NotificationBell'
 import styles from './layout.module.css'
 
 interface MpStatus { enabled: boolean; connected: boolean }
@@ -119,10 +120,11 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
           <div className={styles.brandMark}>TB</div>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div className={styles.brandName}>Tá Barato</div>
             <div className={styles.brandTag}>LOJISTA</div>
           </div>
+          <NotificationBell variant="dark" getOrderHref={() => '/lojista/pedidos'} />
         </div>
 
         <nav className={styles.nav}>

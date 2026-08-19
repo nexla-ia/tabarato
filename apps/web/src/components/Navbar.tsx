@@ -5,6 +5,7 @@ import { ShoppingBag, LogOut, ShoppingCart, MapPin, ChevronDown, Heart } from 'l
 import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
 import { useCartStore } from '@/stores/cart'
+import { NotificationBell } from './NotificationBell'
 import styles from './Navbar.module.css'
 
 export function Navbar() {
@@ -40,6 +41,7 @@ export function Navbar() {
 
           {user ? (
             <>
+              <NotificationBell variant="light" />
               <Link href="/favorites" className={`${styles.iconBtn} ${pathname.startsWith('/favorites') ? styles.iconBtnActive : ''}`} title="Lojas favoritas">
                 <Heart size={20} />
               </Link>
