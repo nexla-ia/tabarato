@@ -84,6 +84,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     basePrice: product.basePrice,
     stock: product.stock,
     hasVariations: product.hasVariations,
+    promoBuyQty: product.promoBuyQty ?? null,
+    promoPayQty: product.promoPayQty ?? null,
     avgRating: product.avgRating ?? null,
     reviewCount: product.reviewCount ?? 0,
     soldCount: product.soldCount ?? 0,

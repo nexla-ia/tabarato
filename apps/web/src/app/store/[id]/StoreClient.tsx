@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Phone, Store as StoreIcon, Heart } from 'lucide-react'
 import { useCartStore, CartItem } from '@/stores/cart'
+import { promoLabel } from '@/lib/promo'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import { formatPhone } from '@/lib/masks'
@@ -22,6 +23,7 @@ interface Product {
   imageUrl?: string; basePrice?: number | string; isActive: boolean
   stock?: number | null
   hasVariations?: boolean
+  promoBuyQty?: number | null; promoPayQty?: number | null
   variations?: Variation[]
   category?: Category | null
 }
@@ -94,6 +96,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
     addItem(store.id, store.name, {
       productId: product.id, variationId: variation?.id, name: product.name,
       price, quantity: 1, imageUrl: product.imageUrl ?? undefined, variationName: variation?.name,
+      promoBuyQty: product.promoBuyQty, promoPayQty: product.promoPayQty,
     }, user?.id)
   }
 
@@ -337,6 +340,13 @@ function ProductCard({ product, storeId, onAdd }: {
           : <div className={styles.productImgFallback}>📦</div>
         }
         {outOfStock && <span className={styles.outRibbon}>Esgotado</span>}
+        {!outOfStock && promoLabel(product.promoBuyQty, product.promoPayQty) && (
+          <span style={{
+            position: 'absolute', top: 8, left: 8, zIndex: 2,
+            background: '#16A34A', color: '#fff', fontSize: 11, fontWeight: 800,
+            padding: '3px 8px', borderRadius: 8, letterSpacing: 0.2,
+          }}>{promoLabel(product.promoBuyQty, product.promoPayQty)}</span>
+        )}
       </Link>
       <div className={styles.productInfo}>
         <Link href={`/product/${product.id}`} className={styles.nameLink}><h3 className={styles.productName}>{product.name}</h3></Link>

@@ -57,6 +57,8 @@ export interface Product {
   isActive: boolean
   categoryId?: string | null
   variations?: ProductVariation[]
+  promoBuyQty?: number | null
+  promoPayQty?: number | null
 }
 
 export interface Coupon {

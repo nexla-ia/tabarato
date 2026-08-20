@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft, Tag, X, Store as StoreIcon } from 'lucide-react'
 import { useCartStore, StoreCart, CartItem, AppliedCoupon } from '@/stores/cart'
+import { promoLabel, promoDiscountFor } from '@/lib/promo'
 import { api } from '@/lib/api'
 import { Navbar } from '@/components/Navbar'
 import styles from './page.module.css'
@@ -33,9 +34,11 @@ export default function CartPage() {
 
   const subtotal = stores.reduce((acc, s) => acc + s.items.reduce((a, i) => a + i.price * i.quantity, 0), 0)
   const discountTotal = stores.reduce((acc, s) => acc + (s.coupon?.discount ?? 0), 0)
+  const promoTotal = Math.round(stores.reduce((acc, s) =>
+    acc + s.items.reduce((a, i) => a + promoDiscountFor(i.quantity, i.price, i.promoBuyQty, i.promoPayQty), 0), 0) * 100) / 100
   const freeStores = stores.filter(s => s.coupon?.freeShipping).length
   const deliveryEstimate = (stores.length - freeStores) * DELIVERY_ESTIMATE
-  const orderTotal = Math.max(0, subtotal - discountTotal) + deliveryEstimate
+  const orderTotal = Math.max(0, subtotal - discountTotal - promoTotal) + deliveryEstimate
 
   return (
     <>
@@ -68,6 +71,12 @@ export default function CartPage() {
               <span>Subtotal</span>
               <span>{fmtBRL(subtotal)}</span>
             </div>
+            {promoTotal > 0 && (
+              <div className={`${styles.summaryRow} ${styles.summaryDiscount}`}>
+                <span>Promoções</span>
+                <span>-{fmtBRL(promoTotal)}</span>
+              </div>
+            )}
             {discountTotal > 0 && (
               <div className={`${styles.summaryRow} ${styles.summaryDiscount}`}>
                 <span>Cupons</span>
@@ -111,6 +120,7 @@ function StoreGroupCard({ storeCart, onUpdateQty, onRemoveItem, onClearStore }: 
   const [couponError, setCouponError] = useState('')
 
   const storeSubtotal = storeCart.items.reduce((a, i) => a + i.price * i.quantity, 0)
+  const storePromo = Math.round(storeCart.items.reduce((a, i) => a + promoDiscountFor(i.quantity, i.price, i.promoBuyQty, i.promoPayQty), 0) * 100) / 100
   const coupon = storeCart.coupon
 
   async function applyCoupon() {
@@ -167,6 +177,17 @@ function StoreGroupCard({ storeCart, onUpdateQty, onRemoveItem, onClearStore }: 
             <span className={styles.itemName}>{item.name}</span>
             {item.variationName && <span className={styles.itemVar}>{item.variationName}</span>}
             <span className={styles.itemPrice}>{fmtBRL(item.price)}</span>
+            {promoLabel(item.promoBuyQty, item.promoPayQty) && (
+              <span style={{
+                alignSelf: 'flex-start', marginTop: 3, background: '#DCFCE7', color: '#15803D',
+                fontSize: 11, fontWeight: 800, padding: '2px 7px', borderRadius: 7,
+              }}>
+                🏷️ {promoLabel(item.promoBuyQty, item.promoPayQty)}
+                {promoDiscountFor(item.quantity, item.price, item.promoBuyQty, item.promoPayQty) > 0
+                  ? ` · -${fmtBRL(promoDiscountFor(item.quantity, item.price, item.promoBuyQty, item.promoPayQty))}`
+                  : ''}
+              </span>
+            )}
           </div>
           <div className={styles.itemActions}>
             <div className={styles.qty}>
@@ -222,9 +243,15 @@ function StoreGroupCard({ storeCart, onUpdateQty, onRemoveItem, onClearStore }: 
         {couponError && <p className={styles.couponError}>{couponError}</p>}
       </div>
 
+      {storePromo > 0 && (
+        <div className={styles.storeGroupTotal} style={{ color: '#15803D', fontWeight: 700 }}>
+          <span>🏷️ Promoções</span>
+          <span>-{fmtBRL(storePromo)}</span>
+        </div>
+      )}
       <div className={styles.storeGroupTotal}>
         <span>Subtotal · {storeCart.storeName}</span>
-        <span>{fmtBRL(storeSubtotal)}</span>
+        <span>{fmtBRL(Math.max(0, storeSubtotal - storePromo))}</span>
       </div>
     </div>
   )

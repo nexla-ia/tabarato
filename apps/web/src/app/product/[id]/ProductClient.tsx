@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, ChevronRight, Clock, MapPin, Minus, Plus, ShoppingCart, Package, Star } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
+import { promoLabel } from '@/lib/promo'
 import { useAuth } from '@/hooks/useAuth'
 import { ProductGallery } from './ProductGallery'
 import styles from './ProductClient.module.css'
@@ -15,6 +16,7 @@ interface Product {
   imageUrl?: string | null; images?: string[] | null
   basePrice?: number | string | null
   stock?: number | null; hasVariations?: boolean
+  promoBuyQty?: number | null; promoPayQty?: number | null
   avgRating?: number | null; reviewCount?: number; soldCount?: number
   variations?: Variation[]; category?: Category | null
 }
@@ -113,6 +115,7 @@ export function ProductClient({
     addItem(store.id, store.name, {
       productId: product.id, variationId: selectedVar?.id, name: product.name,
       price, quantity: qty, imageUrl: product.imageUrl ?? undefined, variationName: selectedVar?.name,
+      promoBuyQty: product.promoBuyQty, promoPayQty: product.promoPayQty,
     }, user?.id)
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
@@ -161,6 +164,16 @@ export function ProductClient({
               )}
 
               <div className={styles.price}>{fmtBRL(price)}</div>
+
+              {promoLabel(product.promoBuyQty, product.promoPayQty) && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: '#DCFCE7', color: '#15803D', borderRadius: 12,
+                  padding: '10px 12px', fontSize: 14, fontWeight: 800, margin: '0 0 16px',
+                }}>
+                  🏷️ {promoLabel(product.promoBuyQty, product.promoPayQty)} — leve {product.promoBuyQty} unidades e pague só {product.promoPayQty}!
+                </div>
+              )}
 
               {hasVars && (
                 <div className={styles.varSection}>

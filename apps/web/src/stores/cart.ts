@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { promoDiscountFor } from '@/lib/promo'
 
 export interface CartItem {
   productId: string
@@ -9,6 +10,8 @@ export interface CartItem {
   quantity: number
   imageUrl?: string
   variationName?: string
+  promoBuyQty?: number | null
+  promoPayQty?: number | null
 }
 
 export interface AppliedCoupon {
@@ -38,6 +41,8 @@ interface CartState {
   itemCount: () => number
   total: () => number
   storeTotal: (storeId: string) => number
+  storePromoDiscount: (storeId: string) => number
+  promoTotal: () => number
   setCoupon: (storeId: string, coupon: AppliedCoupon | null) => void
 }
 
@@ -109,6 +114,20 @@ export const useCartStore = create<CartState>()(
         const s = get().stores.find((s) => s.storeId === storeId)
         return s ? s.items.reduce((a, i) => a + i.price * i.quantity, 0) : 0
       },
+
+      // Desconto "Leve X Pague Y" acumulado dos itens da loja (mesma regra do backend).
+      storePromoDiscount: (storeId) => {
+        const s = get().stores.find((s) => s.storeId === storeId)
+        if (!s) return 0
+        return Math.round(
+          s.items.reduce((a, i) => a + promoDiscountFor(i.quantity, i.price, i.promoBuyQty, i.promoPayQty), 0) * 100,
+        ) / 100
+      },
+
+      promoTotal: () => Math.round(
+        get().stores.reduce((acc, s) =>
+          acc + s.items.reduce((a, i) => a + promoDiscountFor(i.quantity, i.price, i.promoBuyQty, i.promoPayQty), 0), 0) * 100,
+      ) / 100,
 
       setCoupon: (storeId, coupon) => set({
         stores: get().stores.map((s) => (s.storeId === storeId ? { ...s, coupon } : s)),

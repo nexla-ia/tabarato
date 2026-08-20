@@ -5,6 +5,7 @@ import { Zap, CreditCard } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useCartStore } from '@/stores/cart'
+import { promoDiscountFor } from '@/lib/promo'
 import { useAuth } from '@/hooks/useAuth'
 import { validateCardForm } from '@/lib/cardValidation'
 import { geocodeAddress } from '@/lib/geocoding'
@@ -50,6 +51,8 @@ export default function CheckoutPage() {
   const { user, ready } = useAuth()
 
   const total = () => stores.reduce((acc, s) => acc + s.items.reduce((a, i) => a + i.price * i.quantity, 0), 0)
+  const promoTotal = () => Math.round(stores.reduce((acc, s) =>
+    acc + s.items.reduce((a, i) => a + promoDiscountFor(i.quantity, i.price, i.promoBuyQty, i.promoPayQty), 0), 0) * 100) / 100
 
   // Chave de idempotência: estável entre retries do mesmo checkout (evita pedido duplicado)
   const idemKey = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`)
@@ -369,6 +372,11 @@ export default function CheckoutPage() {
             <div className={styles.summaryRow}>
               <span>Subtotal</span><span>{fmtBRL(total())}</span>
             </div>
+            {promoTotal() > 0 && (
+              <div className={styles.summaryRow} style={{ color: '#15803D', fontWeight: 700 }}>
+                <span>🏷️ Promoções</span><span>-{fmtBRL(promoTotal())}</span>
+              </div>
+            )}
             <div className={styles.summaryRow}>
               <span>Entrega{stores.length > 1 ? ` (${stores.length} lojas)` : ''}</span>
               <span>{stores.length > 0 && stores.every(s => s.coupon?.freeShipping) ? 'Grátis' : 'calculado no pedido'}</span>

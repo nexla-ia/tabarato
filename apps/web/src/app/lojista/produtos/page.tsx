@@ -21,9 +21,11 @@ interface FormState {
   imageUrl: string
   images: string[]
   isActive: boolean
+  promoBuyQty: string
+  promoPayQty: string
 }
 
-const EMPTY: FormState = { name: '', description: '', basePrice: '', stock: '', categoryId: '', imageUrl: '', images: [], isActive: true }
+const EMPTY: FormState = { name: '', description: '', basePrice: '', stock: '', categoryId: '', imageUrl: '', images: [], isActive: true, promoBuyQty: '', promoPayQty: '' }
 
 export default function ProdutosPage() {
   const qc = useQueryClient()
@@ -41,6 +43,18 @@ export default function ProdutosPage() {
 
   const save = useMutation({
     mutationFn: async (f: FormState) => {
+      // Promoção "Leve X Pague Y": envia os dois ou limpa (null). Valida X > Y.
+      let promoBuyQty: number | null = null
+      let promoPayQty: number | null = null
+      if (f.promoBuyQty.trim() !== '' || f.promoPayQty.trim() !== '') {
+        const buy = parseInt(f.promoBuyQty, 10)
+        const pay = parseInt(f.promoPayQty, 10)
+        if (!buy || !pay || buy < 2 || pay < 1 || buy <= pay) {
+          throw new Error('Promoção inválida: "Leve" deve ser maior que "Pague" (ex.: Leve 3, Pague 2).')
+        }
+        promoBuyQty = buy
+        promoPayQty = pay
+      }
       const payload = {
         name: f.name,
         description: f.description || undefined,
@@ -50,11 +64,14 @@ export default function ProdutosPage() {
         imageUrl: f.imageUrl || undefined,
         images: f.images,
         isActive: f.isActive,
+        promoBuyQty,
+        promoPayQty,
       }
       if (f.id) return (await api.patch(`/products/${f.id}`, payload)).data
       return (await api.post(`/products/store/${storeQ.data!.id}`, payload)).data
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['products-my'] }); setForm(null) },
+    onError: (e: any) => alert(e?.response?.data?.message ?? e?.message ?? 'Não foi possível salvar o produto.'),
   })
 
   async function handleImageFile(file: File) {
@@ -130,6 +147,8 @@ export default function ProdutosPage() {
       id: p.id, name: p.name, description: p.description ?? '',
       basePrice: String(Math.round(Number(p.basePrice) * 100)), stock: p.stock == null ? '' : String(p.stock),
       categoryId: p.categoryId ?? '', imageUrl: p.imageUrl ?? '', images: p.images ?? [], isActive: p.isActive,
+      promoBuyQty: p.promoBuyQty != null ? String(p.promoBuyQty) : '',
+      promoPayQty: p.promoPayQty != null ? String(p.promoPayQty) : '',
     })
   }
 
@@ -244,6 +263,31 @@ export default function ProdutosPage() {
                 <input className={styles.input} type="number" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} placeholder="vazio = livre" />
               </div>
             </div>
+
+            <label className={styles.label}>Promoção — Leve X Pague Y (opcional)</label>
+            <div className={styles.row}>
+              <div style={{ flex: 1 }}>
+                <input
+                  className={styles.input} inputMode="numeric" maxLength={2}
+                  value={form.promoBuyQty}
+                  onChange={e => setForm({ ...form, promoBuyQty: onlyDigits(e.target.value) })}
+                  placeholder="Leve (ex.: 3)"
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <input
+                  className={styles.input} inputMode="numeric" maxLength={2}
+                  value={form.promoPayQty}
+                  onChange={e => setForm({ ...form, promoPayQty: onlyDigits(e.target.value) })}
+                  placeholder="Pague (ex.: 2)"
+                />
+              </div>
+            </div>
+            {form.promoBuyQty && form.promoPayQty && Number(form.promoBuyQty) > Number(form.promoPayQty) && (
+              <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 700, color: '#15803D' }}>
+                🏷️ Cliente leva {form.promoBuyQty} e paga {form.promoPayQty} — {Number(form.promoBuyQty) - Number(form.promoPayQty)} grátis a cada {form.promoBuyQty}.
+              </p>
+            )}
 
             <label className={styles.label}>Categoria</label>
             <CategorySelect

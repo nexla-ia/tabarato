@@ -48,6 +48,8 @@ export default async function StorePage({ params }: { params: Promise<{ id: stri
       basePrice: p.basePrice,
       stock: p.stock,
       isActive: p.isActive,
+      promoBuyQty: p.promoBuyQty ?? null,
+      promoPayQty: p.promoPayQty ?? null,
       category: p.category ? { id: p.category.id, name: p.category.name } : null,
       variations: (p.variations ?? []).map((v: any) => ({
         id: v.id, name: v.name, price: v.price, stock: v.stock, isActive: v.isActive,
