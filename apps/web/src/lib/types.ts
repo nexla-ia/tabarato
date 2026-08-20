@@ -41,6 +41,9 @@ export interface Store {
 export interface ProductVariation {
   id: string
   name: string
+  size?: string | null
+  color?: string | null
+  sku?: string | null
   price: number | string
   stock?: number | null
   isActive: boolean

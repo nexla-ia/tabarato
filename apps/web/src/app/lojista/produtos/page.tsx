@@ -1,9 +1,9 @@
 'use client'
 import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus, TriangleAlert } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus, TriangleAlert, Layers } from 'lucide-react'
 import { api } from '@/lib/api'
-import { Product, Store, Category, money } from '@/lib/types'
+import { Product, ProductVariation, Store, Category, money } from '@/lib/types'
 import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
 import { CategorySelect } from '@/components/CategorySelect'
 import { Spinner } from '@/components/Spinner'
@@ -30,6 +30,7 @@ const EMPTY: FormState = { name: '', description: '', basePrice: '', stock: '', 
 export default function ProdutosPage() {
   const qc = useQueryClient()
   const [form, setForm] = useState<FormState | null>(null)
+  const [variationsProduct, setVariationsProduct] = useState<Product | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imageError, setImageError] = useState('')
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -220,6 +221,21 @@ export default function ProdutosPage() {
                   <span className={styles.slider} />
                 </label>
                 <div className={styles.cardActions}>
+                  <button
+                    className={styles.iconBtn}
+                    onClick={() => setVariationsProduct(p)}
+                    title="Variações"
+                    style={{ position: 'relative' }}
+                  >
+                    <Layers size={15} />
+                    {!!p.variations?.length && (
+                      <span style={{
+                        position: 'absolute', top: -5, right: -5, background: 'var(--primary, #FF6600)',
+                        color: '#fff', fontSize: 9, fontWeight: 800, minWidth: 15, height: 15,
+                        borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
+                      }}>{p.variations.length}</span>
+                    )}
+                  </button>
                   <button className={styles.iconBtn} onClick={() => edit(p)} title="Editar"><Pencil size={15} /></button>
                   <button
                     className={`${styles.iconBtn} ${styles.danger}`}
@@ -363,6 +379,179 @@ export default function ProdutosPage() {
           </div>
         </div>
       )}
+
+      {variationsProduct && (
+        <VariationsModal
+          product={variationsProduct}
+          onClose={() => setVariationsProduct(null)}
+          onChanged={() => qc.invalidateQueries({ queryKey: ['products-my'] })}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Gerenciador de variações (tamanho/cor/preço/estoque) de um produto ──────
+interface VarFormState { id?: string; name: string; price: string; size: string; color: string; stock: string }
+const EMPTY_VAR: VarFormState = { name: '', price: '', size: '', color: '', stock: '' }
+
+function VariationsModal({ product, onClose, onChanged }: {
+  product: Product
+  onClose: () => void
+  onChanged: () => void
+}) {
+  const qc = useQueryClient()
+  const [vf, setVf] = useState<VarFormState>(EMPTY_VAR)
+
+  const varsQ = useQuery<ProductVariation[]>({
+    queryKey: ['variations', product.id],
+    queryFn: async () => (await api.get(`/products/${product.id}/variations`)).data,
+  })
+
+  function afterChange() {
+    qc.invalidateQueries({ queryKey: ['variations', product.id] })
+    onChanged()
+  }
+
+  const save = useMutation({
+    mutationFn: async (f: VarFormState) => {
+      const payload = {
+        name: f.name.trim(),
+        price: moneyInputToNumber(f.price),
+        size: f.size.trim() || undefined,
+        color: f.color.trim() || undefined,
+        stock: f.stock === '' ? undefined : Number(f.stock),
+      }
+      if (f.id) return (await api.patch(`/products/variations/${f.id}`, payload)).data
+      return (await api.post(`/products/${product.id}/variations`, payload)).data
+    },
+    onSuccess: () => { setVf(EMPTY_VAR); afterChange() },
+    onError: (e: any) => alert(e?.response?.data?.message ?? 'Não foi possível salvar a variação.'),
+  })
+  const toggle = useMutation({
+    mutationFn: async (id: string) => (await api.patch(`/products/variations/${id}/toggle`)).data,
+    onSuccess: afterChange,
+  })
+  const remove = useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/products/variations/${id}`)).data,
+    onSuccess: () => { setVf((f) => (f.id ? EMPTY_VAR : f)); afterChange() },
+  })
+
+  const vars = varsQ.data ?? []
+  const canSave = vf.name.trim() !== '' && vf.price !== ''
+
+  return (
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHead}>
+          <h3>Variações — {product.name}</h3>
+          <button onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <p className={styles.hint} style={{ marginTop: 0 }}>
+          Variações (tamanho, cor, sabor) têm preço e estoque próprios. Quando o produto tem variações, o cliente escolhe uma antes de adicionar.
+        </p>
+
+        {/* Lista de variações */}
+        {varsQ.isLoading ? (
+          <Spinner />
+        ) : vars.length === 0 ? (
+          <div className={styles.empty} style={{ padding: '20px 0' }}>
+            <Layers size={26} strokeWidth={1.5} />
+            <p>Nenhuma variação ainda.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+            {vars.map((v) => (
+              <div key={v.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                border: '1px solid var(--border, #eee)', borderRadius: 10, opacity: v.isActive ? 1 : 0.55,
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {v.name}
+                    {(v.size || v.color) && (
+                      <span style={{ fontWeight: 400, color: 'var(--muted, #999)', fontSize: 12 }}>
+                        {' '}· {[v.size, v.color].filter(Boolean).join(' / ')}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--muted, #777)' }}>
+                    {money(v.price)}{v.stock != null ? ` · ${v.stock} un.` : ' · estoque livre'}
+                  </div>
+                </div>
+                <label className={styles.switch} title={v.isActive ? 'Ativa' : 'Inativa'}>
+                  <input type="checkbox" checked={v.isActive} onChange={() => toggle.mutate(v.id)} />
+                  <span className={styles.slider} />
+                </label>
+                <button
+                  className={styles.iconBtn}
+                  onClick={() => setVf({
+                    id: v.id, name: v.name, price: String(Math.round(Number(v.price) * 100)),
+                    size: v.size ?? '', color: v.color ?? '', stock: v.stock == null ? '' : String(v.stock),
+                  })}
+                  title="Editar"
+                ><Pencil size={14} /></button>
+                <button
+                  className={`${styles.iconBtn} ${styles.danger}`}
+                  onClick={() => { if (confirm(`Excluir a variação "${v.name}"?`)) remove.mutate(v.id) }}
+                  title="Excluir"
+                ><Trash2 size={14} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Form add/editar */}
+        <div style={{ borderTop: '1px solid var(--border, #eee)', paddingTop: 14 }}>
+          <label className={styles.label}>{vf.id ? 'Editar variação' : 'Nova variação'}</label>
+          <input
+            className={styles.input} value={vf.name}
+            onChange={e => setVf({ ...vf, name: e.target.value })}
+            placeholder="Nome (ex.: Grande, 500ml, Azul) *"
+          />
+          <div className={styles.row}>
+            <div style={{ flex: 1 }}>
+              <label className={styles.label}>Preço (R$) *</label>
+              <input
+                className={styles.input} inputMode="numeric"
+                value={formatMoneyInput(vf.price)}
+                onChange={e => setVf({ ...vf, price: onlyDigits(e.target.value) })}
+                placeholder="0,00"
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className={styles.label}>Estoque</label>
+              <input
+                className={styles.input} type="number" value={vf.stock}
+                onChange={e => setVf({ ...vf, stock: e.target.value })}
+                placeholder="vazio = livre"
+              />
+            </div>
+          </div>
+          <div className={styles.row}>
+            <div style={{ flex: 1 }}>
+              <label className={styles.label}>Tamanho</label>
+              <input className={styles.input} value={vf.size} onChange={e => setVf({ ...vf, size: e.target.value })} placeholder="opcional" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className={styles.label}>Cor</label>
+              <input className={styles.input} value={vf.color} onChange={e => setVf({ ...vf, color: e.target.value })} placeholder="opcional" />
+            </div>
+          </div>
+
+          <div className={styles.modalActions}>
+            {vf.id && <button className={styles.modalCancel} onClick={() => setVf(EMPTY_VAR)}>Cancelar edição</button>}
+            <button
+              className={styles.modalConfirm}
+              onClick={() => save.mutate(vf)}
+              disabled={save.isPending || !canSave}
+            >
+              {save.isPending ? 'Salvando…' : vf.id ? 'Salvar variação' : 'Adicionar variação'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
