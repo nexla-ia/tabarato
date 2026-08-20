@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { GoogleSignInButton } from '@/components/GoogleSignInButton'
 import styles from './page.module.css'
 
 export default function LoginPage() {
@@ -17,24 +18,29 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
 
+  // Pós-login (comum a e-mail/senha e Google): salva a sessão e redireciona.
+  function handleAuthSuccess(data: any) {
+    login(data.accessToken, data.user)
+    // Se veio de uma página protegida (ex.: checkout), volta pra lá.
+    const redirect = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('redirect')
+      : null
+    // startsWith('/') sozinho deixaria passar "//evil.com" (URL protocol-relative);
+    // exige uma barra e não duas, pra garantir que é sempre um caminho interno.
+    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+      router.push(redirect)
+    } else {
+      // Route by role: store owners land on the lojista panel
+      router.push(data.user?.role === 'STORE_OWNER' ? '/lojista' : '/')
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(''); setLoading(true)
     try {
       const { data } = await api.post('/auth/login', { email, password })
-      login(data.accessToken, data.user)
-      // Se veio de uma página protegida (ex.: checkout), volta pra lá.
-      const redirect = typeof window !== 'undefined'
-        ? new URLSearchParams(window.location.search).get('redirect')
-        : null
-      // startsWith('/') sozinho deixaria passar "//evil.com" (URL protocol-relative);
-      // exige uma barra e não duas, pra garantir que é sempre um caminho interno.
-      if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
-        router.push(redirect)
-      } else {
-        // Route by role: store owners land on the lojista panel
-        router.push(data.user?.role === 'STORE_OWNER' ? '/lojista' : '/')
-      }
+      handleAuthSuccess(data)
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Credenciais inválidas')
     } finally {
@@ -83,7 +89,15 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className={styles.footer}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0 16px' }}>
+          <span style={{ flex: 1, height: 1, background: 'var(--border, #ece7e2)' }} />
+          <span style={{ fontSize: 13, color: 'var(--muted, #b0a098)' }}>ou</span>
+          <span style={{ flex: 1, height: 1, background: 'var(--border, #ece7e2)' }} />
+        </div>
+
+        <GoogleSignInButton onAuth={handleAuthSuccess} />
+
+        <p className={styles.footer} style={{ marginTop: 20 }}>
           Não tem conta?{' '}
           <Link href="/register" className={styles.link}>Criar conta grátis</Link>
         </p>

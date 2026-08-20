@@ -30,6 +30,13 @@ interface Product {
 
 // estoque null = ilimitado; <= 0 = esgotado
 function isOut(stock?: number | null) { return stock != null && stock <= 0 }
+// preço "a partir de": menor variação ativa, ou o preço base
+function productPrice(p: Product): number {
+  const vs = (p.variations ?? []).filter(v => !isOut(v.stock))
+  if (vs.length > 0) return Math.min(...vs.map(v => Number(v.price)))
+  if (p.variations && p.variations.length > 0) return Math.min(...p.variations.map(v => Number(v.price)))
+  return Number(p.basePrice ?? 0)
+}
 
 interface Store {
   id: string; name: string; description?: string; logoUrl?: string
@@ -63,6 +70,9 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
   const { addItem, storeTotal } = useCartStore()
   const storeItems = useCartStore(s => s.stores.find(g => g.storeId === store.id)?.items ?? EMPTY_ITEMS)
   const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<'relevance' | 'price_asc' | 'price_desc'>('relevance')
+  const [priceMin, setPriceMin] = useState('')
+  const [priceMax, setPriceMax] = useState('')
   const { user } = useAuth()
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
@@ -212,18 +222,73 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
               />
             </div>
 
+            {/* Filtros: ordenação + faixa de preço */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              <select
+                value={sort}
+                onChange={e => setSort(e.target.value as any)}
+                style={{ padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--border, #e5e5e5)', fontSize: 14, background: 'var(--card, #fff)', color: 'var(--text, #1a0a00)', fontWeight: 600, cursor: 'pointer' }}
+              >
+                <option value="relevance">Ordenar: Relevância</option>
+                <option value="price_asc">Menor preço</option>
+                <option value="price_desc">Maior preço</option>
+              </select>
+              <input
+                inputMode="decimal" value={priceMin}
+                onChange={e => setPriceMin(e.target.value.replace(/[^0-9.,]/g, ''))}
+                placeholder="Preço mín."
+                style={{ width: 110, padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--border, #e5e5e5)', fontSize: 14, background: 'var(--card, #fff)', color: 'var(--text, #1a0a00)' }}
+              />
+              <input
+                inputMode="decimal" value={priceMax}
+                onChange={e => setPriceMax(e.target.value.replace(/[^0-9.,]/g, ''))}
+                placeholder="Preço máx."
+                style={{ width: 110, padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--border, #e5e5e5)', fontSize: 14, background: 'var(--card, #fff)', color: 'var(--text, #1a0a00)' }}
+              />
+              {(sort !== 'relevance' || priceMin || priceMax) && (
+                <button
+                  onClick={() => { setSort('relevance'); setPriceMin(''); setPriceMax('') }}
+                  style={{ padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--border, #e5e5e5)', fontSize: 13, background: 'transparent', color: 'var(--muted, #777)', cursor: 'pointer', fontWeight: 600 }}
+                >Limpar filtros</button>
+              )}
+            </div>
+
             {(() => {
               const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
               const q = norm(query.trim())
-              const filtered = q
+              let filtered = q
                 ? products.filter(p => norm(p.name).includes(q) || norm(p.description ?? '').includes(q))
                 : products
 
+              // Faixa de preço (aceita vírgula ou ponto)
+              const minP = priceMin ? parseFloat(priceMin.replace(',', '.')) : null
+              const maxP = priceMax ? parseFloat(priceMax.replace(',', '.')) : null
+              filtered = filtered.filter(p => {
+                const pr = productPrice(p)
+                if (minP != null && !isNaN(minP) && pr < minP) return false
+                if (maxP != null && !isNaN(maxP) && pr > maxP) return false
+                return true
+              })
+
               if (!filtered.length) {
-                return <div className={styles.empty}>Nenhum produto encontrado para “{query}”.</div>
+                return <div className={styles.empty}>Nenhum produto encontrado{q ? ` para “${query}”` : ''} com esses filtros.</div>
               }
 
-              // agrupa por categoria preservando ordem de aparição
+              // Ordenação por preço → lista única (sem agrupar por categoria)
+              if (sort !== 'relevance') {
+                const sorted = [...filtered].sort((a, b) =>
+                  sort === 'price_asc' ? productPrice(a) - productPrice(b) : productPrice(b) - productPrice(a))
+                return (
+                  <section className={styles.catSection}>
+                    <h3 className={styles.catTitle}>{sort === 'price_asc' ? 'Menor preço' : 'Maior preço'}</h3>
+                    <div className={styles.grid}>
+                      {sorted.map(p => <ProductCard key={p.id} product={p} storeId={store.id} onAdd={handleAdd} />)}
+                    </div>
+                  </section>
+                )
+              }
+
+              // Relevância → agrupa por categoria preservando ordem de aparição
               const groups: { name: string; items: Product[] }[] = []
               for (const p of filtered) {
                 const catName = p.category?.name ?? 'Outros'
