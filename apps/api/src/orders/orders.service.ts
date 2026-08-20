@@ -616,6 +616,10 @@ export class OrdersService {
       couponId = result.coupon.id
       couponMaxUses = (result.coupon as any).maxUses ?? null
       couponFreeShipping = Boolean(result.freeShipping)
+      // Cupom + promoção nunca podem passar do subtotal (senão o pedido zeraria/ficaria
+      // negativo). Limita o cupom ao que sobra depois do desconto progressivo.
+      couponDiscount = Math.min(couponDiscount, Math.max(0, subtotal - promoDiscount))
+      couponDiscount = Math.round(couponDiscount * 100) / 100
     }
 
     return { store, subtotal, promoDiscount, deliveryFee, orderItems, mpItems, stockDecrements, couponDiscount, couponId, couponMaxUses, couponFreeShipping, loyaltyDiscount: 0 }
@@ -701,6 +705,12 @@ export class OrdersService {
       return { discount, total }
     })
     const grandTotal = Math.round(groupTotals.reduce((s, t) => s + t.total, 0) * 100) / 100
+
+    // Guarda: os descontos não podem zerar o pedido — o Mercado Pago não cobra R$0
+    // (e a loja não pode "pagar" o cliente). Se o total ficou <= 0, barra com mensagem.
+    if (grandTotal <= 0) {
+      throw new BadRequestException('Os descontos deixaram o total em R$ 0,00. Remova um cupom ou promoção para continuar.')
+    }
 
     // Split só faz sentido em loja única (não dá pra dividir 1 pagamento entre N vendedores).
     const paidViaSplit = !multiStore && marketplaceOn && ['PIX', 'CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod)
