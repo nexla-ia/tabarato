@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsNumber, IsOptional, IsString, IsUrl, Min } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsInt, IsNumber, IsOptional, IsString, IsUrl, Min } from 'class-validator'
 
 export class CreateProductDto {
   @IsString()
@@ -32,4 +32,15 @@ export class CreateProductDto {
   @IsOptional()
   @Min(0)
   stock?: number
+
+  // Desconto progressivo "Leve X Pague Y". Enviar os dois juntos; null limpa a promoção.
+  @IsInt()
+  @IsOptional()
+  @Min(2)
+  promoBuyQty?: number | null
+
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  promoPayQty?: number | null
 }

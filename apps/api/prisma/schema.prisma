@@ -277,6 +277,9 @@ model Product {
   basePrice      Decimal? @map("base_price")
   maxDeliveryKm  Float?   @map("max_delivery_km")
   stock         Int?
+  // Desconto progressivo "Leve X Pague Y" (ambos nulos = sem promoção)
+  promoBuyQty   Int?     @map("promo_buy_qty")
+  promoPayQty   Int?     @map("promo_pay_qty")
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -321,6 +324,7 @@ model Order {
   discount    Decimal     @default(0)
   couponDiscount  Decimal @default(0) @map("coupon_discount")
   loyaltyDiscount Decimal @default(0) @map("loyalty_discount")
+  promoDiscount   Decimal @default(0) @map("promo_discount")
   freeShipping    Boolean @default(false) @map("free_shipping")
   total       Decimal
   couponId    String?     @map("coupon_id")

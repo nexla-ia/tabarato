@@ -104,8 +104,9 @@ export class StoresController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('STORE_OWNER')
   @Get('my/analytics')
-  getAnalytics(@CurrentUser() user: any) {
-    return this.storesService.getAnalytics(user.sub)
+  getAnalytics(@CurrentUser() user: any, @Query('period') period?: string) {
+    const p = period === 'day' || period === 'month' ? period : 'week'
+    return this.storesService.getAnalytics(user.sub, p)
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

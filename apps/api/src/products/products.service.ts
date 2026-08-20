@@ -7,11 +7,24 @@ import { CreateVariationDto } from './dto/create-variation.dto'
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
+  // "Leve X Pague Y": só é válido com X > Y (e X ≥ 2). Se o cliente mexeu na promo
+  // mas mandou algo inválido/incompleto, limpa (null) pra não gravar promoção quebrada.
+  private normalizePromo(dto: Partial<CreateProductDto>) {
+    const touched = dto.promoBuyQty !== undefined || dto.promoPayQty !== undefined
+    if (!touched) return
+    const b = dto.promoBuyQty, p = dto.promoPayQty
+    if (b == null || p == null || b < 2 || p < 1 || b <= p) {
+      dto.promoBuyQty = null
+      dto.promoPayQty = null
+    }
+  }
+
   async create(userId: string, storeId: string, dto: CreateProductDto) {
     const store = await this.prisma.store.findUnique({ where: { id: storeId } })
     if (!store) throw new NotFoundException('Store not found')
     if (store.userId !== userId) throw new ForbiddenException('Not your store')
 
+    this.normalizePromo(dto)
     return this.prisma.product.create({
       data: { ...dto, storeId, hasVariations: false },
       include: { category: true },
@@ -187,6 +200,7 @@ export class ProductsService {
     if (!product) throw new NotFoundException('Product not found')
     if (product.store.userId !== userId) throw new ForbiddenException('Not your product')
 
+    this.normalizePromo(dto)
     return this.prisma.product.update({
       where: { id: productId },
       data: dto,

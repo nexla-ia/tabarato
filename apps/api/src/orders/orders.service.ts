@@ -50,6 +50,14 @@ function calcCourierFee(distanceKm: number): number {
   return Math.round((BASE + distanceKm * RATE) * 100) / 100
 }
 
+// Desconto progressivo "Leve X Pague Y": a cada X unidades, (X-Y) saem de graça.
+// Ex.: leve 3 pague 2 (buy=3, pay=2) → 1 grátis a cada 3. Retorna o VALOR do desconto.
+function promoDiscountFor(quantity: number, unitPrice: number, buyQty?: number | null, payQty?: number | null): number {
+  if (!buyQty || !payQty || buyQty <= payQty || buyQty <= 0 || quantity < buyQty) return 0
+  const freeUnits = Math.floor(quantity / buyQty) * (buyQty - payQty)
+  return Math.round(freeUnits * unitPrice * 100) / 100
+}
+
 /**
  * E-mail do pagador aceito pelo Mercado Pago. O MP rejeita o pagamento
  * ("payer.email must be a valid email") quando o e-mail é malformado ou usa um
@@ -566,6 +574,7 @@ export class OrdersService {
 
     const distToAddress = haversineKm(store.lat, store.lng, address.lat, address.lng)
     let subtotal = 0
+    let promoDiscount = 0
     const orderItems: { productId: string; variationId?: string; quantity: number; unitPrice: number; notes?: string }[] = []
     const mpItems: { id: string; title: string; quantity: number; unit_price: number }[] = []
     const stockDecrements: { id: string; type: 'variation' | 'product'; by: number }[] = []
@@ -590,14 +599,18 @@ export class OrdersService {
         if (product.stock !== null) stockDecrements.push({ id: product.id, type: 'product', by: item.quantity })
       }
       subtotal += unitPrice * item.quantity
+      promoDiscount += promoDiscountFor(item.quantity, unitPrice, (product as any).promoBuyQty, (product as any).promoPayQty)
       orderItems.push({ productId: item.productId, variationId: item.variationId, quantity: item.quantity, unitPrice, notes: item.notes })
       mpItems.push({ id: item.productId, title: product.name, quantity: item.quantity, unit_price: unitPrice })
     }
     subtotal = Math.round(subtotal * 100) / 100
+    promoDiscount = Math.round(promoDiscount * 100) / 100
     const deliveryFee = calcCourierFee(distToAddress)
 
     let couponDiscount = 0, couponId: string | undefined, couponMaxUses: number | null = null, couponFreeShipping = false
     if (group.couponCode) {
+      // Cupom valida sobre o subtotal BRUTO (igual ao preview do checkout). O promo
+      // entra como desconto independente somado depois — os dois acumulam.
       const result = await this.coupons.validate(group.couponCode, userId, subtotal, store.id)
       couponDiscount = result.discount
       couponId = result.coupon.id
@@ -605,7 +618,7 @@ export class OrdersService {
       couponFreeShipping = Boolean(result.freeShipping)
     }
 
-    return { store, subtotal, deliveryFee, orderItems, mpItems, stockDecrements, couponDiscount, couponId, couponMaxUses, couponFreeShipping, loyaltyDiscount: 0 }
+    return { store, subtotal, promoDiscount, deliveryFee, orderItems, mpItems, stockDecrements, couponDiscount, couponId, couponMaxUses, couponFreeShipping, loyaltyDiscount: 0 }
   }
 
   // ─── Checkout MULTI-LOJA: cria N pedidos (1 por loja) sob 1 pagamento único ───
@@ -654,7 +667,7 @@ export class OrdersService {
       if (pts < 100 || pts % 100 !== 0) throw new BadRequestException('Resgate de pontos deve ser em múltiplos de 100 (mínimo 100).')
       const account = await this.prisma.loyaltyAccount.findUnique({ where: { userId } })
       if (!account || account.points < pts) throw new BadRequestException('Saldo de pontos insuficiente para o resgate.')
-      const totalPayable = prepared.reduce((s, g) => s + Math.max(0, g.subtotal - g.couponDiscount), 0)
+      const totalPayable = prepared.reduce((s, g) => s + Math.max(0, g.subtotal - g.couponDiscount - g.promoDiscount), 0)
       let desired = (pts / 100) * 10
       if (desired > totalPayable) {
         const usableBlocks = Math.floor(totalPayable / 10)
@@ -667,7 +680,7 @@ export class OrdersService {
         loyaltyAccountId = account.id
         let allocated = 0
         prepared.forEach((g, i) => {
-          const gPayable = Math.max(0, g.subtotal - g.couponDiscount)
+          const gPayable = Math.max(0, g.subtotal - g.couponDiscount - g.promoDiscount)
           let share = i === prepared.length - 1
             ? Math.round((desired - allocated) * 100) / 100
             : Math.round(desired * (gPayable / totalPayable) * 100) / 100
@@ -681,7 +694,7 @@ export class OrdersService {
     // Totais por grupo + total geral (o pagamento único cobre o total).
     const deliveryCodes = prepared.map(() => String(randomInt(100000, 1000000)))
     const groupTotals = prepared.map((g) => {
-      let discount = Math.round((g.couponDiscount + g.loyaltyDiscount) * 100) / 100
+      let discount = Math.round((g.couponDiscount + g.loyaltyDiscount + g.promoDiscount) * 100) / 100
       if (discount > g.subtotal) discount = g.subtotal
       const deliveryWaived = g.couponFreeShipping ? g.deliveryFee : 0
       const total = Math.round((g.subtotal + g.deliveryFee - discount - deliveryWaived) * 100) / 100
@@ -706,6 +719,7 @@ export class OrdersService {
             couponId: g.couponId,
             subtotal: g.subtotal, deliveryFee: g.deliveryFee, discount: gt.discount,
             couponDiscount: g.couponDiscount, loyaltyDiscount: g.loyaltyDiscount,
+            promoDiscount: g.promoDiscount,
             freeShipping: g.couponFreeShipping, total: gt.total,
             notes: dto.notes, scheduledFor: scheduledDate, deliveryCode: deliveryCodes[i],
             paidViaSplit,

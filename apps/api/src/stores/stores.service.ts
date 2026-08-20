@@ -326,65 +326,121 @@ export class StoresService {
     return { reviews, total, page, pages: Math.ceil(total / limit), avgRating: agg._avg.rating ?? null }
   }
 
-  async getAnalytics(userId: string) {
+  // Relatórios do lojista. period: 'day' (hoje, por hora) | 'week' (7 dias) |
+  // 'month' (30 dias). O repasse ao lojista é 90% do subtotal (0.9). Bucketing no
+  // fuso de Rondônia (UTC-4, sem horário de verão) pra "hoje" bater com o relógio local.
+  async getAnalytics(userId: string, period: 'day' | 'week' | 'month' = 'week') {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
 
+    const STORE_SHARE = 0.9
+    const BR_OFFSET_MS = -4 * 3_600_000 // UTC-4 (America/Porto_Velho, sem DST)
+    const brParts = (d: Date) => {
+      const l = new Date(new Date(d).getTime() + BR_OFFSET_MS)
+      return { dateKey: l.toISOString().slice(0, 10), hour: l.getUTCHours() }
+    }
+
     const now = new Date()
-    const days7Ago = new Date(now.getTime() - 7 * 86_400_000)
+    const nowBr = new Date(now.getTime() + BR_OFFSET_MS)
+    const todayKey = nowBr.toISOString().slice(0, 10)
+    // Meia-noite local de hoje, convertida de volta pra UTC (base das queries).
+    const startOfTodayUtc = new Date(Date.parse(todayKey + 'T00:00:00Z') - BR_OFFSET_MS)
+
+    const rangeStart =
+      period === 'day' ? startOfTodayUtc
+      : period === 'month' ? new Date(now.getTime() - 30 * 86_400_000)
+      : new Date(now.getTime() - 7 * 86_400_000)
 
     const [orders, products] = await Promise.all([
       this.prisma.order.findMany({
-        where: { storeId: store.id, createdAt: { gte: days7Ago } },
-        select: { total: true, subtotal: true, status: true, createdAt: true, items: { select: { productId: true, quantity: true, product: { select: { name: true } } } } },
+        where: { storeId: store.id, createdAt: { gte: rangeStart } },
+        select: {
+          subtotal: true, status: true, createdAt: true,
+          items: {
+            select: {
+              productId: true, quantity: true, unitPrice: true,
+              product: { select: { name: true, category: { select: { id: true, name: true } } } },
+            },
+          },
+        },
       }),
       this.prisma.product.count({ where: { storeId: store.id, isActive: true } }),
     ])
 
     const delivered = orders.filter(o => o.status === 'DELIVERED')
     const cancelled = orders.filter(o => o.status === 'CANCELLED')
-    const totalRevenue = delivered.reduce((s, o) => s + Number(o.subtotal) * 0.9, 0)
+    const totalRevenue = delivered.reduce((s, o) => s + Number(o.subtotal) * STORE_SHARE, 0)
     const avgTicket = delivered.length > 0 ? totalRevenue / delivered.length : 0
     const cancellationRate = orders.length > 0 ? (cancelled.length / orders.length) * 100 : 0
 
-    // Sales by day (last 7 days)
-    const salesByDay: Record<string, { date: string; revenue: number; count: number }> = {}
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 86_400_000)
-      const key = d.toISOString().slice(0, 10)
-      salesByDay[key] = { date: key, revenue: 0, count: 0 }
-    }
-    for (const o of delivered) {
-      const key = new Date(o.createdAt).toISOString().slice(0, 10)
-      if (salesByDay[key]) {
-        salesByDay[key].revenue += Number(o.subtotal) * 0.9
-        salesByDay[key].count++
+    // Série temporal: 'day' → 24 horas de hoje; senão → N dias (7 ou 30).
+    type Bucket = { label: string; revenue: number; count: number }
+    const buckets: Bucket[] = []
+    const bucketIndex = new Map<string, number>()
+    if (period === 'day') {
+      for (let h = 0; h < 24; h++) {
+        bucketIndex.set('h' + h, buckets.length)
+        buckets.push({ label: String(h).padStart(2, '0') + 'h', revenue: 0, count: 0 })
+      }
+      for (const o of delivered) {
+        const { hour } = brParts(o.createdAt)
+        const idx = bucketIndex.get('h' + hour)
+        if (idx !== undefined) { buckets[idx].revenue += Number(o.subtotal) * STORE_SHARE; buckets[idx].count++ }
+      }
+    } else {
+      const days = period === 'month' ? 30 : 7
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(now.getTime() + BR_OFFSET_MS - i * 86_400_000)
+        const key = d.toISOString().slice(0, 10)
+        bucketIndex.set(key, buckets.length)
+        buckets.push({ label: key, revenue: 0, count: 0 })
+      }
+      for (const o of delivered) {
+        const { dateKey } = brParts(o.createdAt)
+        const idx = bucketIndex.get(dateKey)
+        if (idx !== undefined) { buckets[idx].revenue += Number(o.subtotal) * STORE_SHARE; buckets[idx].count++ }
       }
     }
 
-    // Top products by quantity sold
-    const productSales: Record<string, { name: string; qty: number }> = {}
+    // Vendas por categoria + top produtos (por unidades) — sobre pedidos entregues.
+    const byCategory: Record<string, { name: string; revenue: number; qty: number }> = {}
+    const productSales: Record<string, { name: string; qty: number; revenue: number }> = {}
     for (const o of delivered) {
       for (const item of o.items) {
-        if (!productSales[item.productId]) {
-          productSales[item.productId] = { name: item.product.name, qty: 0 }
-        }
+        const itemRevenue = Number(item.unitPrice) * item.quantity * STORE_SHARE
+        const cat = item.product.category
+        const catKey = cat?.id ?? 'sem-categoria'
+        if (!byCategory[catKey]) byCategory[catKey] = { name: cat?.name ?? 'Sem categoria', revenue: 0, qty: 0 }
+        byCategory[catKey].revenue += itemRevenue
+        byCategory[catKey].qty += item.quantity
+
+        if (!productSales[item.productId]) productSales[item.productId] = { name: item.product.name, qty: 0, revenue: 0 }
         productSales[item.productId].qty += item.quantity
+        productSales[item.productId].revenue += itemRevenue
       }
     }
+    const round2 = (n: number) => Math.round(n * 100) / 100
+    const salesByCategory = Object.values(byCategory)
+      .map(c => ({ ...c, revenue: round2(c.revenue) }))
+      .sort((a, b) => b.revenue - a.revenue)
     const topProducts = Object.values(productSales)
+      .map(p => ({ ...p, revenue: round2(p.revenue) }))
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 5)
 
     return {
+      period,
       totalOrders: orders.length,
       deliveredOrders: delivered.length,
       cancelledOrders: cancelled.length,
-      totalRevenue: Math.round(totalRevenue * 100) / 100,
-      avgTicket: Math.round(avgTicket * 100) / 100,
+      totalRevenue: round2(totalRevenue),
+      avgTicket: round2(avgTicket),
       cancellationRate: Math.round(cancellationRate * 10) / 10,
       activeProducts: products,
-      salesByDay: Object.values(salesByDay),
+      // salesByDay mantém compat com o dashboard atual (usa .date/.revenue).
+      salesByDay: buckets.map(b => ({ date: b.label, label: b.label, revenue: b.revenue, count: b.count })),
+      series: buckets,
+      salesByCategory,
       topProducts,
     }
   }

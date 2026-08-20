@@ -103,7 +103,13 @@ export class AuthService {
     const email = (payload.email as string | undefined)?.toLowerCase()
     if (!email) throw new UnauthorizedException('O Google não retornou um e-mail.')
 
-    let user = await this.prisma.user.findUnique({ where: { email } })
+    // Casa por e-mail de forma case-insensitive: se já existe conta (criada no
+    // cadastro normal, mesmo com e-mail em maiúsculas), o Google entra NELA — não
+    // cria duplicata. Como o Google já provou a posse do e-mail (verificado), o
+    // vínculo é seguro. Mantém senha, papel e demais dados da conta existente.
+    let user = await this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    })
     if (!user) {
       // Usuário social não tem senha utilizável: grava um hash aleatório.
       const randomHash = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10)
