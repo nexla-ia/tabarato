@@ -8,6 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { PaymentsService } from '../payments/payments.service'
 import { MpOauthService } from '../payments/mp-oauth.service'
 import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
+import { OrderConsumptionService } from './order-consumption.service'
 import { CreateOrderDto } from './dto/create-order.dto'
 
 function isStoreOpenNow(openingHours: any, scheduleExceptions?: any): boolean | null {
@@ -93,6 +94,7 @@ export class OrdersService {
     private notifications: NotificationsService,
     private payments: PaymentsService,
     private mpOauth: MpOauthService,
+    private orderConsumption: OrderConsumptionService,
     @Optional() private matching: DeliveryMatchingService,
   ) {}
 
@@ -194,6 +196,7 @@ export class OrdersService {
     const distToAddress = haversineKm(store.lat, store.lng, address.lat, address.lng)
 
     let subtotal = 0
+    let promoDiscount = 0
     const orderItems: {
       productId: string
       variationId?: string
@@ -242,6 +245,7 @@ export class OrdersService {
       }
 
       subtotal += unitPrice * item.quantity
+      promoDiscount += promoDiscountFor(item.quantity, unitPrice, (product as any).promoBuyQty, (product as any).promoPayQty)
       orderItems.push({
         productId: item.productId,
         variationId: item.variationId,
@@ -254,6 +258,7 @@ export class OrdersService {
 
     // Normaliza o subtotal a centavos (evita floats tipo 59.9999 chegando ao gateway)
     subtotal = Math.round(subtotal * 100) / 100
+    promoDiscount = Math.round(promoDiscount * 100) / 100
 
     const distanceKm = distToAddress // already calculated above
     const deliveryFee = calcCourierFee(distanceKm)
@@ -271,6 +276,8 @@ export class OrdersService {
       couponId = result.coupon.id
       couponMaxUses = (result.coupon as any).maxUses ?? null
       couponFreeShipping = Boolean(result.freeShipping)
+      // Cupom + promoção nunca passam do subtotal (evita total zerado/negativo).
+      couponDiscount = Math.round(Math.min(couponDiscount, Math.max(0, subtotal - promoDiscount)) * 100) / 100
     }
 
     // ── Loyalty redemption (100 pts = R$10) ──────────────────────────────
@@ -286,8 +293,8 @@ export class OrdersService {
       if (!account || account.points < pts) {
         throw new BadRequestException('Saldo de pontos insuficiente para o resgate.')
       }
-      // Desconto só sobre PRODUTOS (nunca a entrega) e sem passar do que resta após o cupom.
-      const maxExtra = Math.max(0, subtotal - couponDiscount)
+      // Desconto só sobre PRODUTOS (nunca a entrega) e sem passar do que resta após cupom+promoção.
+      const maxExtra = Math.max(0, subtotal - couponDiscount - promoDiscount)
       let ld = (pts / 100) * 10
       if (ld > maxExtra) {
         const usableBlocks = Math.floor(maxExtra / 10)
@@ -302,7 +309,7 @@ export class OrdersService {
       }
     }
 
-    let discount = Math.round((couponDiscount + loyaltyDiscount) * 100) / 100
+    let discount = Math.round((couponDiscount + loyaltyDiscount + promoDiscount) * 100) / 100
     if (discount > subtotal) discount = subtotal // segurança: desconto de produto nunca passa do subtotal
     // Cupom de frete grátis: o cliente NÃO paga a entrega (a loja absorve — abatido
     // do repasse dela na entrega). deliveryFee continua gravado (o entregador recebe).
@@ -313,6 +320,11 @@ export class OrdersService {
     // ao entregador. Sem ele, o entregador não finaliza a corrida (padrão iFood).
     // 6 dígitos (900k combinações) + bloqueio por tentativas tornam brute-force inviável.
     const deliveryCode = String(randomInt(100000, 1000000))
+
+    // Guarda: descontos não podem zerar o pedido (MP não cobra R$0).
+    if (total <= 0) {
+      throw new BadRequestException('Os descontos deixaram o total em R$ 0,00. Remova um cupom ou promoção para continuar.')
+    }
 
     // Create payment + order in a single transaction to avoid orphaned records
     const { payment, order } = await this.prisma.$transaction(async (tx) => {
@@ -332,6 +344,7 @@ export class OrdersService {
           discount,
           couponDiscount,
           loyaltyDiscount,
+          promoDiscount,
           freeShipping: couponFreeShipping,
           total,
           notes: dto.notes,
@@ -887,7 +900,9 @@ export class OrdersService {
       where: { id },
       include: {
         user: { select: { id: true, name: true, phone: true } },
-        store: true,
+        // NUNCA expor a loja inteira aqui: cliente/entregador recebem este pedido.
+        // Só campos de exibição (+ userId p/ a checagem de dono, removido no fim).
+        store: { select: { id: true, name: true, logoUrl: true, phone: true, address: true, lat: true, lng: true, isOpen: true, prepTimeMin: true, userId: true } },
         items: { include: { product: true, variation: true } },
         address: true,
         payment: true,
@@ -915,6 +930,9 @@ export class OrdersService {
     if (!isOwner && !isAdmin) {
       ;(order as any).deliveryCode = null
     }
+
+    // userId da loja só serviu pra checagem de dono acima — não vai pro cliente.
+    if ((order as any).store) delete (order as any).store.userId
 
     return order
   }
@@ -992,69 +1010,10 @@ export class OrdersService {
     return updated
   }
 
-  /** Devolve ao estoque os itens de um pedido cancelado (só os que controlam estoque). */
-  private async restoreStock(orderId: string) {
-    const items = await this.prisma.orderItem.findMany({
-      where: { orderId },
-      select: { productId: true, variationId: true, quantity: true },
-    })
-    for (const it of items) {
-      if (it.variationId) {
-        await this.prisma.productVariation.updateMany({
-          where: { id: it.variationId }, data: { stock: { increment: it.quantity } },
-        }).catch(() => {})
-      } else {
-        await this.prisma.product.updateMany({
-          where: { id: it.productId, stock: { not: null } }, data: { stock: { increment: it.quantity } },
-        }).catch(() => {})
-      }
-    }
-  }
-
-  /**
-   * Reverte tudo que o pedido consumiu na criação: estoque, uso de cupom e pontos
-   * de fidelidade resgatados. Usado no cancelamento e quando o pagamento falha
-   * depois do pedido já ter sido gravado. Best-effort (loga falhas). O estorno de
-   * DINHEIRO é tratado à parte (payments.refundPayment).
-   */
+  // Reversão de estoque/cupom/pontos vive no OrderConsumptionService (reutilizado
+  // pelo webhook de pagamento sem dependência circular). Wrapper mantém os call sites.
   private async restoreOrderConsumption(orderId: string) {
-    await this.restoreStock(orderId)
-
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: { userId: true, couponId: true, loyaltyDiscount: true },
-    })
-    if (!order) return
-
-    // Cupom: libera o uso pelo usuário e devolve 1 ao contador global de usos.
-    if (order.couponId) {
-      await this.prisma.couponUse.deleteMany({ where: { orderId } }).catch(() => {})
-      await this.prisma.coupon.updateMany({
-        where: { id: order.couponId, usedCount: { gt: 0 } },
-        data: { usedCount: { decrement: 1 } },
-      }).catch(() => {})
-    }
-
-    // Fidelidade: devolve os pontos resgatados (100 pts = R$10). Guarda contra
-    // dupla-restauração checando se já existe um estorno lançado para este pedido.
-    const loyaltyDiscount = Number(order.loyaltyDiscount)
-    if (loyaltyDiscount > 0) {
-      const points = Math.round(loyaltyDiscount * 10)
-      const already = await this.prisma.loyaltyTransaction.findFirst({
-        where: { orderId, type: 'REFUND' }, select: { id: true },
-      })
-      if (!already && points > 0) {
-        const account = await this.prisma.loyaltyAccount.findUnique({ where: { userId: order.userId } })
-        if (account) {
-          await this.prisma.$transaction([
-            this.prisma.loyaltyAccount.update({ where: { id: account.id }, data: { points: { increment: points } } }),
-            this.prisma.loyaltyTransaction.create({
-              data: { accountId: account.id, points, type: 'REFUND', description: `Estorno de ${points} pontos (pedido cancelado)`, orderId },
-            }),
-          ]).catch((err) => this.logger.warn('Loyalty restore failed', err))
-        }
-      }
-    }
+    return this.orderConsumption.restoreOrderConsumption(orderId)
   }
 
   async cancel(userId: string, orderId: string) {
@@ -1100,7 +1059,7 @@ export class OrdersService {
       where: { id: orderId, storeId: store.id },
       include: {
         user: { select: { id: true, pushToken: true } },
-        delivery: { select: { status: true } },
+        delivery: { select: { id: true, status: true } },
       },
     })
     if (!order) throw new NotFoundException('Order not found')
@@ -1126,6 +1085,16 @@ export class OrdersService {
       data: { status: 'CANCELLED', refusalNote: note },
     })
     await this.restoreOrderConsumption(orderId)
+
+    // Encerra a entrega/busca pendente (o pedido foi cancelado antes da coleta) —
+    // senão o matching continua oferecendo e um entregador aceita pedido cancelado.
+    if ((order as any).delivery?.id) {
+      await this.prisma.delivery.update({
+        where: { id: (order as any).delivery.id },
+        data: { status: 'FAILED' as any },
+      }).catch(() => {})
+      this.matching?.cancelMatching((order as any).delivery.id)
+    }
 
     if (order.user?.pushToken) {
       this.push.send(order.user.pushToken, '❌ Pedido cancelado', note ?? 'A loja cancelou seu pedido.', { orderId })

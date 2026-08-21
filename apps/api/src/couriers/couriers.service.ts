@@ -371,7 +371,7 @@ export class CouriersService {
       const fullOrder = await this.prisma.order.findUnique({
         where: { id: delivery.orderId },
         select: {
-          subtotal: true, couponDiscount: true, storeId: true, paidViaSplit: true,
+          subtotal: true, couponDiscount: true, promoDiscount: true, storeId: true, paidViaSplit: true,
           freeShipping: true, deliveryFee: true,
           payment: { select: { status: true } },
         },
@@ -385,9 +385,10 @@ export class CouriersService {
       // Cupom de frete grátis: a LOJA absorve a entrega → desconta do repasse dela
       // (o entregador continua recebendo a taxa normalmente, paga pela plataforma).
       const storeDeliveryAbsorbed = fullOrder.freeShipping ? Number(fullOrder.deliveryFee) : 0
-      // Loja recebe: subtotal − cupom − comissão − (frete, se frete grátis). Absorve o
-      // CUPOM (promo dela) mas NÃO a fidelidade (bancada pela plataforma).
-      const storeAmount = Math.max(0, Math.round((Number(fullOrder.subtotal) - Number(fullOrder.couponDiscount) - platformCommission - storeDeliveryAbsorbed) * 100) / 100)
+      // Loja recebe: subtotal − cupom − promoção − comissão − (frete, se frete grátis).
+      // Absorve o CUPOM e a PROMOÇÃO "Leve X Pague Y" (ofertas dela), mas NÃO a
+      // fidelidade (bancada pela plataforma).
+      const storeAmount = Math.max(0, Math.round((Number(fullOrder.subtotal) - Number(fullOrder.couponDiscount) - Number((fullOrder as any).promoDiscount ?? 0) - platformCommission - storeDeliveryAbsorbed) * 100) / 100)
       // Fonte da verdade: a flag gravada no pedido no momento da cobrança (não o
       // mpConnected atual, que pode ter mudado após o split → evita pagar a loja 2x).
       const storePaidViaSplit = fullOrder.paidViaSplit

@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { MpOauthService } from './mp-oauth.service'
+import { OrderConsumptionService } from '../orders/order-consumption.service'
 
 @Injectable()
 export class PaymentsService {
@@ -18,6 +19,7 @@ export class PaymentsService {
     private push: PushService,
     private notifications: NotificationsService,
     private mpOauth: MpOauthService,
+    private orderConsumption: OrderConsumptionService,
   ) {
     const client = new MercadoPagoConfig({
       accessToken: this.config.get<string>('MERCADO_PAGO_ACCESS_TOKEN') ?? '',
@@ -335,10 +337,33 @@ export class PaymentsService {
       }
 
       if ((mpStatus === 'rejected' || mpStatus === 'cancelled') && order.payment.status === 'PENDING') {
-        await this.prisma.payment.update({
-          where: { id: order.payment.id },
+        // Transição atômica -> FAILED (só um chamador vence, evita reprocessar retries).
+        const claim = await this.prisma.payment.updateMany({
+          where: { id: order.payment.id, status: 'PENDING' },
           data: { status: 'FAILED' },
         })
+        if (claim.count === 0) return
+
+        // CRÍTICO: cancelar os pedidos e DEVOLVER estoque/cupom/pontos. Sem isso o
+        // pedido ficava PENDING pra sempre — estoque preso, cupom/pontos perdidos, e
+        // ocupando o limite de pedidos simultâneos da loja.
+        await this.orderConsumption.cancelPendingForPayment(order.payment.id)
+
+        if (order.user?.pushToken) {
+          this.push.send(
+            order.user.pushToken,
+            'Pagamento não concluído',
+            'Seu pagamento não foi confirmado e o pedido foi cancelado. Você pode tentar novamente.',
+            { orderId },
+          )
+        }
+        this.notifications.create(
+          order.user.id,
+          'PAYMENT',
+          'Pagamento não concluído',
+          `O pagamento do pedido #${orderId.slice(0, 8)} não foi confirmado — pedido cancelado.`,
+          { orderId },
+        ).catch((err) => this.logger.warn('Notification failed', err))
       }
     } catch (err) {
       this.logger.error('Webhook processing failed', err)

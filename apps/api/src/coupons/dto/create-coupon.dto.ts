@@ -1,11 +1,13 @@
-import { IsBoolean, IsDateString, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
+import { IsBoolean, IsDateString, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
 
 export class CreateCouponDto {
   @IsString()
+  @MaxLength(40)
   code: string
 
   @IsString()
   @IsOptional()
+  @MaxLength(200)
   description?: string
 
   @IsNumber()
@@ -16,6 +18,7 @@ export class CreateCouponDto {
 
   @IsNumber()
   @Min(0.01)
+  @Max(1_000_000)
   @IsOptional()
   discountFixed?: number
 

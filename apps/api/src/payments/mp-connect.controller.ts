@@ -2,6 +2,8 @@ import { Controller, Get, Query, Res, UseGuards, BadRequestException } from '@ne
 import type { Response } from 'express'
 import { ConfigService } from '@nestjs/config'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import { RolesGuard } from '../common/guards/roles.guard'
+import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { PrismaService } from '../prisma/prisma.service'
 import { MpOauthService } from './mp-oauth.service'
@@ -14,7 +16,8 @@ export class MpConnectController {
     private readonly config: ConfigService,
   ) {}
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
   @Get('status')
   async status(@CurrentUser() user: any) {
     const store = await this.prisma.store.findUnique({
@@ -24,7 +27,8 @@ export class MpConnectController {
     return { enabled: this.mp.isEnabled(), connected: Boolean(store?.mpConnected), mpUserId: store?.mpUserId ?? null }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
   @Get('connect')
   async connect(@CurrentUser() user: any, @Query('origin') origin?: string) {
     const store = await this.prisma.store.findUnique({ where: { userId: user.sub }, select: { id: true } })
@@ -32,7 +36,8 @@ export class MpConnectController {
     return { url: this.mp.getAuthUrl('store', store.id, origin) }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
   @Get('disconnect')
   async disconnect(@CurrentUser() user: any) {
     const store = await this.prisma.store.findUnique({ where: { userId: user.sub }, select: { id: true } })
@@ -91,7 +96,8 @@ export class MpConnectController {
 export class MpCourierConnectController {
   constructor(private readonly mp: MpOauthService, private readonly prisma: PrismaService) {}
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('COURIER')
   @Get('status')
   async status(@CurrentUser() user: any) {
     const courier = await this.prisma.courier.findUnique({
@@ -101,7 +107,8 @@ export class MpCourierConnectController {
     return { enabled: this.mp.isAdvancedEnabled(), connected: Boolean(courier?.mpConnected), mpUserId: courier?.mpUserId ?? null }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('COURIER')
   @Get('connect')
   async connect(@CurrentUser() user: any) {
     const courier = await this.prisma.courier.findUnique({ where: { userId: user.sub }, select: { id: true } })
@@ -109,7 +116,8 @@ export class MpCourierConnectController {
     return { url: this.mp.getAuthUrl('courier', courier.id) }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('COURIER')
   @Get('disconnect')
   async disconnect(@CurrentUser() user: any) {
     const courier = await this.prisma.courier.findUnique({ where: { userId: user.sub }, select: { id: true } })

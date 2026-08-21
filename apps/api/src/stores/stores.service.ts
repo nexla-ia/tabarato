@@ -25,12 +25,21 @@ function parseMinutes(time: string): number | null {
   return h * 60 + m
 }
 
-function computeIsOpen(openingHours: any): boolean | null {
-  if (!openingHours || !Array.isArray(openingHours)) return null
-
+function computeIsOpen(openingHours: any, scheduleExceptions?: any): boolean | null {
   const utcNow = new Date()
   const localMs = utcNow.getTime() - 4 * 60 * 60 * 1000
   const local = new Date(localMs)
+
+  // Exceção de data (feriado fechado / abertura extraordinária) tem PRIORIDADE
+  // sobre o horário semanal — mesma regra do checkout (isStoreOpenNow), pra não
+  // ter duas fontes de verdade divergentes.
+  if (Array.isArray(scheduleExceptions)) {
+    const today = local.toISOString().slice(0, 10) // YYYY-MM-DD no horário local
+    const ex = scheduleExceptions.find((e: any) => e && e.date === today)
+    if (ex) return !ex.closed
+  }
+
+  if (!openingHours || !Array.isArray(openingHours)) return null
 
   const dayOfWeek = local.getUTCDay()
   const currentMinutes = local.getUTCHours() * 60 + local.getUTCMinutes()
@@ -84,8 +93,8 @@ export class StoresService {
   ) {}
 
   // isOpen (mostrado ao cliente) = aberto pelo horário E não pausado manualmente.
-  private async syncIsOpen(storeId: string, openingHours: any, currentIsOpen: boolean, isPaused = false): Promise<void> {
-    const scheduleOpen = computeIsOpen(openingHours)
+  private async syncIsOpen(storeId: string, openingHours: any, currentIsOpen: boolean, isPaused = false, scheduleExceptions?: any): Promise<void> {
+    const scheduleOpen = computeIsOpen(openingHours, scheduleExceptions)
     // Horário inválido → não auto-gerencia por horário, mas respeita o pause.
     const effective = scheduleOpen === null ? !isPaused : scheduleOpen && !isPaused
     if (effective !== currentIsOpen) {
@@ -128,7 +137,7 @@ export class StoresService {
     await Promise.allSettled(
       stores
         .filter((s) => s.openingHours)
-        .map((s) => this.syncIsOpen(s.id, s.openingHours, s.isOpen, s.isPaused))
+        .map((s) => this.syncIsOpen(s.id, s.openingHours, s.isOpen, s.isPaused, (s as any).scheduleExceptions))
     )
 
     // Re-fetch with updated isOpen — preserve ALL original filters (categoryId + search)
@@ -181,11 +190,11 @@ export class StoresService {
     // Página pública: loja não-aprovada responde 404 (não enumerar pendentes/suspensas).
     if (store.status !== 'APPROVED') throw new NotFoundException('Store not found')
 
-    await this.syncIsOpen(store.id, store.openingHours, store.isOpen, store.isPaused)
+    await this.syncIsOpen(store.id, store.openingHours, store.isOpen, store.isPaused, (store as any).scheduleExceptions)
 
     // isOpen EFETIVO = horário de funcionamento E não pausado manualmente.
     // (computeIsOpen é só o horário; sem isPaused a loja pausada apareceria "Aberta".)
-    const scheduleOpen = computeIsOpen(store.openingHours)
+    const scheduleOpen = computeIsOpen(store.openingHours, (store as any).scheduleExceptions)
     return {
       ...store,
       isOpen: scheduleOpen === null ? !store.isPaused : scheduleOpen && !store.isPaused,
@@ -199,11 +208,13 @@ export class StoresService {
     })
     if (!store) throw new NotFoundException('Store not found')
 
-    await this.syncIsOpen(store.id, store.openingHours, store.isOpen, store.isPaused)
+    await this.syncIsOpen(store.id, store.openingHours, store.isOpen, store.isPaused, (store as any).scheduleExceptions)
 
-    const scheduleOpen = computeIsOpen(store.openingHours)
+    const scheduleOpen = computeIsOpen(store.openingHours, (store as any).scheduleExceptions)
+    // Nunca serializar os tokens do Mercado Pago (mesmo pro dono) — defense-in-depth.
+    const { mpAccessToken, mpRefreshToken, mpTokenExpiresAt, ...safe } = store as any
     return {
-      ...store,
+      ...safe,
       isOpen: scheduleOpen === null ? !store.isPaused : scheduleOpen && !store.isPaused,
     }
   }
@@ -229,7 +240,9 @@ export class StoresService {
   // Abrir/fechar manual = pausar/retomar (o "aberto" real também depende do horário).
   // Persistir em isPaused evita que o auto-schedule reverta na próxima leitura.
   async toggleOpen(userId: string) {
-    return this.togglePause(userId).then((r) => ({ isPaused: r.isPaused, isOpen: !r.isPaused }))
+    // Usa o isOpen EFETIVO calculado por togglePause (respeita horário/exceções),
+    // não !isPaused — senão "abrir" fora do expediente reportaria Aberta erradamente.
+    return this.togglePause(userId).then((r) => ({ isPaused: r.isPaused, isOpen: r.isOpen }))
   }
 
   async togglePause(userId: string) {
@@ -249,7 +262,7 @@ export class StoresService {
       )
     }
 
-    const scheduleOpen = computeIsOpen(store.openingHours)
+    const scheduleOpen = computeIsOpen(store.openingHours, (store as any).scheduleExceptions)
     const effectiveOpen = scheduleOpen === null ? !nextPaused : (scheduleOpen && !nextPaused)
 
     await this.prisma.store.update({
@@ -346,16 +359,20 @@ export class StoresService {
     // Meia-noite local de hoje, convertida de volta pra UTC (base das queries).
     const startOfTodayUtc = new Date(Date.parse(todayKey + 'T00:00:00Z') - BR_OFFSET_MS)
 
+    // rangeStart alinhado à meia-noite LOCAL do primeiro bucket (não "now - N dias"
+    // rolando), pra soma da série bater com o totalRevenue na borda do período.
     const rangeStart =
       period === 'day' ? startOfTodayUtc
-      : period === 'month' ? new Date(now.getTime() - 30 * 86_400_000)
-      : new Date(now.getTime() - 7 * 86_400_000)
+      : period === 'month' ? new Date(startOfTodayUtc.getTime() - 29 * 86_400_000)
+      : new Date(startOfTodayUtc.getTime() - 6 * 86_400_000)
 
     const [orders, products] = await Promise.all([
       this.prisma.order.findMany({
         where: { storeId: store.id, createdAt: { gte: rangeStart } },
         select: {
-          subtotal: true, status: true, createdAt: true,
+          subtotal: true, couponDiscount: true, promoDiscount: true, freeShipping: true, deliveryFee: true,
+          status: true, createdAt: true,
+          payment: { select: { status: true } },
           items: {
             select: {
               productId: true, quantity: true, unitPrice: true,
@@ -367,9 +384,22 @@ export class StoresService {
       this.prisma.product.count({ where: { storeId: store.id, isActive: true } }),
     ])
 
-    const delivered = orders.filter(o => o.status === 'DELIVERED')
+    // Receita = só pedidos ENTREGUES E PAGOS. Valor líquido da loja (igual ao crédito
+    // na carteira): subtotal*0.9 − cupom − promoção − (frete, se frete grátis).
+    const orderNet = (o: any) => {
+      const gross = Number(o.subtotal) * STORE_SHARE
+      const net = gross - Number(o.couponDiscount ?? 0) - Number(o.promoDiscount ?? 0) - (o.freeShipping ? Number(o.deliveryFee ?? 0) : 0)
+      return Math.max(0, Math.round(net * 100) / 100)
+    }
+    // Fator p/ ratear o líquido nos itens (categoria/produto), mantendo a soma = totalRevenue.
+    const netFactor = (o: any) => {
+      const gross = Number(o.subtotal) * STORE_SHARE
+      return gross > 0 ? orderNet(o) / gross : 0
+    }
+
+    const delivered = orders.filter(o => o.status === 'DELIVERED' && o.payment?.status === 'PAID')
     const cancelled = orders.filter(o => o.status === 'CANCELLED')
-    const totalRevenue = delivered.reduce((s, o) => s + Number(o.subtotal) * STORE_SHARE, 0)
+    const totalRevenue = delivered.reduce((s, o) => s + orderNet(o), 0)
     const avgTicket = delivered.length > 0 ? totalRevenue / delivered.length : 0
     const cancellationRate = orders.length > 0 ? (cancelled.length / orders.length) * 100 : 0
 
@@ -385,7 +415,7 @@ export class StoresService {
       for (const o of delivered) {
         const { hour } = brParts(o.createdAt)
         const idx = bucketIndex.get('h' + hour)
-        if (idx !== undefined) { buckets[idx].revenue += Number(o.subtotal) * STORE_SHARE; buckets[idx].count++ }
+        if (idx !== undefined) { buckets[idx].revenue += orderNet(o); buckets[idx].count++ }
       }
     } else {
       const days = period === 'month' ? 30 : 7
@@ -398,7 +428,7 @@ export class StoresService {
       for (const o of delivered) {
         const { dateKey } = brParts(o.createdAt)
         const idx = bucketIndex.get(dateKey)
-        if (idx !== undefined) { buckets[idx].revenue += Number(o.subtotal) * STORE_SHARE; buckets[idx].count++ }
+        if (idx !== undefined) { buckets[idx].revenue += orderNet(o); buckets[idx].count++ }
       }
     }
 
@@ -406,8 +436,9 @@ export class StoresService {
     const byCategory: Record<string, { name: string; revenue: number; qty: number }> = {}
     const productSales: Record<string, { name: string; qty: number; revenue: number }> = {}
     for (const o of delivered) {
+      const factor = netFactor(o) // rateia cupom/promoção/frete pelos itens
       for (const item of o.items) {
-        const itemRevenue = Number(item.unitPrice) * item.quantity * STORE_SHARE
+        const itemRevenue = Number(item.unitPrice) * item.quantity * STORE_SHARE * factor
         const cat = item.product.category
         const catKey = cat?.id ?? 'sem-categoria'
         if (!byCategory[catKey]) byCategory[catKey] = { name: cat?.name ?? 'Sem categoria', revenue: 0, qty: 0 }
