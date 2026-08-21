@@ -505,11 +505,14 @@ export class OrdersService {
         }
         if (result.status === 'PAID') {
           await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } })
-          if (store.user?.pushToken) {
-            this.push.send(store.user.pushToken, '✅ Pedido pago!', `Pedido #${order.id.slice(0, 8)} pago com cartão.`, { orderId: order.id })
+          // Cliente: confirmação imediata (no cartão; no PIX vem pelo webhook). A loja
+          // recebe o "🛒 Novo pedido!" logo abaixo — não duplica com "Pedido pago".
+          const buyer = await this.prisma.user.findUnique({ where: { id: userId }, select: { pushToken: true } })
+          if (buyer?.pushToken) {
+            this.push.send(buyer.pushToken, '✅ Pagamento confirmado!', 'Seu pedido foi pago e já está sendo preparado.', { orderId: order.id })
           }
-          this.notifications.create(store.userId, 'ORDER_UPDATE', '✅ Pedido pago!', `Pedido #${order.id.slice(0, 8)} · R$ ${total.toFixed(2)}`, { orderId: order.id })
-            .catch((err) => this.logger.warn('Store notification failed', err))
+          this.notifications.create(userId, 'PAYMENT', '✅ Pagamento confirmado!', `Pedido #${order.id.slice(0, 8)} pago com sucesso.`, { orderId: order.id })
+            .catch((err) => this.logger.warn('Buyer notification failed', err))
         } else if (result.status === 'FAILED') {
           await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } })
           await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } })
@@ -659,7 +662,7 @@ export class OrdersService {
       : (dto.storeId && dto.items ? [{ storeId: dto.storeId, items: dto.items, couponCode: dto.couponCode }] : [])
     if (!rawGroups.length) throw new BadRequestException('Carrinho vazio.')
 
-    const payer = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true, phone: true, createdAt: true } })
+    const payer = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true, phone: true, createdAt: true, pushToken: true } })
 
     let scheduledDate: Date | undefined
     if (dto.scheduledFor) {
@@ -831,11 +834,13 @@ export class OrdersService {
         if (result.status === 'PAID') {
           await this.prisma.order.updateMany({ where: { paymentId: payment.id }, data: { status: 'CONFIRMED' } })
           orders.forEach((o) => { o.status = 'CONFIRMED' })
-          for (const g of prepared) {
-            const o = orders.find((x) => x.storeId === g.store.id)!
-            if (g.store.user?.pushToken) this.push.send(g.store.user.pushToken, '✅ Pedido pago!', `Pedido #${o.id.slice(0, 8)} pago com cartão.`, { orderId: o.id })
-            this.notifications.create(g.store.user.id, 'ORDER_UPDATE', '✅ Pedido pago!', `Pedido #${o.id.slice(0, 8)} · R$ ${Number(o.total).toFixed(2)}`, { orderId: o.id }).catch((e) => this.logger.warn('Store notification failed', e))
+          // Cliente: 1 confirmação de pagamento (as lojas recebem "🛒 Novo pedido!"
+          // abaixo — não duplica com "Pedido pago" por loja).
+          if (payer?.pushToken) {
+            this.push.send(payer.pushToken, '✅ Pagamento confirmado!', 'Seu pedido foi pago e já está sendo preparado.', { orderId: firstOrder.id })
           }
+          this.notifications.create(userId, 'PAYMENT', '✅ Pagamento confirmado!', `Pagamento de R$ ${grandTotal.toFixed(2)} confirmado.`, { orderId: firstOrder.id })
+            .catch((e) => this.logger.warn('Buyer notification failed', e))
         } else if (result.status === 'FAILED') {
           await cancelAll()
           throw new BadRequestException(`Pagamento recusado. Motivo: ${result.statusDetail ?? 'cartão não autorizado'}. Verifique os dados e tente novamente.`)
@@ -850,7 +855,7 @@ export class OrdersService {
       }
     }
 
-    // Notifica cada loja do novo pedido (PIX fica PENDING; cartão pago já avisou acima também).
+    // Notifica cada loja do novo pedido (aviso ÚNICO — PIX fica PENDING, cartão já CONFIRMED).
     for (const g of prepared) {
       const o = orders.find((x) => x.storeId === g.store.id)!
       if (g.store.user?.pushToken) this.push.send(g.store.user.pushToken, '🛒 Novo pedido!', 'Você recebeu um novo pedido. Toque para ver.', { orderId: o.id })
