@@ -1,12 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Navbar } from '@/components/Navbar'
 import { OrderChat } from '@/components/OrderChat'
 import { OrderReview } from '@/components/OrderReview'
 import { useAuth } from '@/hooks/useAuth'
+import { useCartStore } from '@/stores/cart'
 import { api } from '@/lib/api'
 import styles from './page.module.css'
 
@@ -25,11 +26,14 @@ function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).rep
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const { user } = useAuth()
+  const addItem = useCartStore((s) => s.addItem)
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [pixCopied, setPixCopied] = useState(false)
   const [checkingPix, setCheckingPix] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   const isTerminal = order?.status === 'DELIVERED' || order?.status === 'CANCELLED'
 
@@ -52,6 +56,42 @@ export default function OrderDetailPage() {
       if (data?.status === 'PAID') api.get(`/orders/${id}`).then(r => setOrder(r.data))
       else alert('Pagamento ainda não confirmado. Aguarde.')
     } catch {} finally { setCheckingPix(false) }
+  }
+
+  async function handleCancel() {
+    if (!confirm('Tem certeza que deseja cancelar este pedido?')) return
+    setCancelling(true)
+    try {
+      await api.patch(`/orders/${id}/cancel`)
+      const r = await api.get(`/orders/${id}`)
+      setOrder(r.data)
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? 'Não foi possível cancelar o pedido.')
+    } finally { setCancelling(false) }
+  }
+  // Cliente só cancela antes de a loja começar a preparar (backend: PENDING/CONFIRMED).
+  const canCancel = order && ['PENDING', 'CONFIRMED'].includes(order.status)
+
+  // "Pedir de novo": readiciona ao carrinho com o PREÇO ATUAL (item.product é o
+  // registro atual), pulando produtos inativos.
+  function handleReorder() {
+    const st = order?.store
+    if (!st?.id) return
+    let added = 0, skipped = 0
+    for (const it of (order.items ?? [])) {
+      const p = it.product
+      if (!p || p.isActive === false) { skipped++; continue }
+      const price = Number(it.variation?.price ?? p.basePrice ?? 0)
+      addItem(st.id, st.name, {
+        productId: p.id, variationId: it.variation?.id, name: p.name,
+        price, quantity: it.quantity, imageUrl: p.imageUrl ?? undefined, variationName: it.variation?.name,
+        promoBuyQty: p.promoBuyQty, promoPayQty: p.promoPayQty,
+      }, user?.id)
+      added++
+    }
+    if (added === 0) { alert('Nenhum item deste pedido está disponível no momento.'); return }
+    alert(skipped > 0 ? `${added} item(ns) adicionados ao carrinho (${skipped} indisponível(is)).` : 'Itens adicionados ao carrinho!')
+    router.push('/cart')
   }
 
   if (loading) return <><Navbar /><div className={styles.loading}>Carregando...</div></>
@@ -132,6 +172,35 @@ export default function OrderDetailPage() {
             <span>Total</span><span>{fmtBRL(order.total)}</span>
           </div>
         </div>
+
+        {/* Pedir de novo (pedidos finalizados) */}
+        {isTerminal && (
+          <button
+            onClick={handleReorder}
+            style={{
+              width: '100%', marginTop: 14, padding: '13px', borderRadius: 12,
+              border: 'none', background: 'var(--primary, #FF6600)', color: '#fff',
+              fontWeight: 800, fontSize: 15, cursor: 'pointer',
+            }}
+          >
+            🔁 Pedir de novo
+          </button>
+        )}
+
+        {/* Cancelar (só antes da loja começar a preparar) */}
+        {canCancel && (
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            style={{
+              width: '100%', marginTop: 14, padding: '13px', borderRadius: 12,
+              border: '1.5px solid #DC2626', background: 'transparent', color: '#DC2626',
+              fontWeight: 700, fontSize: 15, cursor: cancelling ? 'default' : 'pointer', opacity: cancelling ? 0.6 : 1,
+            }}
+          >
+            {cancelling ? 'Cancelando…' : 'Cancelar pedido'}
+          </button>
+        )}
 
         {/* Delivery */}
         {order.delivery && (
