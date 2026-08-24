@@ -45,6 +45,18 @@ async function tokenizeCard(data: { cardNumber: string; cvv: string; expiryMonth
   return json.id as string
 }
 
+// Espelha o cálculo de frete do backend (orders.service: BASE 10 + 2/km).
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.asin(Math.sqrt(a))
+}
+function calcDeliveryFee(distanceKm: number): number {
+  return Math.round((10 + distanceKm * 2) * 100) / 100
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const { stores, clear } = useCartStore()
@@ -89,6 +101,7 @@ export default function CheckoutPage() {
   const [pixResult, setPixResult] = useState<{ orderIds: string[]; pixCode: string; pixQrBase64?: string } | null>(null)
   const [pixCopied, setPixCopied] = useState(false)
   const [polling, setPolling] = useState(false)
+  const [storeCoords, setStoreCoords] = useState<Record<string, { lat: number; lng: number }>>({})
 
   const isCard = payMethod === 'CREDIT_CARD' || payMethod === 'DEBIT_CARD'
   // Teto do cliente é só uma estimativa (o back é quem valida de verdade): não
@@ -99,6 +112,23 @@ export default function CheckoutPage() {
   const netPayable = Math.max(0, total() - promoTotal() - couponsTotal)
   const maxRedeemable = Math.min(loyaltyPoints, Math.floor(netPayable / 10) * 100)
 
+  // Frete real por loja (10 + 2/km) — precisa das coords da loja + do endereço.
+  const selAddr = addresses.find((a) => a.id === selectedAddr)
+  const perStoreDelivery = stores.map((s) => {
+    const c = storeCoords[s.storeId]
+    const delivery = (c && (selAddr as any)?.lat != null && (selAddr as any)?.lng != null)
+      ? calcDeliveryFee(haversineKm(c.lat, c.lng, (selAddr as any).lat, (selAddr as any).lng))
+      : null
+    return { delivery, freeShip: !!s.coupon?.freeShipping }
+  })
+  const deliveryKnown = !!selAddr && perStoreDelivery.length > 0 && perStoreDelivery.every((x) => x.delivery != null)
+  const deliveryCharged = deliveryKnown
+    ? Math.round(perStoreDelivery.reduce((a, x) => a + (x.freeShip ? 0 : (x.delivery ?? 0)), 0) * 100) / 100
+    : 0
+  const loyaltyDiscount = (pointsToRedeem / 100) * 10
+  const productNet = Math.max(0, Math.round((total() - promoTotal() - couponsTotal - loyaltyDiscount) * 100) / 100)
+  const estimatedTotal = Math.round((productNet + deliveryCharged) * 100) / 100
+
   useEffect(() => {
     api.get<Address[]>('/users/me/addresses').then(r => {
       setAddresses(r.data)
@@ -107,6 +137,42 @@ export default function CheckoutPage() {
 
     api.get<{ points: number }>('/users/me/loyalty').then(r => setLoyaltyPoints(r.data.points)).catch(() => {})
   }, [])
+
+  // Coordenadas de cada loja do carrinho — pra estimar o frete real (10 + 2/km) por
+  // loja e mostrar um total confiável (o backend cobra por esse mesmo cálculo).
+  const storeIdsKey = stores.map(s => s.storeId).join(',')
+  useEffect(() => {
+    const ids = [...new Set(stores.map(s => s.storeId))]
+    ids.forEach((id) => {
+      if (storeCoords[id]) return
+      api.get(`/stores/${id}`).then((r) => {
+        const { lat, lng } = r.data ?? {}
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          setStoreCoords((prev) => ({ ...prev, [id]: { lat, lng } }))
+        }
+      }).catch(() => {})
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeIdsKey])
+
+  // PIX: verifica o pagamento automaticamente (o webhook pode demorar/faltar). Se
+  // o backend marcar como pago → vai pro pedido; se expirar/recusar (FAILED) → avisa.
+  useEffect(() => {
+    if (!pixResult) return
+    const iv = setInterval(async () => {
+      try {
+        const { data } = await api.get(`/payments/orders/${pixResult.orderIds[0]}/sync`)
+        if (data?.status === 'PAID') {
+          clearInterval(iv)
+          router.push(pixResult.orderIds.length === 1 ? `/orders/${pixResult.orderIds[0]}` : '/orders')
+        } else if (data?.status === 'FAILED') {
+          clearInterval(iv)
+          setError('O pagamento PIX não foi confirmado (expirou ou foi recusado). Refaça o pedido.')
+        }
+      } catch { /* rede instável: tenta de novo no próximo tick */ }
+    }, 5000)
+    return () => clearInterval(iv)
+  }, [pixResult, router])
 
   async function saveAddress(e: FormEvent) {
     e.preventDefault()
@@ -386,7 +452,7 @@ export default function CheckoutPage() {
             )}
             <div className={styles.summaryRow}>
               <span>Entrega{stores.length > 1 ? ` (${stores.length} lojas)` : ''}</span>
-              <span>{stores.length > 0 && stores.every(s => s.coupon?.freeShipping) ? 'Grátis' : 'calculado no pedido'}</span>
+              <span>{!deliveryKnown ? 'Calculando…' : deliveryCharged === 0 ? 'Grátis' : fmtBRL(deliveryCharged)}</span>
             </div>
 
             {maxRedeemable >= 100 && (
@@ -418,13 +484,23 @@ export default function CheckoutPage() {
                 )}
               </>
             )}
+            <div className={styles.summaryDivider} />
+            <div className={styles.summaryRow} style={{ fontWeight: 800, fontSize: 16 }}>
+              <span>{deliveryKnown ? 'Total' : 'Total (sem entrega)'}</span>
+              <span>{fmtBRL(deliveryKnown ? estimatedTotal : productNet)}</span>
+            </div>
+            {!deliveryKnown && (
+              <div className={styles.summaryRow} style={{ fontSize: 12, color: 'var(--muted, #999)' }}>
+                <span>Entrega sendo calculada…</span><span />
+              </div>
+            )}
           </div>
         </section>
 
         {error && <div className={styles.errorBox}>{error}</div>}
 
-        <button className={styles.submitBtn} onClick={handleSubmit} disabled={loading}>
-          {loading ? 'Processando...' : `Confirmar pedido`}
+        <button className={styles.submitBtn} onClick={handleSubmit} disabled={loading || (!!selectedAddr && !deliveryKnown)}>
+          {loading ? 'Processando...' : (!!selectedAddr && !deliveryKnown) ? 'Calculando entrega…' : `Confirmar pedido${deliveryKnown ? ` · ${fmtBRL(estimatedTotal)}` : ''}`}
         </button>
       </div>
     </>
