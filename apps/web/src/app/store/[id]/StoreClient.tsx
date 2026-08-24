@@ -102,6 +102,12 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
   }
 
   function handleAdd(product: Product, variation?: { id: string; name: string; price: number | string }) {
+    // Loja fechada (horário/pausa já refletidos em isOpen pelo backend): não adiciona
+    // — senão o cliente monta o carrinho e o checkout recusa lá no fim.
+    if (!store.isOpen) {
+      alert('Esta loja está fechada no momento. Não é possível adicionar itens agora.')
+      return
+    }
     const price = Number(variation?.price ?? product.basePrice ?? 0)
     addItem(store.id, store.name, {
       productId: product.id, variationId: variation?.id, name: product.name,

@@ -56,6 +56,13 @@ export default async function StorePage({ params }: { params: Promise<{ id: stri
       })),
     }))
 
+  // Whitelist das avaliações: só o que a UI mostra (sem depender do backend nunca
+  // serializar PII extra do autor).
+  const safeReviews = (reviews?.reviews ?? []).map((r: any) => ({
+    id: r.id, rating: r.rating, comment: r.comment, createdAt: r.createdAt,
+    user: r.user ? { name: r.user.name } : null,
+  }))
+
   return (
     <>
       <Navbar />
@@ -64,7 +71,7 @@ export default async function StorePage({ params }: { params: Promise<{ id: stri
         products={safeProducts}
         rating={reviews?.avgRating ?? null}
         reviewCount={reviews?.total ?? 0}
-        reviews={reviews?.reviews ?? []}
+        reviews={safeReviews}
         photos={store.photos ?? []}
       />
     </>

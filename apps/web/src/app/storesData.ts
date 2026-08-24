@@ -31,7 +31,15 @@ export async function getStores(q?: string): Promise<Store[]> {
   try {
     const res = await fetch(url, { next: { revalidate: 60 } })
     if (!res.ok) return []
-    const stores: Store[] = await res.json()
+    const raw: any[] = await res.json()
+    // Whitelist em runtime: só campos de EXIBIÇÃO viram props do client/HTML público.
+    // Não depende do backend nunca vazar cnpj/pixKey/mp*/ownerId em /stores.
+    const stores: Store[] = (raw ?? []).map((s) => ({
+      id: s.id, name: s.name, description: s.description, logoUrl: s.logoUrl,
+      deliveryRadiusKm: s.deliveryRadiusKm, prepTimeMin: s.prepTimeMin, isOpen: s.isOpen,
+      rating: s.rating ?? null, mpConnected: !!s.mpConnected,
+      categories: (s.categories ?? []).map((c: any) => ({ id: c.id, name: c.name, icon: c.icon ?? null })),
+    }))
     return sortStores(stores)
   } catch { return [] }
 }

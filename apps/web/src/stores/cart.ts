@@ -95,7 +95,13 @@ export const useCartStore = create<CartState>()(
         }
         set({
           stores: get().stores.map((s) => (s.storeId === storeId
-            ? { ...s, items: s.items.map((i) => (i.productId === productId && i.variationId === variationId ? { ...i, quantity: qty } : i)) }
+            ? {
+                ...s,
+                items: s.items.map((i) => (i.productId === productId && i.variationId === variationId ? { ...i, quantity: qty } : i)),
+                // Mudou o subtotal → o desconto do cupom (congelado na aplicação) fica
+                // stale. Remove pra forçar reaplicar/revalidar no valor novo.
+                coupon: null,
+              }
             : s)),
         })
       },

@@ -93,7 +93,11 @@ export default function CheckoutPage() {
   const isCard = payMethod === 'CREDIT_CARD' || payMethod === 'DEBIT_CARD'
   // Teto do cliente é só uma estimativa (o back é quem valida de verdade): não
   // deixa resgatar mais pontos do que o saldo, nem mais que ~o subtotal em blocos de 100.
-  const maxRedeemable = Math.min(loyaltyPoints, Math.floor(total() / 10) * 100)
+  // Fidelidade só pode cobrir o que resta APÓS promoção e cupom (senão a UI mostra
+  // mais desconto do que o backend aplica). Bloco de 100 pts = R$10.
+  const couponsTotal = stores.reduce((acc, s) => acc + (s.coupon?.discount ?? 0), 0)
+  const netPayable = Math.max(0, total() - promoTotal() - couponsTotal)
+  const maxRedeemable = Math.min(loyaltyPoints, Math.floor(netPayable / 10) * 100)
 
   useEffect(() => {
     api.get<Address[]>('/users/me/addresses').then(r => {
@@ -177,6 +181,9 @@ export default function CheckoutPage() {
       }
     } catch (err: any) {
       setError(err.response?.data?.message ?? err.message ?? 'Não foi possível finalizar o pedido')
+      // Regenera a chave: o backend recusa reenvio da MESMA chave após uma tentativa
+      // morta (cartão recusado / PIX falho). Sem isso o cliente trava até recarregar.
+      idemKey.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`
     } finally { setLoading(false) }
   }
 
