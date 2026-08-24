@@ -445,7 +445,11 @@ export class CouriersService {
       // Pontos de fidelidade ao consumidor (só se pago; fire-and-forget)
       if (isPaid) {
         const ord = await this.prisma.order.findUnique({ where: { id: delivery.orderId }, select: { userId: true } })
-        if (ord) this.loyalty.earnPoints(ord.userId, delivery.orderId, Number(fullOrder.subtotal)).catch(() => {})
+        if (ord) {
+          this.loyalty.earnPoints(ord.userId, delivery.orderId, Number(fullOrder.subtotal)).catch(() => {})
+          // Bônus de indicação: só no 1º pedido ENTREGUE do indicado (anti-farming).
+          this.grantReferralIfFirstOrder(ord.userId).catch(() => {})
+        }
       }
     } else {
       // Transição não-terminal — claim atômico também (evita avanço concorrente)
@@ -494,5 +498,24 @@ export class CouriersService {
     }
 
     return updated
+  }
+
+  /**
+   * Bônus de indicação: pago só quando o INDICADO conclui o 1º pedido (entregue+pago).
+   * Mata o farming de contas descartáveis que nunca compram. Claim atômico garante
+   * uma única concessão por indicado, mesmo com entregas concorrentes.
+   */
+  private async grantReferralIfFirstOrder(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { referredBy: true, referralRewarded: true },
+    })
+    if (!user?.referredBy || user.referralRewarded) return
+    const claim = await this.prisma.user.updateMany({
+      where: { id: userId, referralRewarded: false, referredBy: { not: null } },
+      data: { referralRewarded: true },
+    })
+    if (claim.count === 0) return // outro processo já concedeu
+    await this.loyalty.grantReferralBonus(user.referredBy, userId).catch(() => {})
   }
 }

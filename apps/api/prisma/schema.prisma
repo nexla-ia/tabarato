@@ -99,6 +99,8 @@ model User {
   pushToken    String?  @map("push_token")
   referralCode String?  @unique @map("referral_code")
   referredBy   String?  @map("referred_by")
+  // Bônus de indicação só é pago no 1º pedido ENTREGUE do indicado (anti-farming).
+  referralRewarded Boolean @default(false) @map("referral_rewarded")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

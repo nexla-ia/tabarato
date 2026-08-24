@@ -26,6 +26,6 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @Post('google')
   google(@Body() dto: GoogleAuthDto) {
-    return this.auth.authGoogle(dto.idToken)
+    return this.auth.authGoogle(dto.idToken, dto.referralCode)
   }
 }

@@ -53,11 +53,8 @@ export class AuthService {
       },
     })
 
-    // Grant referral bonus to both parties (fire-and-forget)
-    if (referrerId) {
-      this.grantReferralBonus(referrerId, user.id).catch(() => {})
-    }
-
+    // O bônus de indicação NÃO é concedido no cadastro (era farmável com contas
+    // descartáveis). É pago no 1º pedido ENTREGUE do indicado (couriers.service).
     const tokens = this.generateTokens(user.id, user.email, user.role)
     return { user: this.sanitizeUser(user), ...tokens }
   }
@@ -79,7 +76,7 @@ export class AuthService {
   // Verifica o ID token no endpoint oficial do Google (valida assinatura/expiração),
   // confere a audiência (nosso client id) e o e-mail verificado. Cria o usuário na
   // 1ª vez (sem senha utilizável — login só via Google). Casa por e-mail (verificado).
-  async authGoogle(idToken: string) {
+  async authGoogle(idToken: string, referralCode?: string) {
     if (!idToken) throw new UnauthorizedException('Token do Google ausente.')
 
     let payload: any
@@ -112,6 +109,13 @@ export class AuthService {
       where: { email: { equals: email, mode: 'insensitive' } },
     })
     if (!user) {
+      // Indicação (opcional): resolve o indicador; o bônus é pago no 1º pedido
+      // entregue do indicado (não no cadastro) — mesma regra do register.
+      let referrerId: string | undefined
+      if (referralCode) {
+        const referrer = await this.prisma.user.findUnique({ where: { referralCode: referralCode.toUpperCase() } })
+        if (referrer) referrerId = referrer.id
+      }
       // Usuário social não tem senha utilizável: grava um hash aleatório.
       const randomHash = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10)
       user = await this.prisma.user.create({
@@ -122,6 +126,7 @@ export class AuthService {
           passwordHash: randomHash,
           role: 'CONSUMER',
           referralCode: generateReferralCode(),
+          referredBy: referrerId,
         },
       })
     }
@@ -145,29 +150,6 @@ export class AuthService {
     }
   }
 
-  private async grantReferralBonus(referrerId: string, newUserId: string) {
-    const BONUS = 50
-    const upsertAccount = async (userId: string) => {
-      return this.prisma.loyaltyAccount.upsert({
-        where: { userId },
-        create: { userId, points: BONUS, lifetimePoints: BONUS },
-        update: { points: { increment: BONUS }, lifetimePoints: { increment: BONUS } },
-      })
-    }
-    const addTx = async (accountId: string, description: string) => {
-      await this.prisma.loyaltyTransaction.create({
-        data: { accountId, points: BONUS, type: 'BONUS', description },
-      })
-    }
-    const [referrerAccount, newAccount] = await Promise.all([
-      upsertAccount(referrerId),
-      upsertAccount(newUserId),
-    ])
-    await Promise.all([
-      addTx(referrerAccount.id, 'Bônus de indicação — amigo cadastrado'),
-      addTx(newAccount.id, 'Bônus de boas-vindas via indicação'),
-    ])
-  }
 
   private generateTokens(userId: string, email: string, role: string) {
     const payload = { sub: userId, email, role }
