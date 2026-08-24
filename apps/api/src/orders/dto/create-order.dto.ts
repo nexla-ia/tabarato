@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsEnum, IsNumber, IsOptional, IsPositive, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsEnum, IsInt, IsNumber, IsOptional, IsPositive, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { PaymentMethod } from '@prisma/client'
 
@@ -10,7 +10,7 @@ export class OrderItemDto {
   @IsOptional()
   variationId?: string
 
-  @IsNumber()
+  @IsInt()
   @Min(1)
   @Max(1000)
   quantity: number

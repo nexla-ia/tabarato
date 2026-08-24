@@ -3,6 +3,7 @@ import {
   UploadedFile, BadRequestException,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
+import { Throttle } from '@nestjs/throttler'
 import { memoryStorage } from 'multer'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { UploadsService } from './uploads.service'
@@ -14,6 +15,8 @@ const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
+  // Anti-abuso: no máx. 20 uploads/min por usuário (evita floodar o Storage).
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @UseGuards(JwtAuthGuard)
   @Post('image')
   @UseInterceptors(

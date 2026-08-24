@@ -11,8 +11,8 @@ import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
 import { OrderConsumptionService } from './order-consumption.service'
 import { CreateOrderDto } from './dto/create-order.dto'
 
-function isStoreOpenNow(openingHours: any, scheduleExceptions?: any): boolean | null {
-  const localMs = Date.now() - 4 * 60 * 60 * 1000
+function isStoreOpenNow(openingHours: any, scheduleExceptions?: any, atMs: number = Date.now()): boolean | null {
+  const localMs = atMs - 4 * 60 * 60 * 1000
   const local   = new Date(localMs)
   const today   = local.toISOString().slice(0, 10) // YYYY-MM-DD
 
@@ -115,6 +115,9 @@ export class OrdersService {
         },
       })
       const prev = existing?.orders?.[0]
+      // Escopo por usuário: a idempotencyKey de outro cliente NÃO pode devolver o
+      // pedido dele (vazaria endereço/itens e o deliveryCode anti-fraude).
+      if (prev && (prev as any).userId !== userId) throw new ForbiddenException()
       if (prev) {
         // Só devolve o pedido anterior se ele ainda estiver VIVO. Se a tentativa
         // anterior morreu (PIX não gerou o QR ou cartão recusado → pedido CANCELLED
@@ -171,6 +174,10 @@ export class OrdersService {
       // Fechada se: fora do horário, ou isOpen false, ou pausada manualmente pelo lojista.
       const closed = (openNow !== null ? !openNow : !store.isOpen) || (store as any).isPaused
       if (closed) throw new BadRequestException('Esta loja está fechada no momento. Tente novamente mais tarde.')
+    } else {
+      // Agendamento: o horário escolhido tem que cair dentro do funcionamento da loja.
+      const openAt = isStoreOpenNow(store.openingHours, (store as any).scheduleExceptions, scheduledDate.getTime())
+      if (openAt === false) throw new BadRequestException('A loja não funciona no horário agendado. Escolha outro horário.')
     }
 
     // Check concurrent orders limit (null = unlimited; 0 treated as unlimited)
@@ -215,6 +222,12 @@ export class OrdersService {
       })
       if (!product || !product.isActive) {
         throw new BadRequestException(`Product ${item.productId} not available`)
+      }
+      // O produto TEM que ser da loja informada (igual ao prepareStoreGroup). Sem isso
+      // dá pra pedir produto de outra loja sob esta, furar estoque/roteamento e abusar
+      // do cupom da loja informada.
+      if (product.storeId !== storeId) {
+        throw new BadRequestException('Um item não pertence à loja informada.')
       }
 
       if (product.stock !== null && product.stock < item.quantity) {
@@ -579,6 +592,9 @@ export class OrdersService {
       const openNow = isStoreOpenNow(store.openingHours, (store as any).scheduleExceptions)
       const closed = (openNow !== null ? !openNow : !store.isOpen) || (store as any).isPaused
       if (closed) throw new BadRequestException(`A loja "${store.name}" está fechada no momento.`)
+    } else {
+      const openAt = isStoreOpenNow(store.openingHours, (store as any).scheduleExceptions, scheduledDate.getTime())
+      if (openAt === false) throw new BadRequestException(`A loja "${store.name}" não funciona no horário agendado. Escolha outro horário.`)
     }
     const maxConcurrent = (store as any).maxConcurrentOrders
     if (maxConcurrent != null && maxConcurrent > 0) {
@@ -651,6 +667,8 @@ export class OrdersService {
         include: { orders: { include: { items: { include: { product: true, variation: true } }, payment: true, address: true, store: { select: { id: true, name: true, logoUrl: true } } } } },
       })
       if (existing?.orders?.length) {
+        // Escopo por usuário: não devolver o pedido de outro cliente (PII + deliveryCode).
+        if (existing.orders.some((o) => (o as any).userId !== userId)) throw new ForbiddenException()
         const dead = (existing as any).status === 'FAILED' || existing.orders.every((o) => o.status === 'CANCELLED')
         if (!dead) return { orders: existing.orders, payment: existing }
         throw new BadRequestException('A tentativa de pagamento anterior não foi concluída. Refaça o pedido.')

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -12,6 +13,8 @@ import { UpdateStatusDto } from './dto/update-status.dto'
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  // Anti-spam: cada checkout dispara PIX/cartão no MP → limita 12 pedidos/min por usuário.
+  @Throttle({ default: { ttl: 60_000, limit: 12 } })
   @Post()
   create(@CurrentUser() user: any, @Body() dto: CreateOrderDto) {
     // App novo manda `groups` (carrinho multi-loja) → createMulti (N pedidos, 1 pagamento).

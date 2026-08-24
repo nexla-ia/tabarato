@@ -94,10 +94,11 @@ export class AuthService {
     // aud = o client id do Google (Web). Se configurado, exige bater (senão o token
     // poderia ser de outro app). Aceita a lista separada por vírgula (Web/Android/iOS).
     const audEnv = this.config.get<string>('GOOGLE_CLIENT_IDS') ?? this.config.get<string>('GOOGLE_WEB_CLIENT_ID')
-    if (audEnv) {
-      const allowed = audEnv.split(',').map((s) => s.trim()).filter(Boolean)
-      if (!allowed.includes(payload.aud)) throw new UnauthorizedException('Token do Google inválido (audiência).')
-    }
+    const allowed = (audEnv ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+    // Fail-CLOSED: sem client id configurado, NÃO aceitar (senão um ID token emitido
+    // para outro app Google seria aceito → takeover da conta por confused-deputy).
+    if (allowed.length === 0) throw new UnauthorizedException('Login com Google indisponível no momento.')
+    if (!allowed.includes(payload.aud)) throw new UnauthorizedException('Token do Google inválido (audiência).')
     const emailVerified = payload.email_verified === true || payload.email_verified === 'true'
     if (!emailVerified) throw new UnauthorizedException('E-mail do Google não verificado.')
     const email = (payload.email as string | undefined)?.toLowerCase()

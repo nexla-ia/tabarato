@@ -405,6 +405,21 @@ export class PaymentsService {
         await this.prisma.order.updateMany({ where: { paymentId: order.payment.id, status: 'PENDING' }, data: { status: 'CONFIRMED' } })
         return updated
       }
+      // PIX recusado/cancelado/expirado: se o webhook se perdeu, o "Já paguei — verificar"
+      // resolve aqui — cancela o pedido e DEVOLVE estoque/cupom/pontos (não fica PENDING).
+      if (['rejected', 'cancelled', 'expired'].includes(mpPayment.status as string)) {
+        const claim = await this.prisma.payment.updateMany({
+          where: { id: order.payment.id, status: 'PENDING' },
+          data: { status: 'FAILED' },
+        })
+        if (claim.count > 0) {
+          await this.orderConsumption.cancelPendingForPayment(order.payment.id)
+          this.notifications.create(order.userId, 'PAYMENT', 'Pagamento não concluído',
+            `O pagamento do pedido #${orderId.slice(0, 8)} não foi confirmado — pedido cancelado.`, { orderId })
+            .catch((err) => this.logger.warn('Notification failed', err))
+          return await this.prisma.payment.findUnique({ where: { id: order.payment.id } })
+        }
+      }
     } catch {}
 
     return order.payment
