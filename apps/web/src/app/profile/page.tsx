@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ShoppingBag, LayoutDashboard, Store as StoreIcon, ChevronRight, Eye, EyeOff, Award, Gift, Copy, Check, Share2 } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
+import { geocodeAddress } from '@/lib/geocoding'
 import { useAuth } from '@/hooks/useAuth'
 import { formatPhone, onlyDigits } from '@/lib/masks'
 import styles from './page.module.css'
@@ -45,6 +46,8 @@ export default function ProfilePage() {
   const [saveMsg, setSaveMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editAddr, setEditAddr] = useState<any | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -145,6 +148,28 @@ export default function ProfilePage() {
     } catch {} finally {
       setDeletingId(null)
     }
+  }
+
+  async function handleSaveEditAddr() {
+    if (!editAddr) return
+    setSavingEdit(true)
+    try {
+      // Re-geocodifica pra atualizar as coords (frete usa distância real). Falha na
+      // geocodificação não bloqueia: mantém as coords atuais.
+      const query = `${editAddr.street}, ${editAddr.number}, ${editAddr.district}, ${editAddr.city} - ${editAddr.state}, ${editAddr.zipCode}, Brasil`
+      const coords = await geocodeAddress(query).catch(() => null)
+      const payload = {
+        label: editAddr.label, street: editAddr.street, number: editAddr.number,
+        complement: editAddr.complement || undefined, district: editAddr.district,
+        city: editAddr.city, state: editAddr.state, zipCode: editAddr.zipCode,
+        ...(coords ?? {}),
+      }
+      const { data } = await api.patch(`/users/me/addresses/${editAddr.id}`, payload)
+      setAddresses(prev => prev.map(a => (a.id === editAddr.id ? data : a)))
+      setEditAddr(null)
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? 'Não foi possível salvar o endereço.')
+    } finally { setSavingEdit(false) }
   }
 
   function handleLogout() {
@@ -382,7 +407,7 @@ export default function ProfilePage() {
               ) : (
                 <div className={styles.addrList}>
                   {addresses.map(addr => (
-                    <div key={addr.id} className={styles.addrItem}>
+                    <div key={addr.id} className={styles.addrItem} style={{ flexWrap: 'wrap' }}>
                       <div className={styles.addrLeft}>
                         <div className={styles.addrIcon}>{addrIcon(addr.label)}</div>
                         <div>
@@ -396,13 +421,45 @@ export default function ProfilePage() {
                           </div>
                         </div>
                       </div>
-                      <button
-                        className={styles.deleteBtn}
-                        onClick={() => handleDeleteAddr(addr.id)}
-                        disabled={deletingId === addr.id}
-                      >
-                        {deletingId === addr.id ? '...' : 'Remover'}
-                      </button>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          className={styles.deleteBtn}
+                          style={{ color: 'var(--primary, #FF6600)' }}
+                          onClick={() => setEditAddr(editAddr?.id === addr.id ? null : { ...addr, complement: addr.complement ?? '' })}
+                        >
+                          {editAddr?.id === addr.id ? 'Fechar' : 'Editar'}
+                        </button>
+                        <button
+                          className={styles.deleteBtn}
+                          onClick={() => handleDeleteAddr(addr.id)}
+                          disabled={deletingId === addr.id}
+                        >
+                          {deletingId === addr.id ? '...' : 'Remover'}
+                        </button>
+                      </div>
+
+                      {editAddr?.id === addr.id && (
+                        <div style={{ flexBasis: '100%', marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          {([
+                            ['label', 'Nome (Casa, Trabalho…)'], ['street', 'Rua'], ['number', 'Número'],
+                            ['complement', 'Complemento'], ['district', 'Bairro'], ['city', 'Cidade'],
+                            ['state', 'UF'], ['zipCode', 'CEP'],
+                          ] as [string, string][]).map(([k, ph]) => (
+                            <input
+                              key={k}
+                              value={(editAddr as any)[k] ?? ''}
+                              onChange={(e) => setEditAddr((p: any) => ({ ...p, [k]: e.target.value }))}
+                              placeholder={ph}
+                              style={{ padding: '9px 11px', borderRadius: 9, border: '1.5px solid var(--border, #e5e5e5)', fontSize: 13.5, gridColumn: (k === 'street' || k === 'complement') ? 'span 2' : undefined }}
+                            />
+                          ))}
+                          <button
+                            onClick={handleSaveEditAddr}
+                            disabled={savingEdit || !editAddr.street || !editAddr.number}
+                            style={{ gridColumn: 'span 2', padding: '11px', borderRadius: 10, border: 'none', background: 'var(--primary, #FF6600)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
+                          >{savingEdit ? 'Salvando…' : 'Salvar endereço'}</button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

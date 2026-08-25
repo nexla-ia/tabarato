@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Clock, X, MapPin, CreditCard, TriangleAlert, MessageCircle } from 'lucide-react'
+import { ArrowRight, Clock, X, MapPin, CreditCard, TriangleAlert, MessageCircle, Printer } from 'lucide-react'
 import { api } from '@/lib/api'
 import {
   Order, OrderStatus, STATUS_LABEL, STATUS_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL,
@@ -70,6 +70,35 @@ export default function PedidosPage() {
 
   const orders = ordersQ.data ?? []
   const lateCount = orders.filter(isOrderLate).length
+
+  // Imprime um comprovante simples do pedido (abre janela de impressão do navegador).
+  function printOrder(o: any) {
+    const win = window.open('', '_blank', 'width=400,height=640')
+    if (!win) return
+    const esc = (s: any) => String(s ?? '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] as string))
+    const items = (o.items ?? []).map((i: any) =>
+      `<tr><td>${esc(i.quantity)}x ${esc(i.product?.name)}${i.variation?.name ? ' - ' + esc(i.variation.name) : ''}</td><td style="text-align:right">${money(i.unitPrice * i.quantity)}</td></tr>`).join('')
+    const addr = o.address ? [o.address.street, o.address.number, o.address.district, o.address.city].filter(Boolean).map(esc).join(', ') : ''
+    win.document.write(`<html><head><title>Pedido ${esc(o.id.slice(-6).toUpperCase())}</title>
+      <style>body{font-family:monospace;padding:12px;font-size:13px}h2{margin:0 0 4px}table{width:100%;border-collapse:collapse}td{padding:2px 0}hr{border:0;border-top:1px dashed #000;margin:8px 0}.tot{font-weight:bold;font-size:15px}</style>
+      </head><body>
+      <h2>Tá Barato</h2>
+      <div>Pedido #${esc(o.id.slice(-6).toUpperCase())}</div>
+      <div>${esc(new Date(o.createdAt).toLocaleString('pt-BR'))}</div><hr/>
+      <div><b>Cliente:</b> ${esc(o.user?.name)} ${esc(o.user?.phone ?? '')}</div>
+      ${addr ? `<div><b>Entrega:</b> ${addr}</div>` : ''}<hr/>
+      <table>${items}</table><hr/>
+      <table>
+        <tr><td>Subtotal</td><td style="text-align:right">${money(o.subtotal)}</td></tr>
+        <tr><td>Entrega</td><td style="text-align:right">${money(o.deliveryFee)}</td></tr>
+        ${Number(o.discount) > 0 ? `<tr><td>Desconto</td><td style="text-align:right">-${money(o.discount)}</td></tr>` : ''}
+        <tr class="tot"><td>Total</td><td style="text-align:right">${money(o.total)}</td></tr>
+      </table><hr/>
+      <div>Pagamento: ${esc(PAYMENT_LABEL[o.payment?.method ?? ''] ?? o.payment?.method ?? '-')}</div>
+      <script>window.onload=function(){window.print()}</script>
+      </body></html>`)
+    win.document.close()
+  }
   const filtered = (
     filter === 'ALL' ? orders
     : filter === 'LATE' ? orders.filter(isOrderLate)
@@ -169,6 +198,13 @@ export default function PedidosPage() {
 
                 <div className={styles.totals}>
                   <span className={styles.payment}><CreditCard size={13} /> {PAYMENT_LABEL[o.payment?.method ?? ''] ?? o.payment?.method ?? '—'}</span>
+                  <button
+                    onClick={() => printOrder(o)}
+                    title="Imprimir comprovante"
+                    style={{ marginLeft: 'auto', marginRight: 12, border: '1px solid var(--border,#e5e5e5)', background: 'transparent', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <Printer size={13} /> Imprimir
+                  </button>
                   <div className={styles.totalBox}>
                     <span className={styles.totalLabel}>Total</span>
                     <span className={styles.total}>{money(o.total)}</span>
