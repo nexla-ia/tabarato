@@ -29,9 +29,13 @@ export default function LoginPage() {
     // exige uma barra e não duas, pra garantir que é sempre um caminho interno.
     if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
       router.push(redirect)
+    } else if (data.user?.role === 'STORE_OWNER') {
+      router.push('/lojista')
+    } else if (data.user && !data.user.city) {
+      // Cliente sem cidade (típico do login Google) → completa o perfil antes.
+      router.push('/completar-perfil')
     } else {
-      // Route by role: store owners land on the lojista panel
-      router.push(data.user?.role === 'STORE_OWNER' ? '/lojista' : '/')
+      router.push('/')
     }
   }
 
