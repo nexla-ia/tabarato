@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, CreditCard, ExternalLink, AlertTriangle, Loader2, Store as StoreIcon, Camera, Copy, Plus, X, Upload, Clock, Images } from 'lucide-react'
 import { api } from '@/lib/api'
-import { Store, DaySchedule } from '@/lib/types'
+import { Store, DaySchedule, ScheduleException } from '@/lib/types'
 import { formatPhone, onlyDigits } from '@/lib/masks'
 import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
@@ -34,6 +34,8 @@ export default function ConfigPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState('')
   const [hours, setHours] = useState<DaySchedule[]>(DEFAULT_HOURS)
+  const [exceptions, setExceptions] = useState<ScheduleException[]>([])
+  const [newException, setNewException] = useState('')
   const [saved, setSaved] = useState(false)
   const [mpMsg, setMpMsg] = useState<'ok' | 'erro' | null>(null)
   const [connecting, setConnecting] = useState(false)
@@ -104,6 +106,7 @@ export default function ConfigPage() {
     setRadius(s.deliveryRadiusKm != null ? String(s.deliveryRadiusKm) : '')
     setLogoUrl(s.logoUrl ?? '')
     setHours(Array.isArray(s.openingHours) && s.openingHours.length === 7 ? s.openingHours : DEFAULT_HOURS)
+    setExceptions(Array.isArray(s.scheduleExceptions) ? s.scheduleExceptions : [])
     setPhotos(Array.isArray(s.photos) ? s.photos : [])
     setDocumentUrl(s.documentUrl ?? '')
     setMaxConcurrentOrders(s.maxConcurrentOrders != null ? String(s.maxConcurrentOrders) : '')
@@ -164,6 +167,19 @@ export default function ConfigPage() {
     const { from, to } = hours[index]
     setHours((prev) => prev.map((d) => ({ ...d, from, to })))
   }
+  // Exceções de data (feriados / dias especiais) — sobrepõem o horário semanal.
+  function addException() {
+    const date = newException
+    if (!date || exceptions.some((e) => e.date === date)) return
+    setExceptions((prev) => [...prev, { date, closed: true }].sort((a, b) => a.date.localeCompare(b.date)))
+    setNewException('')
+  }
+  function removeException(date: string) {
+    setExceptions((prev) => prev.filter((e) => e.date !== date))
+  }
+  function toggleExceptionClosed(date: string) {
+    setExceptions((prev) => prev.map((e) => (e.date === date ? { ...e, closed: !e.closed } : e)))
+  }
 
   const save = useMutation({
     mutationFn: async () => (await api.patch('/stores/my', {
@@ -173,6 +189,7 @@ export default function ConfigPage() {
       deliveryRadiusKm: radius === '' ? undefined : Number(radius),
       logoUrl: logoUrl || undefined,
       openingHours: hours,
+      scheduleExceptions: exceptions,
       photos,
       documentUrl: documentUrl || undefined,
       maxConcurrentOrders: maxConcurrentOrders === '' ? null : Number(maxConcurrentOrders),
@@ -299,6 +316,42 @@ export default function ConfigPage() {
           ))}
         </div>
         <p className={styles.hint}>Fora desses horários sua loja aparece como fechada automaticamente. Você ainda pode pausar manualmente a qualquer momento no Painel.</p>
+
+        {/* Feriados / dias especiais — sobrepõem o horário normal */}
+        <label className={styles.label} style={{ marginTop: 20 }}>Feriados / dias especiais</label>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <input
+            type="date" value={newException}
+            onChange={(e) => setNewException(e.target.value)}
+            className={styles.timeInput}
+            style={{ flex: 1 }}
+          />
+          <button type="button" className={styles.saveBtn} style={{ margin: 0, width: 'auto', padding: '0 16px' }} onClick={addException} disabled={!newException}>
+            + Adicionar
+          </button>
+        </div>
+        {exceptions.length === 0 ? (
+          <p className={styles.hint} style={{ marginTop: 0 }}>Nenhum feriado cadastrado. Adicione datas em que a loja fecha (ou abre) fora do horário normal.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {exceptions.map((ex) => (
+              <div key={ex.date} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: '1px solid var(--border, #eee)', borderRadius: 10 }}>
+                <span style={{ flex: 1, fontWeight: 600 }}>
+                  {ex.date.split('-').reverse().join('/')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => toggleExceptionClosed(ex.date)}
+                  style={{
+                    padding: '4px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1px solid',
+                    borderColor: ex.closed ? '#DC2626' : '#16A34A', color: ex.closed ? '#DC2626' : '#16A34A', background: 'transparent',
+                  }}
+                >{ex.closed ? 'Fechada' : 'Aberta'}</button>
+                <button type="button" onClick={() => removeException(ex.date)} style={{ border: 'none', background: 'transparent', color: 'var(--muted, #999)', cursor: 'pointer' }} title="Remover">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
 
         <button className={styles.saveBtn} onClick={() => save.mutate()} disabled={save.isPending || !name}>
           {saved ? <><Check size={17} /> Salvo!</> : save.isPending ? 'Salvando…' : 'Salvar alterações'}

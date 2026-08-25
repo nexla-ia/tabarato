@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { Navbar } from '@/components/Navbar'
 import { OrderChat } from '@/components/OrderChat'
 import { OrderReview } from '@/components/OrderReview'
+import { CourierReview } from '@/components/CourierReview'
 import { useAuth } from '@/hooks/useAuth'
 import { useCartStore } from '@/stores/cart'
 import { api } from '@/lib/api'
@@ -241,6 +242,11 @@ export default function OrderDetailPage() {
             <div style={{ marginTop: 10 }}>
               <OrderReview orderId={order.id} />
             </div>
+            {order.delivery?.courier && (
+              <div style={{ marginTop: 16, borderTop: '1px solid var(--border, #eee)', paddingTop: 16 }}>
+                <CourierReview orderId={order.id} courierName={order.delivery.courier.user?.name} />
+              </div>
+            )}
           </div>
         )}
 
