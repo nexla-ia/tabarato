@@ -9,6 +9,7 @@ import { OrderReview } from '@/components/OrderReview'
 import { CourierReview } from '@/components/CourierReview'
 import { useAuth } from '@/hooks/useAuth'
 import { useCartStore } from '@/stores/cart'
+import { useCourierPosition } from '@/hooks/useCourierPosition'
 import { api } from '@/lib/api'
 import styles from './page.module.css'
 
@@ -49,6 +50,11 @@ export default function OrderDetailPage() {
     }, 8000)
     return () => clearInterval(t)
   }, [id, order?.status, isTerminal])
+
+  // Rastreio ao vivo do entregador (enquanto a entrega está a caminho).
+  const LIVE_DELIVERY = ['COURIER_ASSIGNED', 'COURIER_HEADING_TO_STORE', 'COURIER_AT_STORE', 'PICKED_UP', 'HEADING_TO_CLIENT']
+  const trackingActive = !!order?.delivery && LIVE_DELIVERY.includes(order?.delivery?.status) && !isTerminal
+  const courierPos = useCourierPosition(order?.id ?? null, trackingActive)
 
   async function handleCheckPix() {
     setCheckingPix(true)
@@ -212,6 +218,22 @@ export default function OrderDetailPage() {
               : <p className={styles.searching}>🔍 Buscando entregador...</p>
             }
             <p className={styles.deliveryStatus}>{order.delivery.status?.replace(/_/g, ' ')}</p>
+
+            {/* Mapa ao vivo com a posição do entregador (enquanto a caminho) */}
+            {trackingActive && courierPos && (
+              <div style={{ marginTop: 10 }}>
+                <iframe
+                  title="Rastreio do entregador"
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${courierPos.lng - 0.008}%2C${courierPos.lat - 0.006}%2C${courierPos.lng + 0.008}%2C${courierPos.lat + 0.006}&layer=mapnik&marker=${courierPos.lat}%2C${courierPos.lng}`}
+                  style={{ width: '100%', height: 220, border: 0, borderRadius: 12 }}
+                  loading="lazy"
+                />
+                <p className={styles.deliveryStatus} style={{ fontSize: 12, marginTop: 6 }}>📍 Posição do entregador ao vivo</p>
+              </div>
+            )}
+            {trackingActive && !courierPos && (
+              <p className={styles.deliveryStatus} style={{ fontSize: 12, marginTop: 6 }}>📍 Localizando o entregador…</p>
+            )}
 
             {/* Código de entrega (anti-fraude): cliente informa ao entregador */}
             {order.deliveryCode
