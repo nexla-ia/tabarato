@@ -17,7 +17,7 @@
 }
 
 /* Painel de conversas fixo à esquerda do chat (desktop/tablet). */
-.layout { display: flex; gap: 16px; align-items: flex-start; }
+.layout { display: flex; gap: 16px; align-items: flex-start; max-width: 100%; overflow: hidden; }
 .panel {
   width: 260px; flex-shrink: 0;
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
@@ -43,12 +43,19 @@
 }
 .drawerHead button { color: var(--muted); display: flex; }
 
-@media (max-width: 780px) {
+/* 780px é o ponto em que o painel some numa página comum, mas esta vive
+   dentro do shell do lojista — sidebar (232px) + padding do .main (72px)
+   comem esse espaço antes mesmo do conteúdo começar. Sem esse desconto, uma
+   janela de ~700-950px passa no teste de "780px de viewport" e tenta mostrar
+   o painel de 260px mesmo sem sobrar espaço nenhum pro chat, que aí vaza pra
+   fora da tela. +304px compensa exatamente essa sobra da sidebar/padding.
+   Ver também apps/web/src/app/lojista/layout.module.css (.sidebar, .main). */
+@media (max-width: 1084px) {
   .panel { display: none; }
   .convBtn { display: inline-flex; }
 }
 
-.header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; min-width: 0; }
 .avatar {
   width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
   background: var(--orange-light); color: var(--orange-dark);
@@ -56,5 +63,11 @@
   font-family: var(--display); font-weight: 800; font-size: 18px;
 }
 .headerInfo { min-width: 0; }
-.title { font-family: var(--display); font-size: 19px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
-.sub { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.title {
+  font-family: var(--display); font-size: 19px; font-weight: 800; letter-spacing: -0.02em; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sub {
+  font-size: 12.5px; font-weight: 600; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
