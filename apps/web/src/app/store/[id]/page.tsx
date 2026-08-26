@@ -35,6 +35,8 @@ export default async function StorePage({ params }: { params: Promise<{ id: stri
     isOpen: store.isOpen,
     phone: store.phone,
     address: store.address,
+    lat: store.lat,
+    lng: store.lng,
     deliveryRadiusKm: store.deliveryRadiusKm,
     prepTimeMin: store.prepTimeMin,
   }

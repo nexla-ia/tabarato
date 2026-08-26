@@ -15,6 +15,18 @@ import styles from './StoreClient.module.css'
 // re-render infinito (React #185) sempre que a loja não tivesse itens no carrinho.
 const EMPTY_ITEMS: CartItem[] = []
 
+// Coordenadas dão um pino exato (é a localização que o próprio lojista marcou
+// no cadastro); sem elas, cai pro texto do endereço — o Maps geocodifica.
+function mapsUrl(store: { address?: string | null; lat?: number | null; lng?: number | null }): string | null {
+  if (store.lat != null && store.lng != null) {
+    return `https://www.google.com/maps/search/?api=1&query=${store.lat},${store.lng}`
+  }
+  if (store.address) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(store.address)}`
+  }
+  return null
+}
+
 interface Variation { id: string; name: string; price: number | string; stock?: number | null }
 interface Category { id: string; name: string; icon?: string | null }
 interface Product {
@@ -41,6 +53,7 @@ interface Store {
   id: string; name: string; description?: string; logoUrl?: string
   deliveryRadiusKm: number; prepTimeMin: number; isOpen: boolean
   address?: string | null; phone?: string | null
+  lat?: number | null; lng?: number | null
 }
 interface Review {
   id: string; rating: number; comment?: string | null
@@ -169,10 +182,16 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
               <span className={styles.metaItem}><MapPin size={13} /> até {store.deliveryRadiusKm} km</span>
             </div>
             {store.address && (
-              <div className={styles.addressChip}>
+              <a
+                href={mapsUrl(store) ?? undefined}
+                target="_blank" rel="noopener noreferrer"
+                className={styles.addressChip}
+                onClick={(e) => e.stopPropagation()}
+                title="Abrir no Google Maps"
+              >
                 <MapPin size={13} />
                 <span>{store.address}</span>
-              </div>
+              </a>
             )}
           </div>
         </div>
