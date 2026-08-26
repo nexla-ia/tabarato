@@ -186,15 +186,13 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
                 <div className={styles.infoValue}>{store.isOpen ? 'Aberta agora' : 'Fechada'} · entrega até {store.deliveryRadiusKm} km · ~{store.prepTimeMin} min</div>
               </div>
             </div>
-            {store.address && (
-              <div className={styles.infoItem}>
-                <MapPin size={16} />
-                <div>
-                  <div className={styles.infoLabel}>Endereço</div>
-                  <div className={styles.infoValue}>{store.address}</div>
-                </div>
+            <div className={styles.infoItem}>
+              <MapPin size={16} />
+              <div>
+                <div className={styles.infoLabel}>Endereço</div>
+                <div className={styles.infoValue}>{store.address}</div>
               </div>
-            )}
+            </div>
           </div>
         )}
 
