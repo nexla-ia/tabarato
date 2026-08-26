@@ -22,6 +22,11 @@ const STATUS_LABEL: Record<string, string> = {
   READY: 'Pronto', PICKED_UP: 'A caminho', DELIVERED: 'Entregue', CANCELLED: 'Cancelado',
 }
 
+/** Pedido entregue ou cancelado = conversa só-leitura (ver OrderChat). */
+function closedReasonOf(status: string): 'DELIVERED' | 'CANCELLED' | undefined {
+  return status === 'DELIVERED' || status === 'CANCELLED' ? status : undefined
+}
+
 function ChatHeader({ order }: { order: OrderListItem }) {
   return (
     <div className={styles.header}>
@@ -116,7 +121,7 @@ function MensagensContent() {
             {selected ? (
               <>
                 <ChatHeader order={selected} />
-                <OrderChat orderId={selected.id} currentUserId={user.id} fill />
+                <OrderChat orderId={selected.id} currentUserId={user.id} fill closedReason={closedReasonOf(selected.status)} />
               </>
             ) : (
               <div className={styles.placeholder}>
@@ -135,7 +140,7 @@ function MensagensContent() {
                 <ArrowLeft size={16} /> Conversas
               </button>
               <ChatHeader order={selected} />
-              <OrderChat orderId={selected.id} currentUserId={user.id} fill />
+              <OrderChat orderId={selected.id} currentUserId={user.id} fill closedReason={closedReasonOf(selected.status)} />
             </div>
           ) : (
             <ChatConversationList items={conversations} activeId="" onSelect={setSelectedId} />

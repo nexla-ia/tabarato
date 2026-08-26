@@ -17,13 +17,21 @@ export interface ChatMessage {
   sender?: { id: string; name: string; role: string }
 }
 
+export type ChatClosedReason = 'DELIVERED' | 'CANCELLED'
+
 export function useOrderChat(orderId: string | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [connected, setConnected] = useState(false)
+  // Só é setado se o back recusar um envio (pedido virou entregue/cancelado
+  // ENQUANTO o chat estava aberto). A trava "de saída" — pedido já terminado
+  // antes de abrir — vem por prop de quem já sabe o status, sem precisar
+  // tentar mandar mensagem pra descobrir.
+  const [liveClosedReason, setLiveClosedReason] = useState<ChatClosedReason | null>(null)
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
     setMessages([])
+    setLiveClosedReason(null)
     if (!orderId) return
     const token = typeof window !== 'undefined' ? localStorage.getItem('tb_token') : null
     if (!token) return
@@ -42,6 +50,10 @@ export function useOrderChat(orderId: string | null) {
       if (msg.orderId !== orderId) return
       setMessages((prev) => [...prev, msg])
     })
+    socket.on('chat:closed', (data: { orderId: string; reason: ChatClosedReason }) => {
+      if (data.orderId !== orderId) return
+      setLiveClosedReason(data.reason)
+    })
 
     return () => {
       socket.emit('order:unwatch', { orderId })
@@ -56,5 +68,5 @@ export function useOrderChat(orderId: string | null) {
     socketRef.current.emit('chat:send', { orderId, content: trimmed.slice(0, 500) })
   }, [orderId])
 
-  return { messages, sendMessage, connected }
+  return { messages, sendMessage, connected, liveClosedReason }
 }

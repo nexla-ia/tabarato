@@ -100,7 +100,18 @@ export class DeliveryGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
     const user = (client as any).user as { sub: string; role: string }
     if (!user?.sub) return
-    if (!(await this.isParticipant(data.orderId, user.sub))) return
+
+    const order = await this.getParticipantOrder(data.orderId, user.sub)
+    if (!order) return
+
+    // Conversa trava quando o pedido termina — depois de entregue/cancelado
+    // não há mais nada a resolver por mensagem, e reabrir esse canal criaria
+    // um lugar sem dono claro pra reclamação nova. Avisa só quem tentou
+    // mandar (histórico continua legível pra quem só está lendo).
+    if (order.status === 'DELIVERED' || order.status === 'CANCELLED') {
+      client.emit('chat:closed', { orderId: data.orderId, reason: order.status })
+      return
+    }
 
     try {
       const msg = await this.prisma.chatMessage.create({
@@ -154,6 +165,27 @@ export class DeliveryGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       order.store?.userId === userId ||
       order.delivery?.courier?.userId === userId
     )
+  }
+
+  /** Igual a isParticipant, mas devolve o pedido (com status) em vez de bool —
+   *  usado só por chat:send, que precisa checar status DEPOIS de confirmar
+   *  participante, num único query em vez de dois. */
+  private async getParticipantOrder(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        status: true,
+        userId: true,
+        store: { select: { userId: true } },
+        delivery: { select: { courier: { select: { userId: true } } } },
+      },
+    })
+    if (!order) return null
+    const participant =
+      order.userId === userId ||
+      order.store?.userId === userId ||
+      order.delivery?.courier?.userId === userId
+    return participant ? order : null
   }
 
   /** True only if the user is the courier currently assigned to this order. */
