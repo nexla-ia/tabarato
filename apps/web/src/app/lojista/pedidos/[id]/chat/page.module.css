@@ -1,0 +1,19 @@
+.page { max-width: 680px; }
+.loading { padding: 60px; text-align: center; color: var(--muted); display: flex; justify-content: center; }
+
+.back {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 16px;
+}
+.back:hover { color: var(--orange); }
+
+.header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.avatar {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: var(--orange-light); color: var(--orange-dark);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-weight: 800; font-size: 18px;
+}
+.headerInfo { min-width: 0; }
+.title { font-family: var(--display); font-size: 19px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.sub { font-size: 12.5px; font-weight: 600; color: var(--muted); }

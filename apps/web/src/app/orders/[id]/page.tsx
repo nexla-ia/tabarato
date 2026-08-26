@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { MessageCircle, ArrowRight } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
-import { OrderChat } from '@/components/OrderChat'
 import { OrderReview } from '@/components/OrderReview'
 import { CourierReview } from '@/components/CourierReview'
 import { useAuth } from '@/hooks/useAuth'
@@ -280,14 +280,13 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {/* Chat com a loja */}
+        {/* Chat com a loja — tela própria, em vez de embutido aqui embaixo */}
         {user && (
-          <div className={styles.card} style={{ marginTop: 14 }}>
-            <h3 className={styles.sectionLabel}>Fale com a loja</h3>
-            <div style={{ marginTop: 10 }}>
-              <OrderChat orderId={order.id} currentUserId={user.id} />
-            </div>
-          </div>
+          <Link href={`/orders/${order.id}/chat`} className={styles.chatLink}>
+            <span className={styles.chatLinkIcon}><MessageCircle size={18} /></span>
+            <span className={styles.chatLinkText}>Fale com a loja</span>
+            <ArrowRight size={16} />
+          </Link>
         )}
       </div>
     </>

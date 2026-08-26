@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Clock, X, MapPin, CreditCard, TriangleAlert, MessageCircle, Printer } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -8,8 +9,6 @@ import {
   PAYMENT_LABEL, money, timeAgo, isOrderLate,
 } from '@/lib/types'
 import { Spinner } from '@/components/Spinner'
-import { OrderChat } from '@/components/OrderChat'
-import { useAuth } from '@/hooks/useAuth'
 import styles from './page.module.css'
 
 type FilterKey = OrderStatus | 'ALL' | 'LATE'
@@ -27,11 +26,10 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 export default function PedidosPage() {
   const qc = useQueryClient()
-  const { user } = useAuth()
+  const router = useRouter()
   const [filter, setFilter] = useState<FilterKey>('ALL')
   const [cancelId, setCancelId] = useState<string | null>(null)
   const [note, setNote] = useState('')
-  const [chatOrderId, setChatOrderId] = useState<string | null>(null)
 
   const ordersQ = useQuery<Order[]>({
     queryKey: ['store-orders'],
@@ -163,7 +161,7 @@ export default function PedidosPage() {
                     )}
                   </div>
                   <div className={styles.headRight}>
-                    <button className={styles.chatBtn} onClick={() => setChatOrderId(o.id)} title="Chat com o cliente">
+                    <button className={styles.chatBtn} onClick={() => router.push(`/lojista/pedidos/${o.id}/chat`)} title="Chat com o cliente">
                       <MessageCircle size={14} />
                     </button>
                     <span className={styles.time}><Clock size={12} /> {timeAgo(o.createdAt)}</span>
@@ -256,18 +254,6 @@ export default function PedidosPage() {
                 {cancel.isPending ? 'Recusando…' : 'Recusar pedido'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {chatOrderId && user && (
-        <div className={styles.overlay} onClick={() => setChatOrderId(null)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <div className={styles.modalHead}>
-              <h3>Chat · #{chatOrderId.slice(-6).toUpperCase()}</h3>
-              <button onClick={() => setChatOrderId(null)}><X size={18} /></button>
-            </div>
-            <OrderChat orderId={chatOrderId} currentUserId={user.id} />
           </div>
         </div>
       )}

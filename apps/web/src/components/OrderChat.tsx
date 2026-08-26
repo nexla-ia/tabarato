@@ -12,7 +12,15 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function OrderChat({ orderId, currentUserId }: { orderId: string; currentUserId: string }) {
+export function OrderChat({
+  orderId, currentUserId, fill = false,
+}: {
+  orderId: string
+  currentUserId: string
+  /** Cresce pra preencher a altura do container (tela dedicada de chat) em vez
+   *  do box baixinho (220–360px) usado quando o chat vem embutido numa página maior. */
+  fill?: boolean
+}) {
   const { messages, sendMessage, connected } = useOrderChat(orderId)
   const [text, setText] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -28,8 +36,8 @@ export function OrderChat({ orderId, currentUserId }: { orderId: string; current
   }
 
   return (
-    <div className={styles.chat}>
-      <div className={styles.messages}>
+    <div className={`${styles.chat} ${fill ? styles.chatFill : ''}`}>
+      <div className={`${styles.messages} ${fill ? styles.messagesFill : ''}`}>
         {messages.length === 0 ? (
           <p className={styles.empty}>{connected ? 'Nenhuma mensagem ainda.' : 'Conectando…'}</p>
         ) : (

@@ -10,6 +10,11 @@
 }
 .empty { color: var(--muted); font-size: 13px; text-align: center; margin: auto; }
 
+/* Tela dedicada: o box cresce até uma altura generosa e só a lista de
+   mensagens rola (o composer fica sempre visível no rodapé). */
+.chatFill { height: 70vh; min-height: 420px; }
+.messagesFill { max-height: none; }
+
 .bubbleRow { display: flex; }
 .bubbleRowMine { justify-content: flex-end; }
 
