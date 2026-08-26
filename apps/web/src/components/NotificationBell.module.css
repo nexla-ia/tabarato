@@ -61,3 +61,20 @@
 .itemTitle { font-size: 13.5px; font-weight: 700; color: var(--text); }
 .itemText { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
 .itemTime { font-size: 11px; color: var(--faint); margin-top: 2px; }
+
+/* Painel ancorado pela borda ESQUERDA do sino. Usado quando o sino vive num
+   container estreito (sidebar do lojista, 232px): com right:0 o painel de 340px
+   começaria em x negativo e o texto ficava cortado fora da viewport. */
+.panelLeft { left: 0; right: auto; }
+
+/* Em tela estreita nenhuma das duas âncoras cabe — o painel é mais largo que o
+   espaço de qualquer um dos lados. Passa a ocupar a largura da viewport, logo
+   abaixo da barra (navbar do cliente e topo do lojista têm ~60px no mobile). */
+@media (max-width: 720px) {
+  .panel, .panelLeft {
+    position: fixed;
+    top: var(--bell-panel-top, 66px);
+    left: 12px; right: 12px;
+    width: auto; max-width: none;
+  }
+}

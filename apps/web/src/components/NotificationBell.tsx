@@ -27,10 +27,16 @@ function timeAgo(iso: string): string {
 }
 
 export function NotificationBell({
-  variant = 'light', getOrderHref = (orderId: string) => `/orders/${orderId}`,
+  variant = 'light', align = 'right',
+  getOrderHref = (orderId: string) => `/orders/${orderId}`,
 }: {
   /** 'light' = navbar do cliente (fundo claro); 'dark' = sidebar escura do lojista */
   variant?: 'light' | 'dark'
+  /** Borda do sino em que o painel se ancora. 'right' serve pra sino no canto
+   *  direito de uma barra larga; 'left' pra sino dentro de container estreito
+   *  (sidebar do lojista tem 232px — ancorar à direita joga o painel de 340px
+   *  pra fora da viewport e corta o texto). */
+  align?: 'left' | 'right'
   /** Pra onde uma notificação com data.orderId leva ao clicar. Cliente tem página
    *  por pedido (/orders/:id); lojista não, então manda pra lista (/lojista/pedidos). */
   getOrderHref?: (orderId: string) => string
@@ -91,7 +97,7 @@ export function NotificationBell({
       </button>
 
       {open && (
-        <div className={styles.panel}>
+        <div className={`${styles.panel} ${align === 'left' ? styles.panelLeft : ''}`}>
           <div className={styles.panelHead}>
             <span>Notificações</span>
             {count > 0 && (

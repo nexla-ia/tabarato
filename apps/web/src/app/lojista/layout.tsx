@@ -125,7 +125,7 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
             <div className={styles.brandName}>Tá Barato</div>
             <div className={styles.brandTag}>LOJISTA</div>
           </div>
-          <NotificationBell variant="dark" getOrderHref={() => '/lojista/pedidos'} />
+          <NotificationBell variant="dark" align="left" getOrderHref={() => '/lojista/pedidos'} />
         </div>
 
         <nav className={styles.nav}>
