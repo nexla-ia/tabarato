@@ -1,6 +1,48 @@
 .loading { padding: 60px; text-align: center; color: var(--muted); }
-.back { font-size: 14px; color: var(--muted); font-weight: 600; display: inline-flex; align-items: center; gap: 5px; margin-bottom: 16px; }
+
+.topRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.back { font-size: 14px; color: var(--muted); font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
 .back:hover { color: var(--orange); }
+
+/* Botão que abre a lista de conversas como gaveta — só existe em telas
+   estreitas, onde não cabe o painel fixo ao lado do chat. */
+.convBtn {
+  display: none; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 700; color: var(--orange-dark);
+  background: var(--orange-light); border-radius: 10px; padding: 8px 12px;
+}
+
+/* Painel de conversas fixo à esquerda do chat (desktop/tablet). */
+.layout { display: flex; gap: 16px; align-items: flex-start; }
+.panel {
+  width: 260px; flex-shrink: 0;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); height: 70vh; min-height: 420px; overflow: hidden;
+}
+.main { flex: 1; min-width: 0; }
+
+/* Gaveta (mobile): mesma lista, como overlay deslizando da esquerda. */
+.drawerOverlay {
+  position: fixed; inset: 0; background: rgba(26,10,0,0.45);
+  z-index: 60; display: flex;
+}
+.drawer {
+  width: 82%; max-width: 320px; height: 100%;
+  background: var(--card); display: flex; flex-direction: column;
+  animation: slideIn 0.18s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+.drawerHead {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px; border-bottom: 1px solid var(--border);
+  font-weight: 800; font-size: 15px; color: var(--text);
+}
+.drawerHead button { color: var(--muted); display: flex; }
+
+@media (max-width: 780px) {
+  .panel { display: none; }
+  .convBtn { display: inline-flex; }
+}
 
 .header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .storeLogo { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
