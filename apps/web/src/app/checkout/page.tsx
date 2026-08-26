@@ -85,8 +85,6 @@ export default function CheckoutPage() {
   const [pointsToRedeem, setPointsToRedeem] = useState(0)
 
   // Agendamento (opcional): entrega imediata por padrão.
-  const [isScheduled, setIsScheduled] = useState(false)
-  const [scheduledFor, setScheduledFor] = useState('')
 
   // Card fields
   const [cardNumber, setCardNumber] = useState('')
@@ -211,10 +209,6 @@ export default function CheckoutPage() {
       const firstError = cardErrors.cardNumber ?? cardErrors.expiry ?? cardErrors.cvv ?? cardErrors.cpf
       if (firstError) { setError(firstError); return }
     }
-    if (isScheduled) {
-      if (!scheduledFor) { setError('Escolha a data e hora do agendamento'); return }
-      if (new Date(scheduledFor).getTime() <= Date.now()) { setError('O horário agendado precisa ser no futuro'); return }
-    }
 
     setLoading(true); setError('')
     try {
@@ -241,7 +235,6 @@ export default function CheckoutPage() {
         // por antifraude (cc_rejected_high_risk). Só existe depois do script carregar.
         deviceId: typeof window !== 'undefined' ? window.MP_DEVICE_SESSION_ID : undefined,
         pointsToRedeem: pointsToRedeem > 0 ? pointsToRedeem : undefined,
-        scheduledFor: isScheduled && scheduledFor ? new Date(scheduledFor).toISOString() : undefined,
       })
 
       const orders: { id: string }[] = data.orders
@@ -428,38 +421,9 @@ export default function CheckoutPage() {
           )}
         </section>
 
-        {/* Agendamento (opcional) */}
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}><span className={styles.stepNum}>3</span> Entrega</h2>
-          <div className={styles.summaryCard}>
-            <label className={styles.addrCard} style={{ cursor: 'pointer' }}>
-              <input type="radio" name="sched" checked={!isScheduled} onChange={() => setIsScheduled(false)} style={{ display: 'none' }} />
-              <div className={styles.addrRadio}>{!isScheduled && <div className={styles.addrRadioInner} />}</div>
-              <div><div className={styles.addrLabel}>Entrega imediata</div><div className={styles.addrLine}>Assim que a loja preparar</div></div>
-            </label>
-            <label className={styles.addrCard} style={{ cursor: 'pointer' }}>
-              <input type="radio" name="sched" checked={isScheduled} onChange={() => setIsScheduled(true)} style={{ display: 'none' }} />
-              <div className={styles.addrRadio}>{isScheduled && <div className={styles.addrRadioInner} />}</div>
-              <div style={{ flex: 1 }}>
-                <div className={styles.addrLabel}>Agendar para depois</div>
-                {isScheduled && (
-                  <input
-                    type="datetime-local"
-                    value={scheduledFor}
-                    onChange={(e) => setScheduledFor(e.target.value)}
-                    className={styles.input}
-                    style={{ marginTop: 8 }}
-                    min={new Date(Date.now() + 30 * 60000).toISOString().slice(0, 16)}
-                  />
-                )}
-              </div>
-            </label>
-          </div>
-        </section>
-
         {/* Summary */}
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}><span className={styles.stepNum}>4</span> Resumo</h2>
+          <h2 className={styles.sectionTitle}><span className={styles.stepNum}>3</span> Resumo</h2>
           <div className={styles.summaryCard}>
             {stores.map(s => (
               <div key={s.storeId}>
