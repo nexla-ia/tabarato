@@ -281,28 +281,35 @@ export default function ProdutosPage() {
             </div>
 
             <label className={styles.label}>Promoção — Leve X Pague Y (opcional)</label>
-            <div className={styles.row}>
-              <div style={{ flex: 1 }}>
-                <input
-                  className={styles.input} inputMode="numeric" maxLength={2}
-                  value={form.promoBuyQty}
-                  onChange={e => setForm({ ...form, promoBuyQty: onlyDigits(e.target.value) })}
-                  placeholder="Leve (ex.: 3)"
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <input
-                  className={styles.input} inputMode="numeric" maxLength={2}
-                  value={form.promoPayQty}
-                  onChange={e => setForm({ ...form, promoPayQty: onlyDigits(e.target.value) })}
-                  placeholder="Pague (ex.: 2)"
-                />
-              </div>
+            <p className={styles.hint} style={{ marginTop: 0 }}>
+              Cliente compra várias unidades e paga por menos. Ex.: leva 3 e paga 2 → a 3ª sai grátis.
+            </p>
+            <div className={styles.promoSentence}>
+              <span>Cliente leva</span>
+              <input
+                className={styles.promoInput} inputMode="numeric" maxLength={2}
+                value={form.promoBuyQty}
+                onChange={e => setForm({ ...form, promoBuyQty: onlyDigits(e.target.value) })}
+                placeholder="3" aria-label="Quantas unidades o cliente leva"
+              />
+              <span>e paga</span>
+              <input
+                className={styles.promoInput} inputMode="numeric" maxLength={2}
+                value={form.promoPayQty}
+                onChange={e => setForm({ ...form, promoPayQty: onlyDigits(e.target.value) })}
+                placeholder="2" aria-label="Quantas unidades o cliente paga"
+              />
             </div>
-            {form.promoBuyQty && form.promoPayQty && Number(form.promoBuyQty) > Number(form.promoPayQty) && (
-              <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 700, color: '#15803D' }}>
-                🏷️ Cliente leva {form.promoBuyQty} e paga {form.promoPayQty} — {Number(form.promoBuyQty) - Number(form.promoPayQty)} grátis a cada {form.promoBuyQty}.
-              </p>
+            {form.promoBuyQty && form.promoPayQty && (
+              Number(form.promoBuyQty) > Number(form.promoPayQty) ? (
+                <p className={styles.promoOk}>
+                  🏷️ {Number(form.promoBuyQty) - Number(form.promoPayQty)} unidade(s) grátis a cada {form.promoBuyQty}.
+                </p>
+              ) : (
+                <p className={styles.promoWarn}>
+                  ⚠️ "Leva" precisa ser maior que "paga" — do jeito que está, o cliente pagaria por mais unidades do que leva.
+                </p>
+              )
             )}
 
             <label className={styles.label}>Categoria</label>

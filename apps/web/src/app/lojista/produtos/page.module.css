@@ -122,6 +122,27 @@
 
 .hint { color: var(--muted); font-size: 12px; margin-top: 5px; }
 
+/* Promoção "Leve X Pague Y": frase única com os números embutidos — o rótulo
+   ("leva"/"paga") fica sempre visível ao lado do número, em vez de sumir como
+   placeholder assim que o lojista digita (era a causa da confusão: "3" e "2"
+   lado a lado não dizem qual é qual). */
+.promoSentence {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  font-size: 14px; color: var(--text); font-weight: 600;
+}
+.promoInput {
+  width: 54px; text-align: center; border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 9px 4px; font-size: 15px; font-weight: 800; outline: none;
+  background: var(--bg); color: var(--orange);
+}
+.promoInput:focus { border-color: var(--orange); }
+.promoOk {
+  margin: 8px 0 0; font-size: 13px; font-weight: 700; color: #15803D;
+}
+.promoWarn {
+  margin: 8px 0 0; font-size: 13px; font-weight: 700; color: #B45309;
+}
+
 .imgUploadRow { display: flex; align-items: center; gap: 12px; }
 .imgPreview {
   width: 52px; height: 52px; border-radius: 11px; flex-shrink: 0;
