@@ -128,6 +128,12 @@ export default function CheckoutPage() {
     ? Math.round(perStoreDelivery.reduce((a, x) => a + (x.freeShip ? 0 : (x.delivery ?? 0)), 0) * 100) / 100
     : 0
   const loyaltyDiscount = (pointsToRedeem / 100) * 10
+  // Subtotal já líquido de promoção e cupom, mas ainda SEM a entrega nem os
+  // pontos de fidelidade (a fidelidade só é escolhida mais abaixo, depois da
+  // entrega). Existe só pra deixar a conta rastreável na tela — sem essa linha
+  // o cliente via "Subtotal" cheio, depois "Cupom -R$X" e tinha que subtrair
+  // de cabeça pra saber quanto ia entrar na entrega.
+  const productSubtotal = Math.max(0, Math.round((total() - promoTotal() - couponsTotal) * 100) / 100)
   const productNet = Math.max(0, Math.round((total() - promoTotal() - couponsTotal - loyaltyDiscount) * 100) / 100)
   const estimatedTotal = Math.round((productNet + deliveryCharged) * 100) / 100
 
@@ -450,6 +456,11 @@ export default function CheckoutPage() {
             {promoTotal() > 0 && (
               <div className={styles.summaryRow} style={{ color: '#15803D', fontWeight: 700 }}>
                 <span>🏷️ Promoções</span><span>-{fmtBRL(promoTotal())}</span>
+              </div>
+            )}
+            {(promoTotal() > 0 || couponsTotal > 0) && (
+              <div className={styles.summaryRow} style={{ fontWeight: 700 }}>
+                <span>Total dos produtos</span><span>{fmtBRL(productSubtotal)}</span>
               </div>
             )}
             <div className={styles.summaryRow}>
