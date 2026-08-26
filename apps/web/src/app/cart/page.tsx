@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -122,6 +122,37 @@ function StoreGroupCard({ storeCart, onUpdateQty, onRemoveItem, onClearStore }: 
   const storeSubtotal = storeCart.items.reduce((a, i) => a + i.price * i.quantity, 0)
   const storePromo = Math.round(storeCart.items.reduce((a, i) => a + promoDiscountFor(i.quantity, i.price, i.promoBuyQty, i.promoPayQty), 0) * 100) / 100
   const coupon = storeCart.coupon
+
+  // O cupom aplicado fica salvo no carrinho (localStorage) e só era revalidado na
+  // criação do pedido. Se nesse meio-tempo ele fosse usado em outro pedido — ou o
+  // subtotal caísse abaixo do mínimo ao mudar a quantidade — o checkout inteiro
+  // falhava com um erro que não apontava pro cupom. Revalida aqui e derruba na
+  // hora, dizendo o motivo.
+  useEffect(() => {
+    if (!coupon?.code) return
+    let cancelled = false
+    api.get('/coupons/validate', {
+      params: { code: coupon.code, subtotal: storeSubtotal, storeId: storeCart.storeId },
+    })
+      .then(({ data }) => {
+        if (cancelled) return
+        // Desconto percentual muda junto com a quantidade — mantém o resumo honesto.
+        if (data.discount !== coupon.discount || !!data.freeShipping !== coupon.freeShipping) {
+          setCoupon(storeCart.storeId, { ...coupon, discount: data.discount, freeShipping: !!data.freeShipping })
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return
+        // 401 é sessão expirada, não cupom inválido — não descarta por isso.
+        if (err.response?.status === 401) return
+        setCoupon(storeCart.storeId, null)
+        setCouponError(err.response?.data?.message ?? 'Este cupom não é mais válido')
+      })
+    return () => { cancelled = true }
+    // Só reage a troca de cupom/subtotal: incluir `coupon` inteiro reexecutaria a
+    // cada atualização de desconto que o próprio efeito faz.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coupon?.code, storeSubtotal, storeCart.storeId])
 
   async function applyCoupon() {
     const code = couponInput.trim().toUpperCase()
