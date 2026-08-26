@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Store as StoreIcon, Heart } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Heart } from 'lucide-react'
 import { useCartStore, CartItem } from '@/stores/cart'
 import { promoLabel } from '@/lib/promo'
 import { useAuth } from '@/hooks/useAuth'
@@ -176,16 +176,10 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
 
       {/* Info + Products */}
       <div className="container" style={{ padding: '24px 20px 120px' }}>
-        {/* Sobre a loja */}
+        {/* Endereço — status/km/min NÃO repetem aqui: já estão nos chips do
+            cabeçalho (statusChip + metaItem logo acima). */}
         {store.address && (
           <div className={styles.infoCard}>
-            <div className={styles.infoItem}>
-              <StoreIcon size={16} />
-              <div>
-                <div className={styles.infoLabel}>Loja</div>
-                <div className={styles.infoValue}>{store.isOpen ? 'Aberta agora' : 'Fechada'} · entrega até {store.deliveryRadiusKm} km · ~{store.prepTimeMin} min</div>
-              </div>
-            </div>
             <div className={styles.infoItem}>
               <MapPin size={16} />
               <div>
