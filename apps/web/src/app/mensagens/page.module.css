@@ -1,0 +1,10 @@
+.loading { padding: 80px 0; text-align: center; color: var(--muted); }
+
+.empty {
+  max-width: 420px; margin: 60px auto; text-align: center; padding: 48px 24px;
+  color: var(--muted); background: var(--card); border: 1px dashed var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.empty p { font-size: 14px; line-height: 1.5; }
+.shopBtn { display: inline-block; margin-top: 6px; background: var(--orange); color: #fff; padding: 12px 24px; border-radius: 999px; font-weight: 700; }
+.shopBtn:hover { background: var(--orange-dark); }

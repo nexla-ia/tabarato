@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { LayoutDashboard, ReceiptText, Package, Ticket, Wallet, Star, BarChart3, Settings, LogOut, Lock } from 'lucide-react'
+import { LayoutDashboard, ReceiptText, MessagesSquare, Package, Ticket, Wallet, Star, BarChart3, Settings, LogOut, Lock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import { Store, Order, isOrderLate } from '@/lib/types'
@@ -17,6 +17,7 @@ interface MpStatus { enabled: boolean; connected: boolean }
 const NAV = [
   { href: '/lojista',          label: 'Painel',         Icon: LayoutDashboard, exact: true },
   { href: '/lojista/pedidos',  label: 'Pedidos',        Icon: ReceiptText, lockable: true },
+  { href: '/lojista/mensagens', label: 'Mensagens',     Icon: MessagesSquare, lockable: true },
   { href: '/lojista/produtos', label: 'Produtos',       Icon: Package, lockable: true },
   { href: '/lojista/cupons',   label: 'Cupons',         Icon: Ticket, lockable: true },
   { href: '/lojista/carteira', label: 'Carteira',       Icon: Wallet, lockable: true },
@@ -27,7 +28,7 @@ const NAV = [
 
 // Só libera Pedidos/Produtos/Cupons/Carteira/Avaliações/Analytics com a loja aprovada —
 // antes disso não tem pedido, saldo nem avaliação de verdade ainda.
-const LOCKED_PATHS = ['/lojista/pedidos', '/lojista/produtos', '/lojista/cupons', '/lojista/carteira', '/lojista/avaliacoes', '/lojista/analytics']
+const LOCKED_PATHS = ['/lojista/pedidos', '/lojista/mensagens', '/lojista/produtos', '/lojista/cupons', '/lojista/carteira', '/lojista/avaliacoes', '/lojista/analytics']
 
 export default function LojistaLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
