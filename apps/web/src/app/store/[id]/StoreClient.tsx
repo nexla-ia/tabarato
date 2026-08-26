@@ -2,12 +2,11 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Phone, Store as StoreIcon, Heart } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Store as StoreIcon, Heart } from 'lucide-react'
 import { useCartStore, CartItem } from '@/stores/cart'
 import { promoLabel } from '@/lib/promo'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
-import { formatPhone } from '@/lib/masks'
 import { Lightbox } from '@/components/Lightbox'
 import styles from './StoreClient.module.css'
 
@@ -49,7 +48,6 @@ interface Review {
 }
 
 function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}` }
-function digits(s?: string | null) { return (s ?? '').replace(/\D/g, '') }
 function initials(name?: string) { return (name ?? '?').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() }
 function reviewDate(d: string) { return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) }
 
@@ -179,7 +177,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
       {/* Info + Products */}
       <div className="container" style={{ padding: '24px 20px 120px' }}>
         {/* Sobre a loja */}
-        {(store.address || store.phone) && (
+        {store.address && (
           <div className={styles.infoCard}>
             <div className={styles.infoItem}>
               <StoreIcon size={16} />
@@ -196,15 +194,6 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
                   <div className={styles.infoValue}>{store.address}</div>
                 </div>
               </div>
-            )}
-            {store.phone && (
-              <a className={styles.infoItem} href={`https://wa.me/55${digits(store.phone)}`} target="_blank" rel="noopener noreferrer">
-                <Phone size={16} />
-                <div>
-                  <div className={styles.infoLabel}>Contato</div>
-                  <div className={`${styles.infoValue} ${styles.infoLink}`}>{formatPhone(store.phone)}</div>
-                </div>
-              </a>
             )}
           </div>
         )}
