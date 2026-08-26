@@ -51,6 +51,14 @@ export default function OrderDetailPage() {
     return () => clearInterval(t)
   }, [id, order?.status, isTerminal])
 
+  // A notificação de "pedido entregue" aponta pra /orders/:id#avaliar. Sem isso
+  // o cliente cai no topo da página e nem vê que existe avaliação lá embaixo.
+  useEffect(() => {
+    if (order?.status !== 'DELIVERED') return
+    if (window.location.hash !== '#avaliar') return
+    document.getElementById('avaliar')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [order?.status])
+
   // Rastreio ao vivo do entregador (enquanto a entrega está a caminho).
   const LIVE_DELIVERY = ['COURIER_ASSIGNED', 'COURIER_HEADING_TO_STORE', 'COURIER_AT_STORE', 'PICKED_UP', 'HEADING_TO_CLIENT']
   const trackingActive = !!order?.delivery && LIVE_DELIVERY.includes(order?.delivery?.status) && !isTerminal
@@ -259,7 +267,7 @@ export default function OrderDetailPage() {
 
         {/* Avaliação — só depois de entregue */}
         {order.status === 'DELIVERED' && (
-          <div className={styles.card} style={{ marginTop: 14 }}>
+          <div id="avaliar" className={styles.card} style={{ marginTop: 14, scrollMarginTop: 80 }}>
             <h3 className={styles.sectionLabel}>Avalie sua compra</h3>
             <div style={{ marginTop: 10 }}>
               <OrderReview orderId={order.id} />

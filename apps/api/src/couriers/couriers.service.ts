@@ -464,7 +464,7 @@ export class CouriersService {
     const pushMessages: Partial<Record<DeliveryStatus, { title: string; body: string }>> = {
       COURIER_AT_STORE: { title: '📍 Entregador na loja', body: 'O entregador chegou à loja e está coletando seu pedido.' },
       PICKED_UP:        { title: '🚴 Pedido a caminho!',  body: 'O entregador está vindo para você. Fique de olho!' },
-      DELIVERED:        { title: '🎉 Pedido entregue!',   body: 'Aproveite! Não esqueça de avaliar o entregador.' },
+      DELIVERED:        { title: '🎉 Pedido entregue!',   body: 'Aproveite! Avalie sua compra — dá pra anexar foto — e o entregador.' },
     }
     const msg = pushMessages[nextStatus]
     const pushToken = delivery.order.user?.pushToken
@@ -472,7 +472,10 @@ export class CouriersService {
       this.push.send(pushToken, msg.title, msg.body, { orderId: delivery.orderId })
     }
     if (msg) {
-      this.notifications.create(delivery.order.user.id, 'DELIVERY_UPDATE', msg.title, msg.body, { orderId: delivery.orderId }).catch((err) => {
+      // Entregue → a notificação abre a página do pedido já na seção de avaliação.
+      const notifData: Record<string, unknown> = { orderId: delivery.orderId }
+      if (nextStatus === 'DELIVERED') notifData.focus = 'avaliar'
+      this.notifications.create(delivery.order.user.id, 'DELIVERY_UPDATE', msg.title, msg.body, notifData).catch((err) => {
         this.logger.warn('Failed to create delivery notification', err)
       })
     }

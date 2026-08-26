@@ -11,7 +11,8 @@ interface Notification {
   type: string
   title: string
   body?: string | null
-  data?: { orderId?: string } | null
+  /** `focus` é o id da seção a abrir na página do pedido (ex.: 'avaliar'). */
+  data?: { orderId?: string; focus?: string } | null
   isRead: boolean
   createdAt: string
 }
@@ -78,7 +79,14 @@ export function NotificationBell({
       qc.setQueryData<Notification[]>(['notifications-list'], (old) => old?.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)))
     }
     setOpen(false)
-    if (n.data?.orderId) router.push(getOrderHref(n.data.orderId))
+    if (n.data?.orderId) {
+      // `focus` leva a notificação a uma seção da página — 'avaliar' na de pedido
+      // entregue. Restrito a slug simples: o payload vem do servidor, mas nada
+      // justifica deixar um campo livre virar sufixo de rota.
+      const raw = n.data?.focus
+      const focus = typeof raw === 'string' && /^[a-z-]{1,32}$/.test(raw) ? `#${raw}` : ''
+      router.push(`${getOrderHref(n.data.orderId)}${focus}`)
+    }
   }
 
   const count = countQ.data?.count ?? 0
