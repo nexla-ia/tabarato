@@ -18,6 +18,15 @@ export function useAuth() {
       const token = localStorage.getItem('tb_token')
       if (raw && token) {
         const parsed: AuthUser = JSON.parse(raw)
+        // Entregador não tem acesso ao site (ver login). Sessões criadas antes
+        // dessa regra continuariam válidas pelo localStorage — derruba aqui.
+        if (parsed.role === 'COURIER') {
+          clearToken()
+          localStorage.removeItem('tb_token')
+          localStorage.removeItem('tb_user')
+          setReady(true)
+          return
+        }
         setUser(parsed)
         setToken(token)
 

@@ -20,6 +20,13 @@ export default function LoginPage() {
 
   // Pós-login (comum a e-mail/senha e Google): salva a sessão e redireciona.
   function handleAuthSuccess(data: any) {
+    // Entregador não opera pelo site — a entrega acontece no app (aceite de
+    // corrida, rota, posição em tempo real). Barra ANTES de criar a sessão:
+    // deixar entrar só o levaria a uma home de cliente que não serve pra ele.
+    if (data.user?.role === 'COURIER') {
+      setError('Contas de entregador usam o app Tá Barato. O site atende clientes e lojistas.')
+      return
+    }
     login(data.accessToken, data.user)
     // Se veio de uma página protegida (ex.: checkout), volta pra lá.
     const redirect = typeof window !== 'undefined'
