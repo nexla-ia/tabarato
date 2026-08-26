@@ -116,6 +116,12 @@ function RegisterForm() {
           <button className={styles.btn} type="submit" disabled={loading}>
             {loading ? 'Criando conta...' : 'Criar conta de cliente'}
           </button>
+
+          <p className={styles.legalNote}>
+            Ao criar a conta você concorda com os{' '}
+            <Link href="/termos">Termos de Uso</Link> e com a{' '}
+            <Link href="/privacidade">Política de Privacidade</Link>.
+          </p>
         </form>
 
         <p className={styles.footer}>

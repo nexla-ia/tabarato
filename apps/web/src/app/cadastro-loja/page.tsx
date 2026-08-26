@@ -393,6 +393,13 @@ export default function CadastroLojaPage() {
               <button className={styles.cta} onClick={submitStore} disabled={loading}>
                 {loading ? <Loader2 size={18} className={styles.spin} /> : <><Check size={18} /> Criar minha loja</>}
               </button>
+
+              <p className={styles.legalNote}>
+                Ao criar a loja você concorda com os{' '}
+                <Link href="/termos">Termos de Uso</Link> — inclusive com a comissão da
+                plataforma e as regras para lojistas — e com a{' '}
+                <Link href="/privacidade">Política de Privacidade</Link>.
+              </p>
             </div>
           )}
 

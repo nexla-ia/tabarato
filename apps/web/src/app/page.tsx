@@ -99,6 +99,11 @@ export default async function HomePage({
                 <a href="/cadastro-loja">Cadastre sua loja</a>
                 <a href="/login">Painel do lojista</a>
               </div>
+              <div className={styles.footerCol}>
+                <span className={styles.footerColTitle}>Legal</span>
+                <a href="/termos">Termos de Uso</a>
+                <a href="/privacidade">Privacidade</a>
+              </div>
             </div>
           </div>
           <div className={styles.footerBottom}>
