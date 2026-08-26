@@ -149,46 +149,37 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
           <div className={styles.headerInner}>
             <div className={styles.logoWrap}>
               {store.logoUrl
-                ? <Image src={store.logoUrl} alt={store.name} width={84} height={84} style={{ borderRadius: 15.5, objectFit: 'cover' }} />
+                ? <Image src={store.logoUrl} alt={store.name} width={92} height={92} style={{ borderRadius: 20, objectFit: 'cover' }} />
                 : <div className={styles.logoFallback}>🏪</div>
               }
             </div>
-            <div className={styles.headerInfo}>
-              <h1 className={styles.storeName}>{store.name}</h1>
-              {store.description && <p className={styles.storeDesc}>{store.description}</p>}
-              <div className={styles.storeMeta}>
-                <span className={`${styles.statusChip} ${store.isOpen ? styles.open : styles.closed}`}>
-                  {store.isOpen ? '● Aberto' : '● Fechado'}
+            <h1 className={styles.storeName}>{store.name}</h1>
+            {store.description && <p className={styles.storeDesc}>{store.description}</p>}
+            <div className={styles.storeMeta}>
+              <span className={`${styles.statusChip} ${store.isOpen ? styles.open : styles.closed}`}>
+                {store.isOpen ? '● Aberto' : '● Fechado'}
+              </span>
+              {rating != null && rating > 0 && (
+                <span className={styles.ratingMeta}>
+                  <Star size={13} fill="#F59E0B" color="#F59E0B" /> {Number(rating).toFixed(1)}
+                  {reviewCount ? <span className={styles.ratingCount}>({reviewCount})</span> : null}
                 </span>
-                {rating != null && rating > 0 && (
-                  <span className={styles.ratingMeta}>
-                    <Star size={13} fill="#F59E0B" color="#F59E0B" /> {Number(rating).toFixed(1)}
-                    {reviewCount ? <span className={styles.ratingCount}>({reviewCount})</span> : null}
-                  </span>
-                )}
-                <span className={styles.metaItem}><Clock size={13} /> {store.prepTimeMin} min</span>
-                <span className={styles.metaItem}><MapPin size={13} /> até {store.deliveryRadiusKm} km</span>
-              </div>
+              )}
+              <span className={styles.metaItem}><Clock size={13} /> {store.prepTimeMin} min</span>
+              <span className={styles.metaItem}><MapPin size={13} /> até {store.deliveryRadiusKm} km</span>
             </div>
+            {store.address && (
+              <div className={styles.addressChip}>
+                <MapPin size={13} />
+                <span>{store.address}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Info + Products */}
       <div className="container" style={{ padding: '24px 20px 120px' }}>
-        {/* Endereço — status/km/min NÃO repetem aqui: já estão nos chips do
-            cabeçalho (statusChip + metaItem logo acima). */}
-        {store.address && (
-          <div className={styles.infoCard}>
-            <div className={styles.infoItem}>
-              <MapPin size={16} />
-              <div>
-                <div className={styles.infoLabel}>Endereço</div>
-                <div className={styles.infoValue}>{store.address}</div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {products.length === 0 ? (
           <div className={styles.empty}>Nenhum produto disponível no momento.</div>
