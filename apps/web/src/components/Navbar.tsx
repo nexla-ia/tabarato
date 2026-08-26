@@ -45,10 +45,10 @@ export function Navbar() {
               <Link href="/favorites" className={`${styles.iconBtn} ${pathname.startsWith('/favorites') ? styles.iconBtnActive : ''}`} title="Lojas favoritas">
                 <Heart size={20} />
               </Link>
-              <Link href="/mensagens" className={`${styles.iconBtn} ${(pathname === '/mensagens' || pathname.endsWith('/chat')) ? styles.iconBtnActive : ''}`} title="Mensagens">
+              <Link href="/mensagens" className={`${styles.iconBtn} ${pathname === '/mensagens' ? styles.iconBtnActive : ''}`} title="Mensagens">
                 <MessagesSquare size={20} />
               </Link>
-              <Link href="/orders" className={`${styles.iconBtn} ${(pathname.startsWith('/orders') && !pathname.endsWith('/chat')) ? styles.iconBtnActive : ''}`} title="Meus pedidos">
+              <Link href="/orders" className={`${styles.iconBtn} ${pathname.startsWith('/orders') ? styles.iconBtnActive : ''}`} title="Meus pedidos">
                 <ShoppingBag size={20} />
               </Link>
               <Link href="/profile" className={styles.profile} title="Perfil">

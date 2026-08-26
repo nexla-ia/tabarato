@@ -161,7 +161,7 @@ export default function PedidosPage() {
                     )}
                   </div>
                   <div className={styles.headRight}>
-                    <button className={styles.chatBtn} onClick={() => router.push(`/lojista/pedidos/${o.id}/chat`)} title="Chat com o cliente">
+                    <button className={styles.chatBtn} onClick={() => router.push(`/lojista/mensagens?pedido=${o.id}`)} title="Chat com o cliente">
                       <MessageCircle size={14} />
                     </button>
                     <span className={styles.time}><Clock size={12} /> {timeAgo(o.createdAt)}</span>

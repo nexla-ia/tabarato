@@ -10,18 +10,19 @@
 }
 .empty p { font-size: 14px; line-height: 1.5; }
 
-/* Desktop/tablet: lista + placeholder lado a lado — nenhuma conversa abre
-   sozinha, é preciso clicar num pedido pra sair daqui. 1084px porque esta
-   página vive dentro da sidebar (232px) + padding do .main (72px) do
-   shell do lojista — ver o mesmo cálculo em .../pedidos/[id]/chat/page.module.css. */
+/* Desktop/tablet: lista + conversa lado a lado. 1084px porque esta página
+   vive dentro da sidebar (232px) + padding do .main (72px) do shell do
+   lojista — o breakpoint tem que descontar isso, senão a janela "passa" no
+   teste de largura sem sobrar espaço de verdade pro conteúdo. */
 .layout { display: flex; gap: 16px; align-items: flex-start; max-width: 100%; overflow: hidden; }
 .panel {
   width: 260px; flex-shrink: 0;
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow-sm); height: 65vh; min-height: 420px; overflow: hidden;
+  box-shadow: var(--shadow-sm); height: 70vh; min-height: 420px; overflow: hidden;
 }
+.main { flex: 1; min-width: 0; }
 .placeholder {
-  flex: 1; min-width: 0; height: 65vh; min-height: 420px;
+  height: 70vh; min-height: 420px;
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
@@ -29,10 +30,32 @@
 }
 .placeholder p { font-size: 13.5px; color: var(--muted); max-width: 220px; }
 
-/* Mobile: sem espaço pra placeholder vazio — a lista já é a tela inteira. */
-.mobileList { display: none; }
+.header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; min-width: 0; }
+.avatar {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: var(--orange-light); color: var(--orange-dark);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-weight: 800; font-size: 18px;
+}
+.headerInfo { min-width: 0; }
+.headerTitle {
+  font-family: var(--display); font-size: 19px; font-weight: 800; letter-spacing: -0.02em; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.headerSub {
+  font-size: 12.5px; font-weight: 600; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;
+}
+
+/* Mobile: lista OU chat cheio, nunca os dois juntos. */
+.mobileArea { display: none; }
+.mobileBack {
+  display: inline-flex; align-items: center; gap: 5px; margin-bottom: 14px;
+  font-size: 14px; font-weight: 600; color: var(--muted);
+}
+.mobileBack:hover { color: var(--orange); }
 
 @media (max-width: 1084px) {
   .layout { display: none; }
-  .mobileList { display: block; }
+  .mobileArea { display: block; }
 }

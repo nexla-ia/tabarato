@@ -282,7 +282,7 @@ export default function OrderDetailPage() {
 
         {/* Chat com a loja — tela própria, em vez de embutido aqui embaixo */}
         {user && (
-          <Link href={`/orders/${order.id}/chat`} className={styles.chatLink}>
+          <Link href={`/mensagens?pedido=${order.id}`} className={styles.chatLink}>
             <span className={styles.chatLinkIcon}><MessageCircle size={18} /></span>
             <span className={styles.chatLinkText}>Fale com a loja</span>
             <ArrowRight size={16} />

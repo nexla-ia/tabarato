@@ -1,9 +1,12 @@
 'use client'
+import { useEffect, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { MessagesSquare } from 'lucide-react'
+import { MessagesSquare, ArrowLeft } from 'lucide-react'
 import { api } from '@/lib/api'
-import { Order } from '@/lib/types'
-import { timeAgo } from '@/lib/types'
+import { Order, timeAgo } from '@/lib/types'
+import { useAuth } from '@/hooks/useAuth'
+import { OrderChat } from '@/components/OrderChat'
 import { ChatConversationList, ConversationItem } from '@/components/ChatConversationList'
 import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
@@ -13,22 +16,55 @@ const STATUS_LABEL: Record<string, string> = {
   READY: 'Pronto', PICKED_UP: 'A caminho', DELIVERED: 'Entregue', CANCELLED: 'Cancelado',
 }
 
+function ChatHeader({ order }: { order: Order }) {
+  return (
+    <div className={styles.header}>
+      <div className={styles.avatar}>{(order.user?.name ?? '?').charAt(0).toUpperCase()}</div>
+      <div className={styles.headerInfo}>
+        <h2 className={styles.headerTitle}>{order.user?.name ?? 'Cliente'}</h2>
+        <span className={styles.headerSub}>
+          Pedido #{order.id.slice(-6).toUpperCase()} · {STATUS_LABEL[order.status] ?? order.status}
+          {order.user?.phone ? ` · ${order.user.phone}` : ''}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+export default function LojistaMensagensPage() {
+  return (
+    <Suspense fallback={null}>
+      <LojistaMensagensContent />
+    </Suspense>
+  )
+}
+
 /**
- * Entrada do item "Mensagens" no menu. Não abre nenhuma conversa sozinha —
- * só lista os pedidos (um por pedido, mesmo que várias vezes do mesmo
- * cliente; cada pedido tem sua própria conversa). O lojista escolhe, aí sim
- * a conversa abre em /lojista/pedidos/:id/chat.
+ * Tela única de mensagens do lojista: lista de pedidos + a conversa aberta,
+ * tudo dentro desta mesma rota — clicar num pedido troca o painel da direita,
+ * não navega pra lugar nenhum (era esse o bug: ia parar em "Pedidos").
  *
  * Reaproveita a MESMA queryKey do layout e de /lojista/pedidos — cache
  * quente, sem request extra na maioria das vezes.
+ *
+ * ?pedido=ID pré-seleciona uma conversa — usado pelo ícone de chat no card
+ * do pedido em /lojista/pedidos, que já sabe qual abrir.
  */
-export default function LojistaMensagensPage() {
+function LojistaMensagensContent() {
+  const searchParams = useSearchParams()
+  const { user } = useAuth()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const ordersQ = useQuery<Order[]>({
     queryKey: ['store-orders'],
     queryFn: async () => (await api.get('/orders/store')).data,
   })
 
-  if (ordersQ.isLoading) return <div className={styles.loading}><Spinner /></div>
+  useEffect(() => {
+    const pedido = searchParams.get('pedido')
+    if (pedido) setSelectedId(pedido)
+  }, [searchParams])
+
+  if (ordersQ.isLoading || !user) return <div className={styles.loading}><Spinner /></div>
 
   const orders = ordersQ.data ?? []
   if (orders.length === 0) {
@@ -45,24 +81,45 @@ export default function LojistaMensagensPage() {
     name: o.user?.name ?? 'Cliente',
     subtitle: `${STATUS_LABEL[o.status] ?? o.status} · ${timeAgo(o.createdAt)}`,
   }))
+  const selected = orders.find((o) => o.id === selectedId) ?? null
 
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>Mensagens</h1>
 
+      {/* Desktop/tablet: lista + conversa lado a lado. */}
       <div className={styles.layout}>
         <aside className={styles.panel}>
-          <ChatConversationList items={conversations} activeId="" getHref={(id) => `/lojista/pedidos/${id}/chat`} />
+          <ChatConversationList items={conversations} activeId={selectedId ?? ''} onSelect={setSelectedId} />
         </aside>
-        <div className={styles.placeholder}>
-          <MessagesSquare size={40} strokeWidth={1.5} />
-          <p>Selecione um pedido ao lado para ver a conversa.</p>
+        <div className={styles.main}>
+          {selected ? (
+            <>
+              <ChatHeader order={selected} />
+              <OrderChat orderId={selected.id} currentUserId={user.id} fill />
+            </>
+          ) : (
+            <div className={styles.placeholder}>
+              <MessagesSquare size={40} strokeWidth={1.5} />
+              <p>Selecione um pedido ao lado para ver a conversa.</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Mobile: sem espaço pra placeholder vazio — a lista já é a tela inteira. */}
-      <div className={styles.mobileList}>
-        <ChatConversationList items={conversations} activeId="" getHref={(id) => `/lojista/pedidos/${id}/chat`} />
+      {/* Mobile: lista OU chat cheio, nunca os dois juntos. */}
+      <div className={styles.mobileArea}>
+        {selected ? (
+          <div>
+            <button type="button" className={styles.mobileBack} onClick={() => setSelectedId(null)}>
+              <ArrowLeft size={16} /> Conversas
+            </button>
+            <ChatHeader order={selected} />
+            <OrderChat orderId={selected.id} currentUserId={user.id} fill />
+          </div>
+        ) : (
+          <ChatConversationList items={conversations} activeId="" onSelect={setSelectedId} />
+        )}
       </div>
     </div>
   )
