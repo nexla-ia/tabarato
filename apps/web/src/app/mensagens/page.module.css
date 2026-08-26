@@ -1,5 +1,35 @@
 .loading { padding: 80px 0; text-align: center; color: var(--muted); }
 
+.title { font-family: var(--display); font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); margin-bottom: 16px; }
+
+/* Desktop/tablet: lista + placeholder lado a lado — nenhuma conversa abre
+   sozinha, é preciso clicar num pedido pra sair daqui. */
+.layout {
+  display: flex; gap: 16px; align-items: flex-start; max-width: 100%; overflow: hidden;
+}
+.panel {
+  width: 260px; flex-shrink: 0;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); height: 65vh; min-height: 420px; overflow: hidden;
+}
+.placeholder {
+  flex: 1; min-width: 0; height: 65vh; min-height: 420px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  color: var(--faint); text-align: center; padding: 20px;
+}
+.placeholder p { font-size: 13.5px; color: var(--muted); max-width: 220px; }
+
+/* Mobile: sem espaço pra placeholder vazio — a lista já é a tela inteira,
+   tocar num pedido leva direto pra conversa dele. */
+.mobileList { display: none; }
+
+@media (max-width: 780px) {
+  .layout { display: none; }
+  .mobileList { display: block; }
+}
+
 .empty {
   max-width: 420px; margin: 60px auto; text-align: center; padding: 48px 24px;
   color: var(--muted); background: var(--card); border: 1px dashed var(--border);
