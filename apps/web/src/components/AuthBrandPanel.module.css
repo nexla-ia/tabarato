@@ -11,17 +11,18 @@
     radial-gradient(1200px 400px at 80% -10%, rgba(255,180,120,0.35), transparent 60%),
     linear-gradient(150deg, #FF7A00 0%, #FF5500 42%, #CC3300 100%);
 }
+/* position:sticky + height:100vh prende o painel na altura da tela, SEMPRE —
+   sem isso ele esticava (via flex) até a altura do formulário ao lado, e como
+   o conteúdo fica centralizado (.content { margin: auto 0 }), uma tela com
+   form mais alto (cadastro, com mais campos) empurrava logo/título mais pra
+   baixo que o login. Com sticky isso não depende mais do vizinho. */
 @media (min-width: 900px) {
-  .panel { display: flex; }
+  .panel { display: flex; position: sticky; top: 0; height: 100vh; }
 }
 
-/* Cadastro de loja é um wizard longo — o painel acompanha o scroll (sticky)
-   em vez de sumir no mobile; login/cadastro de cliente são uma tela curta só,
-   então some abaixo de 900px e o form vira o único conteúdo (variante padrão). */
-.panelSticky { position: static; }
-@media (min-width: 900px) {
-  .panelSticky { position: sticky; top: 0; height: 100vh; }
-}
+/* Cadastro de loja é um wizard longo — no mobile o painel acompanha o scroll
+   da página em vez de sumir (variante padrão some abaixo de 900px, porque
+   login/cadastro de cliente são uma tela curta e o form já basta sozinho). */
 @media (max-width: 899px) {
   .panelSticky { display: flex; width: 100%; min-width: 0; max-width: none; padding: 40px 32px; }
 }
