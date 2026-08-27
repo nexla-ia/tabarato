@@ -25,18 +25,49 @@ export default function LojistaDashboard() {
     refetchInterval: 20_000,
   })
 
+  // Antes: clicar esperava o PATCH voltar e SÓ DEPOIS disparava um invalidate
+  // (mais um GET do zero) pra atualizar a tela — 2 viagens de rede em série
+  // pra virar um botão, e nada mexia na tela até as duas voltarem. A resposta
+  // do PATCH já vem com {isOpen, isPaused} corretos (o back computa isso
+  // considerando o horário de funcionamento), então: onMutate vira o botão na
+  // hora (otimista, sem esperar rede) e onSuccess grava a resposta real no
+  // cache direto — sem refetch nenhum. Erro reverte pro estado anterior.
   const toggleOpen = useMutation({
     mutationFn: async () => (await api.patch('/stores/my/toggle-open')).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['store-my'] }),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ['store-my'] })
+      const prev = qc.getQueryData<Store>(['store-my'])
+      if (prev) qc.setQueryData<Store>(['store-my'], { ...prev, isOpen: !prev.isOpen, isPaused: prev.isOpen })
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => { if (ctx?.prev) qc.setQueryData(['store-my'], ctx.prev) },
+    onSuccess: (data) => qc.setQueryData<Store>(['store-my'], (old) => old ? { ...old, ...data } : old),
   })
   const togglePause = useMutation({
     mutationFn: async () => (await api.patch('/stores/my/toggle-pause')).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['store-my'] }),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ['store-my'] })
+      const prev = qc.getQueryData<Store>(['store-my'])
+      if (prev) qc.setQueryData<Store>(['store-my'], { ...prev, isPaused: !prev.isPaused, isOpen: !!prev.isPaused })
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => { if (ctx?.prev) qc.setQueryData(['store-my'], ctx.prev) },
+    onSuccess: (data) => qc.setQueryData<Store>(['store-my'], (old) => old ? { ...old, ...data } : old),
   })
+  // Mesmo tratamento de /lojista/pedidos (essa é a versão simplificada do
+  // widget "pedidos ativos" do painel) — vira o status na hora do clique.
   const advance = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) =>
       (await api.patch(`/orders/${id}/status`, { status })).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['store-orders'] }),
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ['store-orders'] })
+      const prev = qc.getQueryData<Order[]>(['store-orders'])
+      qc.setQueryData<Order[]>(['store-orders'], (old) =>
+        old?.map((o) => (o.id === id ? { ...o, status: status as Order['status'] } : o)))
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => { if (ctx?.prev) qc.setQueryData(['store-orders'], ctx.prev) },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['store-orders'] }),
   })
 
   const store = storeQ.data
