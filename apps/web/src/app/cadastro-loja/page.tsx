@@ -27,9 +27,11 @@ const STEPS = [
 
 // Conteúdo do painel de marca pro cadastro de lojista — logo e largura vêm
 // fixos do AuthBrandPanel; só isto (texto/lista) muda em relação a login/cadastro de cliente.
+// Tom de boas-vindas (não de pitch de vendas): quem chega aqui já decidiu se
+// cadastrar, o painel é pra receber bem, não convencer.
 const LOJISTA_BRAND = {
-  title: <>Venda no<br /><AuthBrandAccent>Tá Barato</AuthBrandAccent></>,
-  subtitle: 'Cadastre sua loja e comece a receber pedidos em Vilhena hoje mesmo.',
+  title: <>Que bom te ver<br /><AuthBrandAccent>por aqui!</AuthBrandAccent></>,
+  subtitle: 'Ficamos felizes com sua vontade de vender no Tá Barato. Vamos deixar sua loja pronta em poucos minutos.',
   items: [
     { icon: <Check size={14} />, text: 'Receba pedidos em tempo real' },
     { icon: <Check size={14} />, text: 'Entregadores da plataforma' },

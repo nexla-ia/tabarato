@@ -1,7 +1,6 @@
 import { Suspense } from 'react'
 import Image from 'next/image'
 import { Navbar } from '@/components/Navbar'
-import { SearchBar } from '@/components/SearchBar'
 import { CategoryBrowser } from './CategoryBrowser'
 import { PromoStrip } from './PromoStrip'
 import { PopularProducts } from './PopularProducts'
@@ -37,37 +36,22 @@ export default async function HomePage({
     <>
       <Navbar />
       <main>
-        {/* ── Hero ── */}
-        <section className={`${styles.hero} ${searching ? styles.heroCompact : ''}`}>
-          {!searching && <div className={styles.heroGlow} />}
-          {!searching && <div className={styles.heroBlob1} />}
-          {!searching && <div className={styles.heroBlob2} />}
-          <div className={`container ${styles.heroInner}`}>
-            <div className={styles.heroCopy}>
-              <div className={styles.heroSearchTop}>
-                <Suspense fallback={<div className={styles.searchFallback} />}>
-                  <SearchBar />
-                </Suspense>
-              </div>
-              {!searching && (
-                <>
-                  <h1 className={styles.heroTitle}>
-                    O comércio local<br />na palma da<span className={styles.heroTitleAccent}> sua mão</span>
-                  </h1>
-                  <p className={styles.heroSub}>
-                    Peça de restaurantes, lanchonetes e lojas da cidade e receba rapidinho em casa.
-                  </p>
-                </>
-              )}
-            </div>
-            {!searching && (
+        {/* ── Hero — banner de marca. Busca mora na navbar (todas as páginas);
+            aqui só aparece fora do modo busca (senão fica repetido/sem função
+            logo abaixo da navbar). ── */}
+        {!searching && (
+          <section className={styles.hero}>
+            <div className={styles.heroGlow} />
+            <div className={styles.heroBlob1} />
+            <div className={styles.heroBlob2} />
+            <div className={`container ${styles.heroInner}`}>
               <div className={styles.heroArt}>
                 <Image src="/logo.png" alt="Tá Barato" width={280} height={280} priority className={styles.heroLogo} style={{ objectFit: 'contain' }} />
               </div>
-            )}
-          </div>
-          {!searching && <div className={styles.heroWave} />}
-        </section>
+            </div>
+            <div className={styles.heroWave} />
+          </section>
+        )}
 
         <div className="container">
           {!searching ? (

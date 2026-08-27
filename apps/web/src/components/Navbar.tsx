@@ -1,4 +1,5 @@
 'use client'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { ShoppingBag, LogOut, ShoppingCart, MapPin, ChevronDown, Heart, MessagesSquare } from 'lucide-react'
@@ -6,6 +7,7 @@ import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
 import { useCartStore } from '@/stores/cart'
 import { NotificationBell } from './NotificationBell'
+import { SearchBar } from './SearchBar'
 import styles from './Navbar.module.css'
 
 export function Navbar() {
@@ -31,6 +33,14 @@ export function Navbar() {
             <span className={styles.locationText}>Vilhena<span className={styles.locationState}>, RO</span></span>
             <ChevronDown size={14} className={styles.chev} />
           </button>
+        </div>
+
+        {/* Busca mora aqui (não mais no hero da home) — funciona de qualquer
+            página, sempre manda pra /?q=...#lojas. */}
+        <div className={styles.searchSlot}>
+          <Suspense fallback={<div className={styles.searchFallback} />}>
+            <SearchBar />
+          </Suspense>
         </div>
 
         <div className={styles.actions}>
