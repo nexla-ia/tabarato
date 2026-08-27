@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Heart } from 'lucide-react'
 import { useCartStore, CartItem } from '@/stores/cart'
 import { promoLabel } from '@/lib/promo'
@@ -73,11 +74,30 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
   const [sort, setSort] = useState<'relevance' | 'price_asc' | 'price_desc'>('relevance')
   const [priceMin, setPriceMin] = useState('')
   const [priceMax, setPriceMax] = useState('')
-  const { user } = useAuth()
+  const { user, ready } = useAuth()
+  const router = useRouter()
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
   const [favLoading, setFavLoading] = useState(false)
   const cartCount = storeItems.reduce((a, i) => a + i.quantity, 0)
+
+  // Lojista só pode ver a própria loja — evita navegar/comprar em loja de
+  // terceiro (mesma vedação de autocompra do bloqueio no checkout). Se a
+  // loja aberta não é a dele, manda de volta pra loja dele.
+  const [myStoreId, setMyStoreId] = useState<string | null>(null)
+  const [myStoreChecked, setMyStoreChecked] = useState(false)
+  useEffect(() => {
+    if (!ready) return
+    if (user?.role !== 'STORE_OWNER') { setMyStoreChecked(true); return }
+    api.get<{ id: string }>('/stores/my')
+      .then((r) => setMyStoreId(r.data.id))
+      .catch(() => {})
+      .finally(() => setMyStoreChecked(true))
+  }, [ready, user])
+  const blockedForOwner = ready && user?.role === 'STORE_OWNER' && (!myStoreChecked || (!!myStoreId && myStoreId !== store.id))
+  useEffect(() => {
+    if (myStoreChecked && myStoreId && myStoreId !== store.id) router.replace(`/store/${myStoreId}`)
+  }, [myStoreChecked, myStoreId, store.id, router])
 
   useEffect(() => {
     if (!user) { setIsFavorite(false); return }
@@ -114,6 +134,14 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
       price, quantity: 1, imageUrl: product.imageUrl ?? undefined, variationName: variation?.name,
       promoBuyQty: product.promoBuyQty, promoPayQty: product.promoPayQty,
     }, user?.id)
+  }
+
+  if (blockedForOwner) {
+    return (
+      <div className="container" style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--muted)' }}>
+        Redirecionando para a sua loja…
+      </div>
+    )
   }
 
   return (

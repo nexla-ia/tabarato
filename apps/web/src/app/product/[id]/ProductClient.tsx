@@ -1,11 +1,13 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, ChevronRight, Clock, MapPin, Minus, Plus, ShoppingCart, Package, Star } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
 import { promoLabel } from '@/lib/promo'
 import { useAuth } from '@/hooks/useAuth'
+import { api } from '@/lib/api'
 import { ProductGallery } from './ProductGallery'
 import styles from './ProductClient.module.css'
 
@@ -94,7 +96,27 @@ export function ProductClient({
   reviews?: Review[]; storeSuggestions?: Suggestion[]; marketSuggestions?: Suggestion[]
 }) {
   const { addItem } = useCartStore()
-  const { user } = useAuth()
+  const { user, ready } = useAuth()
+  const router = useRouter()
+
+  // Lojista só pode ver a própria loja — mesma vedação de autocompra do
+  // bloqueio no checkout/página da loja. Página de produto também deixa
+  // adicionar ao carrinho, então precisa da mesma trava.
+  const [myStoreId, setMyStoreId] = useState<string | null>(null)
+  const [myStoreChecked, setMyStoreChecked] = useState(false)
+  useEffect(() => {
+    if (!ready) return
+    if (user?.role !== 'STORE_OWNER') { setMyStoreChecked(true); return }
+    api.get<{ id: string }>('/stores/my')
+      .then((r) => setMyStoreId(r.data.id))
+      .catch(() => {})
+      .finally(() => setMyStoreChecked(true))
+  }, [ready, user])
+  const blockedForOwner = ready && user?.role === 'STORE_OWNER' && (!myStoreChecked || (!!myStoreId && myStoreId !== store.id))
+  useEffect(() => {
+    if (myStoreChecked && myStoreId && myStoreId !== store.id) router.replace(`/store/${myStoreId}`)
+  }, [myStoreChecked, myStoreId, store.id, router])
+
   const [selectedVar, setSelectedVar] = useState(
     product.variations?.find(v => !isOut(v.stock)) ?? product.variations?.[0],
   )
@@ -119,6 +141,14 @@ export function ProductClient({
     }, user?.id)
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
+  }
+
+  if (blockedForOwner) {
+    return (
+      <div className="container" style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--muted)' }}>
+        Redirecionando para a sua loja…
+      </div>
+    )
   }
 
   return (
