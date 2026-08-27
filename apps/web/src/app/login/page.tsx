@@ -7,6 +7,7 @@ import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { GoogleSignInButton } from '@/components/GoogleSignInButton'
+import { AuthBrandPanel } from '@/components/AuthBrandPanel'
 import styles from './page.module.css'
 
 export default function LoginPage() {
@@ -61,6 +62,8 @@ export default function LoginPage() {
 
   return (
     <div className={styles.page}>
+      <AuthBrandPanel />
+      <div className={styles.formPanel}>
       <div className={styles.card}>
         <Link href="/" className={styles.backLink}><ArrowLeft size={16} /> Voltar ao início</Link>
         <div className={styles.logoWrap}>
@@ -116,6 +119,7 @@ export default function LoginPage() {
           É lojista?{' '}
           <Link href="/cadastro-loja" className={styles.link}>Cadastre sua loja</Link>
         </p>
+      </div>
       </div>
     </div>
   )

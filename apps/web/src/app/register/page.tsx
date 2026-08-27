@@ -7,6 +7,7 @@ import { ArrowLeft, ShoppingBag, Store, ArrowRight, Eye, EyeOff } from 'lucide-r
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { formatPhone, onlyDigits } from '@/lib/masks'
+import { AuthBrandPanel } from '@/components/AuthBrandPanel'
 import styles from '../login/page.module.css'
 
 export default function RegisterPage() {
@@ -54,6 +55,8 @@ function RegisterForm() {
 
   return (
     <div className={styles.page}>
+      <AuthBrandPanel />
+      <div className={styles.formPanel}>
       <div className={styles.card}>
         <Link href="/" className={styles.backLink}><ArrowLeft size={16} /> Voltar ao início</Link>
         <div className={styles.logoWrap}>
@@ -128,6 +131,7 @@ function RegisterForm() {
           Já tem conta?{' '}
           <Link href="/login" className={styles.link}>Entrar</Link>
         </p>
+      </div>
       </div>
     </div>
   )
