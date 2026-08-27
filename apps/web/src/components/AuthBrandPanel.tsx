@@ -19,7 +19,7 @@ export function AuthBrandPanel() {
       <Link href="/" className={styles.brandBack}><ArrowLeft size={16} /> Voltar ao início</Link>
 
       <div className={styles.brandContent}>
-        <Image src="/logo.png" alt="Tá Barato" width={72} height={72} className={styles.brandLogo} style={{ objectFit: 'contain' }} />
+        <Image src="/logo.png" alt="Tá Barato" width={132} height={132} className={styles.brandLogo} style={{ objectFit: 'contain' }} />
         <span className={styles.brandBadge}>🛵 Entrega na sua casa · Vilhena-RO</span>
         <h1 className={styles.brandTitle}>
           O comércio local<br />na palma da<span className={styles.brandTitleAccent}> sua mão</span>

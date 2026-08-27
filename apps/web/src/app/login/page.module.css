@@ -33,7 +33,7 @@
 .brandBack:hover { color: #fff; }
 
 .brandContent { position: relative; z-index: 1; margin: auto 0; }
-.brandLogo { margin-bottom: 26px; filter: drop-shadow(0 14px 30px rgba(90,20,0,0.35)); }
+.brandLogo { margin-bottom: 20px; filter: drop-shadow(0 14px 30px rgba(90,20,0,0.35)); }
 .brandBadge {
   display: inline-flex; align-items: center; gap: 6px;
   background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.28); color: #fff;
