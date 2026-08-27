@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, CreditCard } from 'lucide-react'
+import { Zap, CreditCard, Copy, Check, Clock, ShoppingBag } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useCartStore } from '@/stores/cart'
@@ -23,6 +23,12 @@ function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).rep
 function fmtCpf(v: string) { return v.replace(/\D/g,'').slice(0,11).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4') }
 function fmtCard(v: string) { return v.replace(/\D/g,'').slice(0,16).replace(/(.{4})/g,'$1 ').trim() }
 function fmtExpiry(v: string) { const d = v.replace(/\D/g,'').slice(0,4); return d.length > 2 ? `${d.slice(0,2)}/${d.slice(2)}` : d }
+function fmtCountdown(ms: number) {
+  const total = Math.max(0, Math.ceil(ms / 1000))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
 
 type PayMethod = 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD'
 
@@ -100,8 +106,19 @@ export default function CheckoutPage() {
   const [savingAddr, setSavingAddr] = useState(false)
 
   // PIX result — 1 pagamento pode cobrir vários pedidos (1 por loja)
-  const [pixResult, setPixResult] = useState<{ orderIds: string[]; pixCode: string; pixQrBase64?: string } | null>(null)
+  const [pixResult, setPixResult] = useState<{
+    orderIds: string[]; pixCode: string; pixQrBase64?: string
+    totalAmount?: number; pixExpiresAt?: string
+  } | null>(null)
   const [pixCopied, setPixCopied] = useState(false)
+  // Só conta o relógio enquanto a tela do PIX está aberta — sem isso o
+  // interval ficaria rodando à toa durante o resto do checkout.
+  const [pixNow, setPixNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!pixResult?.pixExpiresAt) return
+    const t = setInterval(() => setPixNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [pixResult?.pixExpiresAt])
   const [polling, setPolling] = useState(false)
   const [storeCoords, setStoreCoords] = useState<Record<string, { lat: number; lng: number }>>({})
 
@@ -247,7 +264,11 @@ export default function CheckoutPage() {
       clear()
 
       if (payMethod === 'PIX' && data.payment?.pixCode) {
-        setPixResult({ orderIds: orders.map(o => o.id), pixCode: data.payment.pixCode, pixQrBase64: data.payment.pixQrBase64 })
+        setPixResult({
+          orderIds: orders.map(o => o.id), pixCode: data.payment.pixCode, pixQrBase64: data.payment.pixQrBase64,
+          totalAmount: data.payment.amount != null ? Number(data.payment.amount) : undefined,
+          pixExpiresAt: data.payment.pixExpiresAt,
+        })
       } else if (orders.length === 1) {
         router.push(`/orders/${orders[0].id}`)
       } else {
@@ -283,25 +304,73 @@ export default function CheckoutPage() {
   // PIX screen
   if (pixResult) {
     const orderHref = pixResult.orderIds.length === 1 ? `/orders/${pixResult.orderIds[0]}` : '/orders'
+    const refLabel = pixResult.orderIds.length === 1
+      ? `#${pixResult.orderIds[0].slice(-6).toUpperCase()}`
+      : pixResult.orderIds.map(id => `#${id.slice(-6).toUpperCase()}`).join(' · ')
+    const expiresAtMs = pixResult.pixExpiresAt ? new Date(pixResult.pixExpiresAt).getTime() : null
+    const remainingMs = expiresAtMs != null ? expiresAtMs - pixNow : null
+    const expired = remainingMs != null && remainingMs <= 0
+    const urgent = remainingMs != null && remainingMs > 0 && remainingMs <= 5 * 60_000
+
     return (
       <>
         <Navbar />
         <div className={styles.pixPage}>
           <div className={styles.pixCard}>
-            <div className={styles.pixIcon}>⚡</div>
-            <h2 className={styles.pixTitle}>{pixResult.orderIds.length > 1 ? `${pixResult.orderIds.length} pedidos criados!` : 'Pedido criado!'}</h2>
-            <p className={styles.pixSub}>Escaneie o QR Code ou copie o código PIX para pagar</p>
-            {pixResult.pixQrBase64 && (
-              <Image src={`data:image/png;base64,${pixResult.pixQrBase64}`} alt="QR Code PIX" width={220} height={220} style={{ borderRadius: 12, margin: '16px auto' }} />
+            <div className={styles.pixHead}>
+              <span className={styles.pixBadge}><Zap size={20} /></span>
+              <div className={styles.pixHeadText}>
+                <h2 className={styles.pixTitle}>
+                  {pixResult.orderIds.length > 1 ? `${pixResult.orderIds.length} pedidos criados` : 'Pedido criado'}
+                </h2>
+                <span className={styles.pixRef}>{refLabel}</span>
+              </div>
+            </div>
+
+            {pixResult.totalAmount != null && (
+              <div className={styles.pixAmount}>
+                <span className={styles.pixAmountLabel}>Total a pagar via PIX</span>
+                <span className={styles.pixAmountValue}>{fmtBRL(pixResult.totalAmount)}</span>
+              </div>
             )}
-            <button className={styles.copyBtn} onClick={copyPix}>
-              {pixCopied ? '✓ Copiado!' : '📋 Copiar código PIX'}
-            </button>
-            {error && <div className={styles.errorBox}>{error}</div>}
-            <button className={styles.confirmBtn} onClick={handleCheckPix} disabled={polling}>
-              {polling ? 'Verificando...' : 'Já paguei — verificar pagamento'}
-            </button>
-            <a href={orderHref} className={styles.laterLink}>Ver pedido depois</a>
+
+            {expired ? (
+              <div className={styles.pixExpired}>
+                <Clock size={26} />
+                <p className={styles.pixExpiredTitle}>Código PIX expirado</p>
+                <p className={styles.pixExpiredSub}>
+                  O prazo de 30 minutos pra pagar esse código acabou. O pedido continua registrado —
+                  acompanhe o status ou fale com a loja pelo chat do pedido.
+                </p>
+                <a href={orderHref} className={styles.confirmBtn}>
+                  <ShoppingBag size={16} /> Ver pedido
+                </a>
+              </div>
+            ) : (
+              <>
+                {remainingMs != null && (
+                  <div className={`${styles.pixTimer} ${urgent ? styles.pixTimerUrgent : ''}`}>
+                    <Clock size={13} /> Expira em <strong>{fmtCountdown(remainingMs)}</strong>
+                  </div>
+                )}
+
+                {pixResult.pixQrBase64 && (
+                  <div className={styles.pixQrFrame}>
+                    <Image src={`data:image/png;base64,${pixResult.pixQrBase64}`} alt="QR Code PIX" width={196} height={196} />
+                  </div>
+                )}
+                <p className={styles.pixSub}>Escaneie com o app do seu banco ou copie o código abaixo</p>
+
+                <button className={styles.copyBtn} onClick={copyPix}>
+                  {pixCopied ? <><Check size={16} /> Copiado</> : <><Copy size={16} /> Copiar código PIX</>}
+                </button>
+                {error && <div className={styles.errorBox}>{error}</div>}
+                <button className={styles.confirmBtn} onClick={handleCheckPix} disabled={polling}>
+                  {polling ? 'Verificando...' : 'Já paguei — verificar pagamento'}
+                </button>
+                <a href={orderHref} className={styles.laterLink}>Ver pedido depois</a>
+              </>
+            )}
           </div>
         </div>
       </>

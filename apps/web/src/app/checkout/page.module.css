@@ -68,13 +68,68 @@
 .submitBtn:hover { background: var(--orange-dark); transform: translateY(-1px); }
 .submitBtn:disabled { opacity: 0.65; }
 
-/* PIX */
+/* PIX — cara de comprovante de pagamento, não de tela solta: cabeçalho com
+   referência do pedido, bloco de valor destacado, QR emoldurado, prazo visível. */
 .pixPage { min-height: 80vh; display: flex; align-items: center; justify-content: center; padding: 32px; }
-.pixCard { background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 40px; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 8px 40px rgba(0,0,0,0.08); }
-.pixIcon { font-size: 48px; margin-bottom: 12px; }
-.pixTitle { font-family: var(--display); font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
-.pixSub { font-size: 14px; color: var(--muted); margin-bottom: 8px; line-height: 1.5; }
-.copyBtn { background: #F0FDF4; border: 1.5px solid #BBF7D0; color: #16A34A; padding: 12px 20px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; margin-bottom: 12px; width: 100%; }
-.confirmBtn { background: var(--orange); color: #fff; padding: 14px; border-radius: 14px; font-size: 15px; font-weight: 800; cursor: pointer; width: 100%; margin-bottom: 12px; }
+.pixCard {
+  background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+  padding: 28px 30px 30px; max-width: 400px; width: 100%; text-align: center;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+}
+
+.pixHead { display: flex; align-items: center; gap: 12px; text-align: left; margin-bottom: 18px; }
+.pixBadge {
+  width: 44px; height: 44px; border-radius: 13px; flex-shrink: 0;
+  background: var(--orange-light); color: var(--orange-dark);
+  display: flex; align-items: center; justify-content: center;
+}
+.pixHeadText { min-width: 0; }
+.pixTitle { font-family: var(--display); font-size: 18px; font-weight: 800; color: var(--text); line-height: 1.2; }
+.pixRef { font-size: 12.5px; font-weight: 600; color: var(--faint); letter-spacing: 0.02em; }
+
+.pixAmount {
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--bg-warm); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 18px; margin-bottom: 16px;
+}
+.pixAmountLabel { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.pixAmountValue { font-family: var(--display); font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
+
+.pixTimer {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0 auto 16px;
+  font-size: 12.5px; font-weight: 600; color: var(--muted);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px;
+}
+.pixTimer strong { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 800; }
+.pixTimerUrgent { color: #B91C1C; background: #FEF2F2; border-color: #FECACA; animation: pixPulse 1.6s ease-in-out infinite; }
+.pixTimerUrgent strong { color: #B91C1C; }
+@keyframes pixPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+.pixQrFrame {
+  display: inline-block; padding: 14px; margin-bottom: 14px;
+  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+}
+.pixQrFrame img { display: block; border-radius: 4px; }
+
+.pixSub { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+
+.copyBtn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: #F0FDF4; border: 1.5px solid #BBF7D0; color: #16A34A;
+  padding: 12px 20px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
+  margin-bottom: 12px; width: 100%; transition: background 0.14s;
+}
+.copyBtn:hover { background: #DCFCE7; }
+.confirmBtn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--orange); color: #fff; text-decoration: none;
+  padding: 14px; border-radius: 14px; font-size: 15px; font-weight: 800; cursor: pointer;
+  width: 100%; margin-bottom: 12px; transition: background 0.14s;
+}
+.confirmBtn:hover { background: var(--orange-dark); }
 .confirmBtn:disabled { opacity: 0.65; }
 .laterLink { font-size: 13px; color: var(--muted); text-decoration: underline; display: block; }
+
+.pixExpired { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0 4px; color: var(--faint); }
+.pixExpiredTitle { font-family: var(--display); font-size: 17px; font-weight: 800; color: var(--text); margin-top: 6px; }
+.pixExpiredSub { font-size: 13px; color: var(--muted); line-height: 1.55; margin: 6px 0 18px; }
