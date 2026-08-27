@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, CreditCard, Copy, Check, Clock, ShoppingBag } from 'lucide-react'
+import { Zap, CreditCard, Copy, Check, Clock, ShoppingBag, Store, ArrowLeft } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useCartStore } from '@/stores/cart'
@@ -299,6 +299,34 @@ export default function CheckoutPage() {
     navigator.clipboard.writeText(pixResult?.pixCode ?? '')
     setPixCopied(true)
     setTimeout(() => setPixCopied(false), 2500)
+  }
+
+  // Lojista não compra pela própria conta — evita autocompra/manipulação de
+  // reputação (mesma vedação que marketplaces como o Mercado Livre têm pra
+  // vendedor). O back já recusa o pedido de qualquer forma; travar aqui evita
+  // deixar a pessoa preencher endereço/pagamento inteiros só pra falhar no fim.
+  if (user && user.role === 'STORE_OWNER') {
+    return (
+      <>
+        <Navbar />
+        <div className={styles.pixPage}>
+          <div className={styles.pixCard}>
+            <div className={styles.pixHead}>
+              <span className={styles.pixBadge}><Store size={20} /></span>
+              <div className={styles.pixHeadText}>
+                <h2 className={styles.pixTitle}>Contas de loja não compram</h2>
+              </div>
+            </div>
+            <p className={styles.pixSub}>
+              Sua conta é de lojista. Pra fazer pedidos como cliente, entre com uma conta de comprador separada.
+            </p>
+            <button className={styles.confirmBtn} onClick={() => router.push('/')}>
+              <ArrowLeft size={16} /> Voltar ao início
+            </button>
+          </div>
+        </div>
+      </>
+    )
   }
 
   // PIX screen

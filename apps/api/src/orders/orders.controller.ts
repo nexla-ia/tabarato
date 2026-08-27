@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -17,6 +17,13 @@ export class OrdersController {
   @Throttle({ default: { ttl: 60_000, limit: 12 } })
   @Post()
   create(@CurrentUser() user: any, @Body() dto: CreateOrderDto) {
+    // Lojista não compra pela própria conta — evita autocompra/manipulação de
+    // reputação (mesma vedação que o Mercado Livre e afins têm pra vendedor).
+    // Guard único aqui: os dois caminhos abaixo (create/createMulti) passam
+    // por este endpoint, então barra os dois de uma vez.
+    if (user.role === 'STORE_OWNER') {
+      throw new ForbiddenException('Contas de loja não podem fazer pedidos como cliente.')
+    }
     // App novo manda `groups` (carrinho multi-loja) → createMulti (N pedidos, 1 pagamento).
     // App antigo manda storeId+items → create legado (1 pedido).
     if (dto.groups && dto.groups.length) return this.ordersService.createMulti(user.sub, dto)
