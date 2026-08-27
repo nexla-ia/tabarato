@@ -143,7 +143,7 @@ export interface Order {
 }
 
 export const STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Aguardando', CONFIRMED: 'Confirmado', PREPARING: 'Preparando',
+  PENDING: 'Aguardando pagamento', CONFIRMED: 'Confirmado', PREPARING: 'Preparando',
   READY: 'Pronto', PICKED_UP: 'Coletado', DELIVERED: 'Entregue', CANCELLED: 'Cancelado',
 }
 

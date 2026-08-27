@@ -18,7 +18,7 @@ interface OrderListItem {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Aguardando', CONFIRMED: 'Confirmado', PREPARING: 'Preparando',
+  PENDING: 'Aguardando pagamento', CONFIRMED: 'Confirmado', PREPARING: 'Preparando',
   READY: 'Pronto', PICKED_UP: 'A caminho', DELIVERED: 'Entregue', CANCELLED: 'Cancelado',
 }
 
