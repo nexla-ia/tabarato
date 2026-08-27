@@ -2,18 +2,12 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ShoppingBag, LayoutDashboard, Store as StoreIcon, ChevronRight, Eye, EyeOff, Award, Gift, Copy, Check, Share2 } from 'lucide-react'
+import { ShoppingBag, LayoutDashboard, Store as StoreIcon, MapPin, ChevronRight, Eye, EyeOff, Award, Gift, Copy, Check, Share2 } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
-import { geocodeAddress } from '@/lib/geocoding'
 import { useAuth } from '@/hooks/useAuth'
 import { formatPhone, onlyDigits } from '@/lib/masks'
 import styles from './page.module.css'
-
-const ADDR_ICONS: Record<string, string> = {
-  Casa: '🏠', Trabalho: '💼', 'Casa dos pais': '👨‍👩‍👧', Outro: '📍',
-}
-function addrIcon(label: string) { return ADDR_ICONS[label] ?? '📍' }
 
 interface Address {
   id: string; label: string; street: string; number: string
@@ -44,10 +38,6 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
-
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [editAddr, setEditAddr] = useState<any | null>(null)
-  const [savingEdit, setSavingEdit] = useState(false)
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -139,39 +129,6 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleDeleteAddr(id: string) {
-    if (!confirm('Remover este endereço?')) return
-    setDeletingId(id)
-    try {
-      await api.delete(`/users/me/addresses/${id}`)
-      setAddresses(prev => prev.filter(a => a.id !== id))
-    } catch {} finally {
-      setDeletingId(null)
-    }
-  }
-
-  async function handleSaveEditAddr() {
-    if (!editAddr) return
-    setSavingEdit(true)
-    try {
-      // Re-geocodifica pra atualizar as coords (frete usa distância real). Falha na
-      // geocodificação não bloqueia: mantém as coords atuais.
-      const query = `${editAddr.street}, ${editAddr.number}, ${editAddr.district}, ${editAddr.city} - ${editAddr.state}, ${editAddr.zipCode}, Brasil`
-      const coords = await geocodeAddress(query).catch(() => null)
-      const payload = {
-        label: editAddr.label, street: editAddr.street, number: editAddr.number,
-        complement: editAddr.complement || undefined, district: editAddr.district,
-        city: editAddr.city, state: editAddr.state, zipCode: editAddr.zipCode,
-        ...(coords ?? {}),
-      }
-      const { data } = await api.patch(`/users/me/addresses/${editAddr.id}`, payload)
-      setAddresses(prev => prev.map(a => (a.id === editAddr.id ? data : a)))
-      setEditAddr(null)
-    } catch (e: any) {
-      alert(e?.response?.data?.message ?? 'Não foi possível salvar o endereço.')
-    } finally { setSavingEdit(false) }
-  }
-
   function handleLogout() {
     logout()
     router.push('/')
@@ -233,6 +190,14 @@ export default function ProfilePage() {
                 <span className={styles.quickText}>
                   <span className={styles.quickTitle}>Meus pedidos</span>
                   <span className={styles.quickSub}>Acompanhe suas compras</span>
+                </span>
+                <ChevronRight size={18} className={styles.quickChev} />
+              </Link>
+              <Link href="/enderecos" className={styles.quickLink}>
+                <span className={styles.quickIcon}><MapPin size={20} /></span>
+                <span className={styles.quickText}>
+                  <span className={styles.quickTitle}>Meus endereços</span>
+                  <span className={styles.quickSub}>{addresses.length > 0 ? `${addresses.length} salvo${addresses.length > 1 ? 's' : ''}` : 'Casa, trabalho e outros locais'}</span>
                 </span>
                 <ChevronRight size={18} className={styles.quickChev} />
               </Link>
@@ -395,75 +360,6 @@ export default function ProfilePage() {
                   {pwSaving ? 'Trocando...' : 'Trocar senha'}
                 </button>
               </form>
-            </div>
-
-            {/* Addresses */}
-            <div className={styles.card}>
-              <div className={styles.sectionTitle}>Meus endereços</div>
-              {addresses.length === 0 ? (
-                <div className={styles.emptyAddr}>
-                  Nenhum endereço salvo ainda. Adicione um no checkout!
-                </div>
-              ) : (
-                <div className={styles.addrList}>
-                  {addresses.map(addr => (
-                    <div key={addr.id} className={styles.addrItem} style={{ flexWrap: 'wrap' }}>
-                      <div className={styles.addrLeft}>
-                        <div className={styles.addrIcon}>{addrIcon(addr.label)}</div>
-                        <div>
-                          <div className={styles.addrLabel}>
-                            {addr.label}
-                            {addr.isDefault && <span className={styles.defaultBadge}>padrão</span>}
-                          </div>
-                          <div className={styles.addrStreet}>
-                            {addr.street}, {addr.number}
-                            {addr.complement ? `, ${addr.complement}` : ''} — {addr.district}, {addr.city}/{addr.state}
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                          className={styles.deleteBtn}
-                          style={{ color: 'var(--primary, #FF6600)' }}
-                          onClick={() => setEditAddr(editAddr?.id === addr.id ? null : { ...addr, complement: addr.complement ?? '' })}
-                        >
-                          {editAddr?.id === addr.id ? 'Fechar' : 'Editar'}
-                        </button>
-                        <button
-                          className={styles.deleteBtn}
-                          onClick={() => handleDeleteAddr(addr.id)}
-                          disabled={deletingId === addr.id}
-                        >
-                          {deletingId === addr.id ? '...' : 'Remover'}
-                        </button>
-                      </div>
-
-                      {editAddr?.id === addr.id && (
-                        <div style={{ flexBasis: '100%', marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          {([
-                            ['label', 'Nome (Casa, Trabalho…)'], ['street', 'Rua'], ['number', 'Número'],
-                            ['complement', 'Complemento'], ['district', 'Bairro'], ['city', 'Cidade'],
-                            ['state', 'UF'], ['zipCode', 'CEP'],
-                          ] as [string, string][]).map(([k, ph]) => (
-                            <input
-                              key={k}
-                              value={(editAddr as any)[k] ?? ''}
-                              onChange={(e) => setEditAddr((p: any) => ({ ...p, [k]: e.target.value }))}
-                              placeholder={ph}
-                              style={{ padding: '9px 11px', borderRadius: 9, border: '1.5px solid var(--border, #e5e5e5)', fontSize: 13.5, gridColumn: (k === 'street' || k === 'complement') ? 'span 2' : undefined }}
-                            />
-                          ))}
-                          <button
-                            onClick={handleSaveEditAddr}
-                            disabled={savingEdit || !editAddr.street || !editAddr.number}
-                            style={{ gridColumn: 'span 2', padding: '11px', borderRadius: 10, border: 'none', background: 'var(--primary, #FF6600)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
-                          >{savingEdit ? 'Salvando…' : 'Salvar endereço'}</button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Danger zone */}

@@ -7,6 +7,7 @@ import { useCartStore, CartItem } from '@/stores/cart'
 import { promoLabel } from '@/lib/promo'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
+import { mapsUrl } from '@/lib/geocoding'
 import { Lightbox } from '@/components/Lightbox'
 import styles from './StoreClient.module.css'
 
@@ -14,18 +15,6 @@ import styles from './StoreClient.module.css'
 // zustand nunca veria o valor como "igual" ao anterior e entraria em loop de
 // re-render infinito (React #185) sempre que a loja não tivesse itens no carrinho.
 const EMPTY_ITEMS: CartItem[] = []
-
-// Coordenadas dão um pino exato (é a localização que o próprio lojista marcou
-// no cadastro); sem elas, cai pro texto do endereço — o Maps geocodifica.
-function mapsUrl(store: { address?: string | null; lat?: number | null; lng?: number | null }): string | null {
-  if (store.lat != null && store.lng != null) {
-    return `https://www.google.com/maps/search/?api=1&query=${store.lat},${store.lng}`
-  }
-  if (store.address) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(store.address)}`
-  }
-  return null
-}
 
 interface Variation { id: string; name: string; price: number | string; stock?: number | null }
 interface Category { id: string; name: string; icon?: string | null }

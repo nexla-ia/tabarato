@@ -154,35 +154,6 @@
   font-size: 13px; font-weight: 600; margin-top: 14px;
 }
 
-.addrList { display: flex; flex-direction: column; gap: 10px; }
-.addrItem {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; border-radius: 12px;
-  border: 1.5px solid var(--border); background: var(--bg);
-}
-.addrLeft { display: flex; align-items: center; gap: 12px; }
-.addrIcon {
-  width: 36px; height: 36px; border-radius: 10px;
-  background: var(--orange-light);
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; font-size: 16px;
-}
-.addrLabel { font-size: 14px; font-weight: 800; color: var(--text); }
-.addrStreet { font-size: 12px; color: var(--muted); margin-top: 1px; }
-.defaultBadge {
-  display: inline-block; margin-left: 6px;
-  background: var(--orange-light); color: var(--orange);
-  font-size: 10px; font-weight: 800;
-  padding: 2px 6px; border-radius: 6px;
-}
-.deleteBtn {
-  color: #DC2626; padding: 6px; border-radius: 8px;
-  transition: background 0.15s;
-  font-size: 13px; font-weight: 700;
-}
-.deleteBtn:hover { background: #FEF2F2; }
-.emptyAddr { font-size: 14px; color: var(--muted); text-align: center; padding: 24px; }
-
 .dangerCard { border-color: #FECACA; background: #FFF5F5; }
 .logoutBtn {
   width: 100%; padding: 14px;

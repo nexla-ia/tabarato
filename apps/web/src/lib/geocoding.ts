@@ -79,3 +79,18 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string |
     return null
   }
 }
+
+/**
+ * Link do Google Maps pra um ponto salvo (endereço de entrega, loja). Prefere
+ * coordenadas — é o pino exato marcado no cadastro; sem elas cai pro texto do
+ * endereço e deixa o próprio Maps geocodificar.
+ */
+export function mapsUrl(point: { address?: string | null; lat?: number | null; lng?: number | null }): string | null {
+  if (point.lat != null && point.lng != null) {
+    return `https://www.google.com/maps/search/?api=1&query=${point.lat},${point.lng}`
+  }
+  if (point.address) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(point.address)}`
+  }
+  return null
+}
