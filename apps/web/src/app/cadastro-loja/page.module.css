@@ -1,49 +1,7 @@
 .page { display: flex; min-height: 100vh; background: var(--bg); }
 
-/* ── Hero (lateral) ─────────────────────────────────────────────────────── */
-.hero {
-  width: 42%;
-  background:
-    radial-gradient(120% 90% at 80% -10%, rgba(255,140,60,0.55) 0%, transparent 55%),
-    linear-gradient(160deg, #FF5500 0%, #E23A00 55%, #7A1E00 100%);
-  color: #fff;
-  display: flex; align-items: center;
-  padding: 56px;
-  position: sticky; top: 0; height: 100vh;
-  overflow: hidden;
-}
-.heroGlow {
-  position: absolute; width: 380px; height: 380px; border-radius: 50%;
-  background: rgba(255,255,255,0.10);
-  top: -120px; right: -120px;
-  filter: blur(6px);
-}
-.heroInner { position: relative; z-index: 1; max-width: 360px; }
-.heroBadge {
-  display: inline-flex; align-items: center; gap: 7px;
-  background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.32);
-  padding: 7px 15px; border-radius: 30px;
-  font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
-  margin-bottom: 26px;
-  backdrop-filter: blur(4px);
-}
-.heroTitle {
-  font-family: var(--display);
-  font-size: 52px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.02;
-  margin-bottom: 18px;
-}
-.heroAccent {
-  background: linear-gradient(90deg, #FFE9B0, #FFF);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-.heroSub { font-size: 15.5px; color: rgba(255,255,255,0.82); line-height: 1.6; margin-bottom: 30px; }
-.heroList { list-style: none; display: flex; flex-direction: column; gap: 13px; }
-.heroList li { display: flex; align-items: center; gap: 10px; font-size: 14.5px; color: rgba(255,255,255,0.94); font-weight: 500; }
-.heroList svg {
-  flex-shrink: 0; color: #fff;
-  background: rgba(255,255,255,0.22); border-radius: 50%; padding: 4px;
-  width: 24px; height: 24px;
-}
+/* Painel de marca (lateral) vem do componente AuthBrandPanel — ver
+   src/components/AuthBrandPanel.module.css. Aqui só o form. */
 
 /* ── Form (lado direito) ────────────────────────────────────────────────── */
 .formSide { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 44px 24px; }
@@ -240,13 +198,9 @@
 /* ── Responsivo ─────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .page { flex-direction: column; }
-  .hero { width: 100%; height: auto; position: static; padding: 40px 32px; }
-  .heroTitle { font-size: 40px; }
   .formSide { padding: 32px 20px 48px; }
 }
 @media (max-width: 480px) {
-  .hero { padding: 32px 24px; }
-  .heroTitle { font-size: 34px; }
   .grid2 { grid-template-columns: 1fr; }
   .stepLabel { font-size: 10px; }
 }

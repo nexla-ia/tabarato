@@ -1,0 +1,69 @@
+/* Painel de marca do fluxo de autenticação (login, cadastro de cliente,
+   cadastro de loja) — logo e largura são fixos em QUALQUER lugar que isso
+   apareça; só o texto (badge/título/lista) muda por contexto via props. */
+.panel {
+  display: none;
+  position: relative; overflow: hidden;
+  width: 42%; min-width: 380px; max-width: 560px; flex-shrink: 0;
+  flex-direction: column;
+  padding: 44px 52px;
+  background:
+    radial-gradient(1200px 400px at 80% -10%, rgba(255,180,120,0.35), transparent 60%),
+    linear-gradient(150deg, #FF7A00 0%, #FF5500 42%, #CC3300 100%);
+}
+@media (min-width: 900px) {
+  .panel { display: flex; }
+}
+
+/* Cadastro de loja é um wizard longo — o painel acompanha o scroll (sticky)
+   em vez de sumir no mobile; login/cadastro de cliente são uma tela curta só,
+   então some abaixo de 900px e o form vira o único conteúdo (variante padrão). */
+.panelSticky { position: static; }
+@media (min-width: 900px) {
+  .panelSticky { position: sticky; top: 0; height: 100vh; }
+}
+@media (max-width: 899px) {
+  .panelSticky { display: flex; width: 100%; min-width: 0; max-width: none; padding: 40px 32px; }
+}
+
+.glow {
+  position: absolute; inset: 0;
+  background: radial-gradient(600px 300px at 15% 120%, rgba(26,10,0,0.28), transparent 70%);
+  pointer-events: none;
+}
+.blob1 { position: absolute; width: 300px; height: 300px; border-radius: 50%; background: rgba(255,255,255,0.08); top: -100px; right: -60px; }
+.blob2 { position: absolute; width: 160px; height: 160px; border-radius: 50%; background: rgba(255,255,255,0.06); bottom: 60px; left: 6%; }
+
+.back {
+  position: relative; z-index: 1;
+  display: inline-flex; align-items: center; gap: 6px;
+  color: rgba(255,255,255,0.85); font-size: 13.5px; font-weight: 600;
+  transition: color 0.14s;
+}
+.back:hover { color: #fff; }
+
+.content { position: relative; z-index: 1; margin: auto 0; }
+/* Logo grande e centrada — único elemento fora do bloco alinhado à esquerda,
+   funciona como a assinatura visual do painel. */
+.logoWrap { display: flex; justify-content: center; margin-bottom: 28px; }
+.logo { display: block; width: 100%; max-width: 216px; height: auto; filter: drop-shadow(0 16px 34px rgba(90,20,0,0.4)); }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.28); color: #fff;
+  font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: 999px;
+  margin-bottom: 18px; backdrop-filter: blur(4px);
+}
+.title {
+  font-family: var(--display); font-size: clamp(26px, 2.6vw, 36px); font-weight: 800;
+  line-height: 1.1; letter-spacing: -0.03em; color: #fff;
+  text-shadow: 0 4px 30px rgba(120,30,0,0.3); margin-bottom: 14px;
+}
+.titleAccent { color: #FFE0B3; }
+.subtitle { font-size: 14.5px; color: rgba(255,255,255,0.9); line-height: 1.6; max-width: 340px; margin-bottom: 30px; }
+
+.list { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 13px; }
+.listItem { display: flex; align-items: center; gap: 10px; color: #fff; font-size: 13.5px; font-weight: 600; }
+.listIcon {
+  width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+  background: rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center;
+}

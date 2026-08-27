@@ -1,46 +1,66 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, Clock, CreditCard, ShieldCheck } from 'lucide-react'
-import styles from '@/app/login/page.module.css'
+import styles from './AuthBrandPanel.module.css'
+
+interface BrandItem { icon: React.ReactNode; text: string }
+
+/** Trecho destacado (cor creme) dentro do título — pra quem passa um `title`
+ *  customizado sem precisar conhecer a classe interna do painel. */
+export function AuthBrandAccent({ children }: { children: React.ReactNode }) {
+  return <span className={styles.titleAccent}>{children}</span>
+}
+
+const DEFAULT_ITEMS: BrandItem[] = [
+  { icon: <Clock size={14} />, text: 'Entrega rápida, direto do comércio local' },
+  { icon: <CreditCard size={14} />, text: 'Pague com PIX ou cartão, sem complicação' },
+  { icon: <ShieldCheck size={14} />, text: 'Acompanhe a entrega em tempo real' },
+]
 
 /**
- * Painel de marca do login/cadastro — mesma paleta e copy do hero da home
- * (page.module.css: .hero/.heroBadge/.heroTitle), só que vertical e mais
- * enxuto. Some abaixo de 900px (ver media query em page.module.css); o card
- * do formulário cobre esse caso com seu próprio back-link/logo.
+ * Painel de marca compartilhado por login, cadastro de cliente e cadastro de
+ * loja. Logo e largura do painel são FIXOS — sempre os mesmos em qualquer
+ * tela — só o texto (badge/título/subtítulo/lista) muda de acordo com quem
+ * está do outro lado do formulário.
  */
-export function AuthBrandPanel() {
+export function AuthBrandPanel({
+  badge = '🛵 Entrega na sua casa · Vilhena-RO',
+  title = <>O comércio local<br />na palma da<span className={styles.titleAccent}> sua mão</span></>,
+  subtitle = 'Peça de restaurantes, lanchonetes e lojas da cidade e receba rapidinho em casa.',
+  items = DEFAULT_ITEMS,
+  sticky = false,
+}: {
+  badge?: React.ReactNode
+  title?: React.ReactNode
+  subtitle?: string
+  items?: BrandItem[]
+  /** Cadastro de loja é um wizard longo — o painel acompanha o scroll (sticky)
+   *  em vez de sumir no mobile, que é o padrão pras telas curtas de login/cadastro. */
+  sticky?: boolean
+}) {
   return (
-    <div className={styles.brandPanel}>
-      <div className={styles.brandGlow} />
-      <div className={styles.brandBlob1} />
-      <div className={styles.brandBlob2} />
+    <div className={`${styles.panel} ${sticky ? styles.panelSticky : ''}`}>
+      <div className={styles.glow} />
+      <div className={styles.blob1} />
+      <div className={styles.blob2} />
 
-      <Link href="/" className={styles.brandBack}><ArrowLeft size={16} /> Voltar ao início</Link>
+      <Link href="/" className={styles.back}><ArrowLeft size={16} /> Voltar ao início</Link>
 
-      <div className={styles.brandContent}>
-        <Image src="/logo.png" alt="Tá Barato" width={132} height={132} className={styles.brandLogo} style={{ objectFit: 'contain' }} />
-        <span className={styles.brandBadge}>🛵 Entrega na sua casa · Vilhena-RO</span>
-        <h1 className={styles.brandTitle}>
-          O comércio local<br />na palma da<span className={styles.brandTitleAccent}> sua mão</span>
-        </h1>
-        <p className={styles.brandSub}>
-          Peça de restaurantes, lanchonetes e lojas da cidade e receba rapidinho em casa.
-        </p>
+      <div className={styles.content}>
+        <div className={styles.logoWrap}>
+          <Image src="/logo.png" alt="Tá Barato" width={216} height={216} className={styles.logo} style={{ objectFit: 'contain' }} priority />
+        </div>
+        <span className={styles.badge}>{badge}</span>
+        <h1 className={styles.title}>{title}</h1>
+        <p className={styles.subtitle}>{subtitle}</p>
 
-        <div className={styles.brandList}>
-          <div className={styles.brandListItem}>
-            <span className={styles.brandListIcon}><Clock size={14} /></span>
-            Entrega rápida, direto do comércio local
-          </div>
-          <div className={styles.brandListItem}>
-            <span className={styles.brandListIcon}><CreditCard size={14} /></span>
-            Pague com PIX ou cartão, sem complicação
-          </div>
-          <div className={styles.brandListItem}>
-            <span className={styles.brandListIcon}><ShieldCheck size={14} /></span>
-            Acompanhe a entrega em tempo real
-          </div>
+        <div className={styles.list}>
+          {items.map((it, i) => (
+            <div key={i} className={styles.listItem}>
+              <span className={styles.listIcon}>{it.icon}</span>
+              {it.text}
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -14,6 +14,7 @@ import { onlyDigits, formatCnpj, formatPhone, validateCnpj, joinList } from '@/l
 import { sortCategoriesOutrosLast } from '@/lib/categoryIcons'
 import { lookupCnpj } from '@/lib/cnpjLookup'
 import { reverseGeocode } from '@/lib/geocoding'
+import { AuthBrandPanel, AuthBrandAccent } from '@/components/AuthBrandPanel'
 import styles from './page.module.css'
 
 interface Category { id: string; name: string; icon?: string | null }
@@ -23,6 +24,19 @@ const STEPS = [
   { label: 'Sua loja', Icon: Store },
   { label: 'Pagamento', Icon: CreditCard },
 ]
+
+// Conteúdo do painel de marca pro cadastro de lojista — logo e largura vêm
+// fixos do AuthBrandPanel; só isto (texto/lista) muda em relação a login/cadastro de cliente.
+const LOJISTA_BRAND = {
+  badge: <><Store size={13} /> Para lojistas</>,
+  title: <>Venda no<br /><AuthBrandAccent>Tá Barato</AuthBrandAccent></>,
+  subtitle: 'Cadastre sua loja e comece a receber pedidos em Vilhena hoje mesmo.',
+  items: [
+    { icon: <Check size={14} />, text: 'Receba pedidos em tempo real' },
+    { icon: <Check size={14} />, text: 'Entregadores da plataforma' },
+    { icon: <Check size={14} />, text: 'Receba via PIX direto no Mercado Pago' },
+  ],
+}
 
 export default function CadastroLojaPage() {
   const router = useRouter()
@@ -210,7 +224,7 @@ export default function CadastroLojaPage() {
   if (done) {
     return (
       <div className={styles.page}>
-        <HeroSide />
+        <AuthBrandPanel sticky {...LOJISTA_BRAND} />
         <div className={styles.formSide}>
           <div className={`${styles.successCard} ${styles.reveal}`}>
             <div className={styles.successIcon}><PartyPopper size={30} /></div>
@@ -238,7 +252,7 @@ export default function CadastroLojaPage() {
 
   return (
     <div className={styles.page}>
-      <HeroSide />
+      <AuthBrandPanel sticky {...LOJISTA_BRAND} />
 
       <div className={styles.formSide}>
         <div className={styles.card}>
@@ -412,24 +426,6 @@ export default function CadastroLojaPage() {
 
 /* ── Subcomponentes ────────────────────────────────────────────────────── */
 type Ic = React.ComponentType<{ size?: number | string; className?: string }>
-
-function HeroSide() {
-  return (
-    <div className={styles.hero}>
-      <div className={styles.heroGlow} />
-      <div className={styles.heroInner}>
-        <div className={styles.heroBadge}><Store size={15} /> Para lojistas</div>
-        <h1 className={styles.heroTitle}>Venda no<br /><span className={styles.heroAccent}>Tá Barato</span></h1>
-        <p className={styles.heroSub}>Cadastre sua loja e comece a receber pedidos em Vilhena hoje mesmo.</p>
-        <ul className={styles.heroList}>
-          <li><Check size={14} /> Receba pedidos em tempo real</li>
-          <li><Check size={14} /> Entregadores da plataforma</li>
-          <li><Check size={14} /> Receba via PIX direto no Mercado Pago</li>
-        </ul>
-      </div>
-    </div>
-  )
-}
 
 function StepHead({ Icon, title, desc }: { Icon: Ic; title: string; desc: string }) {
   return (
