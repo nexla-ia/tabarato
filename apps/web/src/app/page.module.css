@@ -28,21 +28,18 @@
   z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* center (não space-between): a logo ficava colada na borda direita do
+     container — centralizar a linha inteira deixa o espaço sobrando dividido
+     nas duas pontas em vez de todo empurrado pra ela. */
+  justify-content: center;
   gap: 32px;
 }
 .heroCopy { max-width: 620px; flex: 1; animation: rise 0.7s cubic-bezier(0.22,1,0.36,1) both; }
 
-.heroBadge {
-  display: inline-flex; align-items: center;
-  background: rgba(255,255,255,0.18);
-  border: 1px solid rgba(255,255,255,0.28);
-  color: #fff;
-  font-size: 13px; font-weight: 700;
-  padding: 7px 15px; border-radius: 999px;
-  margin-bottom: 20px;
-  backdrop-filter: blur(4px);
-}
+/* Busca no topo do hero — antes era a última coisa depois do título/subtítulo,
+   agora é a primeira coisa visível (mais perto da navbar, mais "à mão"). */
+.heroSearchTop { margin-bottom: 24px; }
+
 .heroTitle {
   font-family: var(--display);
   font-size: clamp(34px, 5vw, 54px);

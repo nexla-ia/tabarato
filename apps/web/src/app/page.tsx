@@ -44,9 +44,13 @@ export default async function HomePage({
           {!searching && <div className={styles.heroBlob2} />}
           <div className={`container ${styles.heroInner}`}>
             <div className={styles.heroCopy}>
+              <div className={styles.heroSearchTop}>
+                <Suspense fallback={<div className={styles.searchFallback} />}>
+                  <SearchBar />
+                </Suspense>
+              </div>
               {!searching && (
                 <>
-                  <span className={styles.heroBadge}>🛵 Entrega na sua casa · Vilhena-RO</span>
                   <h1 className={styles.heroTitle}>
                     O comércio local<br />na palma da<span className={styles.heroTitleAccent}> sua mão</span>
                   </h1>
@@ -55,9 +59,6 @@ export default async function HomePage({
                   </p>
                 </>
               )}
-              <Suspense fallback={<div className={styles.searchFallback} />}>
-                <SearchBar />
-              </Suspense>
             </div>
             {!searching && (
               <div className={styles.heroArt}>

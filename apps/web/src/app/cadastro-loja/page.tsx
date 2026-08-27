@@ -28,7 +28,6 @@ const STEPS = [
 // Conteúdo do painel de marca pro cadastro de lojista — logo e largura vêm
 // fixos do AuthBrandPanel; só isto (texto/lista) muda em relação a login/cadastro de cliente.
 const LOJISTA_BRAND = {
-  badge: <><Store size={13} /> Para lojistas</>,
   title: <>Venda no<br /><AuthBrandAccent>Tá Barato</AuthBrandAccent></>,
   subtitle: 'Cadastre sua loja e comece a receber pedidos em Vilhena hoje mesmo.',
   items: [
