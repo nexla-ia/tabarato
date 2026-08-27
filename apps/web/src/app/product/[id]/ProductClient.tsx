@@ -133,7 +133,12 @@ export function ProductClient({
   const hasRating = product.avgRating != null && product.avgRating > 0
   const hasSoldCount = !!product.soldCount && product.soldCount > 0
 
+  const isStoreOwner = user?.role === 'STORE_OWNER'
+
   function handleAdd() {
+    // Lojista não compra (nem na própria loja) — checkout já recusa de qualquer
+    // forma. Botão já fica escondido pra esse papel; isso é reforço.
+    if (isStoreOwner) return
     addItem(store.id, store.name, {
       productId: product.id, variationId: selectedVar?.id, name: product.name,
       price, quantity: qty, imageUrl: product.imageUrl ?? undefined, variationName: selectedVar?.name,
@@ -227,7 +232,9 @@ export function ProductClient({
                 </div>
               )}
 
-              {selectionOut ? (
+              {isStoreOwner ? (
+                <div className={styles.outBox}>Contas de loja não compram.</div>
+              ) : selectionOut ? (
                 <div className={styles.outBox}>Produto indisponível no momento.</div>
               ) : (
                 <div className={styles.buyBox}>

@@ -122,6 +122,9 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
   }
 
   function handleAdd(product: Product, variation?: { id: string; name: string; price: number | string }) {
+    // Lojista não compra (nem na própria loja) — checkout já recusa de qualquer
+    // forma. Botão já fica escondido pra esse papel; isso é reforço.
+    if (user?.role === 'STORE_OWNER') return
     // Loja fechada (horário/pausa já refletidos em isOpen pelo backend): não adiciona
     // — senão o cliente monta o carrinho e o checkout recusa lá no fim.
     if (!store.isOpen) {
@@ -296,7 +299,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
                   <section className={styles.catSection}>
                     <h3 className={styles.catTitle}>{sort === 'price_asc' ? 'Menor preço' : 'Maior preço'}</h3>
                     <div className={styles.grid}>
-                      {sorted.map(p => <ProductCard key={p.id} product={p} storeId={store.id} onAdd={handleAdd} />)}
+                      {sorted.map(p => <ProductCard key={p.id} product={p} storeId={store.id} onAdd={handleAdd} isStoreOwner={user?.role === 'STORE_OWNER'} />)}
                     </div>
                   </section>
                 )
@@ -315,7 +318,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
                 <section key={g.name} className={styles.catSection}>
                   <h3 className={styles.catTitle}>{g.name}</h3>
                   <div className={styles.grid}>
-                    {g.items.map(p => <ProductCard key={p.id} product={p} storeId={store.id} onAdd={handleAdd} />)}
+                    {g.items.map(p => <ProductCard key={p.id} product={p} storeId={store.id} onAdd={handleAdd} isStoreOwner={user?.role === 'STORE_OWNER'} />)}
                   </div>
                 </section>
               ))
@@ -362,7 +365,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
       </div>
 
       {/* Floating cart bar */}
-      {cartCount > 0 && (
+      {cartCount > 0 && user?.role !== 'STORE_OWNER' && (
         <div className={styles.cartBar}>
           <div className={styles.cartBarLeft}>
             <ShoppingCart size={18} />
@@ -389,10 +392,11 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
   )
 }
 
-function ProductCard({ product, storeId, onAdd }: {
+function ProductCard({ product, storeId, onAdd, isStoreOwner }: {
   product: Product
   storeId: string
   onAdd: (p: Product, v?: Variation) => void
+  isStoreOwner?: boolean
 }) {
   const [selectedVar, setSelectedVar] = useState(
     product.variations?.find(v => !isOut(v.stock)) ?? product.variations?.[0],
@@ -452,7 +456,9 @@ function ProductCard({ product, storeId, onAdd }: {
 
         <div className={styles.productBottom}>
           <span className={styles.productPrice}>{fmtBRL(price)}</span>
-          {selectionOut ? (
+          {isStoreOwner ? (
+            <span className={styles.outLabel}>Contas de loja não compram</span>
+          ) : selectionOut ? (
             <span className={styles.outLabel}>Indisponível</span>
           ) : qty > 0 ? (
             <div className={styles.qtyControl}>
