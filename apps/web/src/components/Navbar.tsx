@@ -2,11 +2,12 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { ShoppingBag, LogOut, ShoppingCart, MapPin, ChevronDown, Heart, MessagesSquare } from 'lucide-react'
+import { ShoppingCart, MapPin, ChevronDown } from 'lucide-react'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
 import { useCartStore } from '@/stores/cart'
 import { NotificationBell } from './NotificationBell'
+import { ProfileMenu } from './ProfileMenu'
 import { SearchBar } from './SearchBar'
 import styles from './Navbar.module.css'
 
@@ -52,22 +53,7 @@ export function Navbar() {
           {user ? (
             <>
               <NotificationBell variant="light" />
-              <Link href="/favorites" className={`${styles.iconBtn} ${pathname.startsWith('/favorites') ? styles.iconBtnActive : ''}`} title="Lojas favoritas">
-                <Heart size={20} />
-              </Link>
-              <Link href="/mensagens" className={`${styles.iconBtn} ${pathname === '/mensagens' ? styles.iconBtnActive : ''}`} title="Mensagens">
-                <MessagesSquare size={20} />
-              </Link>
-              <Link href="/orders" className={`${styles.iconBtn} ${pathname.startsWith('/orders') ? styles.iconBtnActive : ''}`} title="Meus pedidos">
-                <ShoppingBag size={20} />
-              </Link>
-              <Link href="/profile" className={styles.profile} title="Perfil">
-                <span className={styles.avatarCircle}>{user.name?.[0]?.toUpperCase()}</span>
-                <span className={styles.profileName}>{user.name?.split(' ')[0]}</span>
-              </Link>
-              <button className={styles.iconBtn} onClick={handleLogout} title="Sair">
-                <LogOut size={18} />
-              </button>
+              <ProfileMenu name={user.name} onLogout={handleLogout} />
             </>
           ) : (
             <>
