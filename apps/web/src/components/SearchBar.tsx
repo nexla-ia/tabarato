@@ -40,7 +40,12 @@ export function SearchBar() {
 
   function runSearch(term: string) {
     const clean = term.trim()
-    if (!clean) return
+    // Campo vazio + clicar em "Buscar" virava um no-op silencioso — se a
+    // pessoa estava numa página de loja (não na home), parecia que a busca
+    // "não fazia nada"/"só mostrava a própria loja", quando na real não tinha
+    // pra onde navegar mesmo. Sem termo, leva pra listagem geral em vez de
+    // ficar parado.
+    if (!clean) { setOpen(false); router.push('/#lojas'); return }
     setRecent(saveRecent(clean))
     setOpen(false)
     router.push(`/?q=${encodeURIComponent(clean)}#lojas`)
