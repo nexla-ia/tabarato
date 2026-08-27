@@ -10,15 +10,17 @@ export interface Store {
 }
 
 function sortStores(stores: Store[]): Store[] {
-  // Verificada (conectada ao Mercado Pago, recebe pedido de verdade) primeiro,
-  // depois aberta antes de fechada — mantém a ordem alfabética dentro de cada grupo.
+  // Aberta antes de fechada primeiro — é o que o cliente quer comprar AGORA.
+  // "Verificada" (conectada ao Mercado Pago) só desempata dentro do mesmo
+  // grupo aberto/fechado; antes vinha primeiro que aberto/fechado, então uma
+  // loja fechada mas verificada furava na frente de lojas abertas sem MP.
   return stores
     .map((s, i) => ({ s, i }))
     .sort((a, b) => {
+      const open = Number(!!b.s.isOpen) - Number(!!a.s.isOpen)
+      if (open) return open
       const verified = Number(!!b.s.mpConnected) - Number(!!a.s.mpConnected)
       if (verified) return verified
-      const open = Number(b.s.isOpen) - Number(a.s.isOpen)
-      if (open) return open
       return a.i - b.i
     })
     .map(({ s }) => s)
