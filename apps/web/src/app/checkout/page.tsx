@@ -310,7 +310,9 @@ export default function CheckoutPage() {
     const expiresAtMs = pixResult.pixExpiresAt ? new Date(pixResult.pixExpiresAt).getTime() : null
     const remainingMs = expiresAtMs != null ? expiresAtMs - pixNow : null
     const expired = remainingMs != null && remainingMs <= 0
-    const urgent = remainingMs != null && remainingMs > 0 && remainingMs <= 5 * 60_000
+    // Prazo é de 10min (PIX_EXPIRATION_MINUTES na API) — últimos 2min como aviso
+    // urgente, proporcional ao que era "últimos 5 de 30" antes de encurtar o prazo.
+    const urgent = remainingMs != null && remainingMs > 0 && remainingMs <= 2 * 60_000
 
     return (
       <>
@@ -339,7 +341,7 @@ export default function CheckoutPage() {
                 <Clock size={26} />
                 <p className={styles.pixExpiredTitle}>Código PIX expirado</p>
                 <p className={styles.pixExpiredSub}>
-                  O prazo de 30 minutos pra pagar esse código acabou. O pedido continua registrado —
+                  O prazo de 10 minutos pra pagar esse código acabou. O pedido continua registrado —
                   acompanhe o status ou fale com a loja pelo chat do pedido.
                 </p>
                 <a href={orderHref} className={styles.confirmBtn}>

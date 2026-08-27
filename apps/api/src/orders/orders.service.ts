@@ -7,6 +7,7 @@ import { PushService } from '../common/push.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { PaymentsService } from '../payments/payments.service'
 import { MpOauthService } from '../payments/mp-oauth.service'
+import { PIX_EXPIRATION_MS } from '../payments/pix.constants'
 import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
 import { OrderConsumptionService } from './order-consumption.service'
 import { CreateOrderDto } from './dto/create-order.dto'
@@ -462,7 +463,7 @@ export class OrdersService {
             gatewayId: pixResult.gatewayId,
             pixCode: pixResult.pixCode,
             pixQrBase64: pixResult.pixQrBase64,
-            pixExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
+            pixExpiresAt: new Date(Date.now() + PIX_EXPIRATION_MS),
           })
         }
       } catch (err: any) {
@@ -824,7 +825,7 @@ export class OrdersService {
       try {
         const pixResult = await this.payments.createPixPayment(payment.id, grandTotal, firstOrder.id, safePayerEmail(payer?.email), splitOpts)
         if (pixResult.splitFellBack) await this.prisma.order.updateMany({ where: { paymentId: payment.id }, data: { paidViaSplit: false } }).catch(() => {})
-        paymentOut = { ...payment, gatewayId: pixResult.gatewayId, pixCode: pixResult.pixCode, pixQrBase64: pixResult.pixQrBase64, pixExpiresAt: new Date(Date.now() + 30 * 60 * 1000) }
+        paymentOut = { ...payment, gatewayId: pixResult.gatewayId, pixCode: pixResult.pixCode, pixQrBase64: pixResult.pixQrBase64, pixExpiresAt: new Date(Date.now() + PIX_EXPIRATION_MS) }
         orders.forEach((o) => { if (o.payment) Object.assign(o.payment, paymentOut) })
       } catch (err: any) {
         this.logger.error('PIX (multi) creation failed after orders were saved', err)

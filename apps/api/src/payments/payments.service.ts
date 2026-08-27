@@ -7,6 +7,7 @@ import { PushService } from '../common/push.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { MpOauthService } from './mp-oauth.service'
 import { OrderConsumptionService } from '../orders/order-consumption.service'
+import { PIX_EXPIRATION_MS } from './pix.constants'
 
 @Injectable()
 export class PaymentsService {
@@ -73,7 +74,7 @@ export class PaymentsService {
       payer: { email: payerEmail },
       notification_url: webhookUrl,
       external_reference: orderId,
-      date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      date_of_expiration: new Date(Date.now() + PIX_EXPIRATION_MS).toISOString(),
       // Split: comissão da plataforma vai pra conta da Tá Barato
       ...(useSplit && opts?.sellerToken && opts?.applicationFee
         ? { application_fee: Math.round(opts.applicationFee * 100) / 100 }
@@ -131,7 +132,7 @@ export class PaymentsService {
         gatewayId,
         pixCode,
         pixQrBase64,
-        pixExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
+        pixExpiresAt: new Date(Date.now() + PIX_EXPIRATION_MS),
       },
     })
 
