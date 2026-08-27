@@ -24,12 +24,14 @@ const DEFAULT_ITEMS: BrandItem[] = [
  * está do outro lado do formulário.
  */
 export function AuthBrandPanel({
-  badge = '🛵 Entrega na sua casa · Vilhena-RO',
+  badge,
   title = <>O comércio local<br />na palma da<span className={styles.titleAccent}> sua mão</span></>,
   subtitle = 'Peça de restaurantes, lanchonetes e lojas da cidade e receba rapidinho em casa.',
   items = DEFAULT_ITEMS,
   sticky = false,
 }: {
+  /** Sem badge por padrão (login/cadastro de cliente) — passe pra contextualizar
+   *  telas específicas, como "Para lojistas" no cadastro de loja. */
   badge?: React.ReactNode
   title?: React.ReactNode
   subtitle?: string
@@ -50,7 +52,7 @@ export function AuthBrandPanel({
         <div className={styles.logoWrap}>
           <Image src="/logo.png" alt="Tá Barato" width={216} height={216} className={styles.logo} style={{ objectFit: 'contain' }} priority />
         </div>
-        <span className={styles.badge}>{badge}</span>
+        {badge && <span className={styles.badge}>{badge}</span>}
         <h1 className={styles.title}>{title}</h1>
         <p className={styles.subtitle}>{subtitle}</p>
 
