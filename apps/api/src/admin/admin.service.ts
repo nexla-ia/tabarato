@@ -1,12 +1,35 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { UploadsService } from '../uploads/uploads.service'
 import { UpdateCourierStatusDto } from './dto/update-courier-status.dto'
 import { UpdateCourierDocStatusDto } from './dto/update-courier-doc-status.dto'
 import { UpdateStoreStatusDto } from './dto/update-store-status.dto'
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private uploads: UploadsService,
+  ) {}
+
+  /**
+   * Troca os PATHs privados dos documentos por signed URLs exibíveis (1h). Os
+   * documentos ficam num bucket privado — sem isso o admin veria só o path e o
+   * <img> quebraria. Valores http legados passam direto.
+   */
+  private async withSignedDocs<T extends {
+    cnhPhotoUrl?: string | null; identityPhotoUrl?: string | null; vehicleDocPhotoUrl?: string | null
+  }>(courier: T): Promise<T> {
+    const signed = await this.uploads.signDocuments([
+      courier.cnhPhotoUrl, courier.identityPhotoUrl, courier.vehicleDocPhotoUrl,
+    ])
+    return {
+      ...courier,
+      cnhPhotoUrl: courier.cnhPhotoUrl ? signed[courier.cnhPhotoUrl] ?? null : null,
+      identityPhotoUrl: courier.identityPhotoUrl ? signed[courier.identityPhotoUrl] ?? null : null,
+      vehicleDocPhotoUrl: courier.vehicleDocPhotoUrl ? signed[courier.vehicleDocPhotoUrl] ?? null : null,
+    }
+  }
 
   async getStats() {
     const [totalUsers, pendingCouriers, pendingStores, totalOrders] = await Promise.all([
@@ -19,7 +42,7 @@ export class AdminService {
   }
 
   async getCouriers(status?: string) {
-    return this.prisma.courier.findMany({
+    const couriers = await this.prisma.courier.findMany({
       where: status ? { status: status as any } : undefined,
       include: {
         user: { select: { name: true, email: true, phone: true, avatarUrl: true } },
@@ -27,16 +50,28 @@ export class AdminService {
       orderBy: { createdAt: 'desc' },
       take: 500,
     })
+    // Assina TODOS os documentos numa única chamada (createSignedUrls em lote),
+    // em vez de uma por entregador.
+    const signed = await this.uploads.signDocuments(
+      couriers.flatMap((c) => [c.cnhPhotoUrl, c.identityPhotoUrl, c.vehicleDocPhotoUrl]),
+    )
+    return couriers.map((c) => ({
+      ...c,
+      cnhPhotoUrl: c.cnhPhotoUrl ? signed[c.cnhPhotoUrl] ?? null : null,
+      identityPhotoUrl: c.identityPhotoUrl ? signed[c.identityPhotoUrl] ?? null : null,
+      vehicleDocPhotoUrl: c.vehicleDocPhotoUrl ? signed[c.vehicleDocPhotoUrl] ?? null : null,
+    }))
   }
 
   async updateCourierStatus(id: string, dto: UpdateCourierStatusDto) {
     const courier = await this.prisma.courier.findUnique({ where: { id } })
     if (!courier) throw new NotFoundException('Courier not found')
-    return this.prisma.courier.update({
+    const updated = await this.prisma.courier.update({
       where: { id },
       data: { status: dto.status },
       include: { user: { select: { name: true, email: true, phone: true, avatarUrl: true } } },
     })
+    return this.withSignedDocs(updated)
   }
 
   async updateCourierDocStatus(id: string, dto: UpdateCourierDocStatusDto) {
@@ -63,14 +98,15 @@ export class AdminService {
                         updated.vehicleDocStatus === 'REJECTED'
 
     if (allApproved || anyRejected) {
-      return this.prisma.courier.update({
+      const finalized = await this.prisma.courier.update({
         where: { id },
         data: { status: allApproved ? 'APPROVED' : 'REJECTED' },
         include: { user: { select: { name: true, email: true, phone: true, avatarUrl: true } } },
       })
+      return this.withSignedDocs(finalized)
     }
 
-    return updated
+    return this.withSignedDocs(updated)
   }
 
   async getStores(status?: string) {

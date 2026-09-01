@@ -12,6 +12,7 @@ import { DeliveryMatchingService } from './delivery-matching.service'
 import { DeliveryGateway } from './delivery.gateway'
 import { CreateCourierDto } from './dto/create-courier.dto'
 import { UpdateLocationDto } from './dto/update-location.dto'
+import { UploadsService } from '../uploads/uploads.service'
 
 /** Distância em metros entre dois pontos (Haversine). */
 function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -40,6 +41,7 @@ export class CouriersService {
     private loyalty: LoyaltyService,
     private config: ConfigService,
     private mpOauth: MpOauthService,
+    private uploads: UploadsService,
     @Optional() private matching: DeliveryMatchingService,
     @Optional() private gateway: DeliveryGateway,
   ) {}
@@ -80,7 +82,17 @@ export class CouriersService {
       include: { user: { select: { name: true, email: true, phone: true } } },
     })
     if (!courier) throw new NotFoundException('Courier profile not found')
-    return courier
+    // Documentos ficam num bucket privado — devolve signed URLs para o próprio
+    // entregador ver o que enviou (o campo guarda o path, não uma URL pública).
+    const signed = await this.uploads.signDocuments([
+      courier.cnhPhotoUrl, courier.identityPhotoUrl, courier.vehicleDocPhotoUrl,
+    ])
+    return {
+      ...courier,
+      cnhPhotoUrl: courier.cnhPhotoUrl ? signed[courier.cnhPhotoUrl] ?? null : null,
+      identityPhotoUrl: courier.identityPhotoUrl ? signed[courier.identityPhotoUrl] ?? null : null,
+      vehicleDocPhotoUrl: courier.vehicleDocPhotoUrl ? signed[courier.vehicleDocPhotoUrl] ?? null : null,
+    }
   }
 
   async updateLocation(userId: string, dto: UpdateLocationDto) {

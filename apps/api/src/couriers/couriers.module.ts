@@ -10,6 +10,7 @@ import { WalletModule } from '../wallet/wallet.module'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { LoyaltyModule } from '../loyalty/loyalty.module'
 import { PaymentsModule } from '../payments/payments.module'
+import { UploadsModule } from '../uploads/uploads.module'
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { PaymentsModule } from '../payments/payments.module'
     NotificationsModule,
     LoyaltyModule,
     PaymentsModule,
+    UploadsModule,
   ],
   controllers: [CouriersController],
   providers: [CouriersService, PushService, DeliveryMatchingService, DeliveryGateway],
