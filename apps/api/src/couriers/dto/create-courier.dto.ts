@@ -24,16 +24,18 @@ export class CreateCourierDto {
   @MaxLength(140)
   pixKey?: string
 
-  @IsOptional()
+  // Documentos OBRIGATÓRIOS para cadastro — o admin precisa deles para aprovar o
+  // entregador (antes eram opcionais, dava pra se cadastrar às cegas, sem nada
+  // para conferir). A URL deve apontar para o bucket de documentos do Storage.
   @IsString()
   @MaxLength(500)
-  cnhPhotoUrl?: string
+  cnhPhotoUrl: string
 
-  @IsOptional()
   @IsString()
   @MaxLength(500)
-  identityPhotoUrl?: string
+  identityPhotoUrl: string
 
+  // Documento do veículo continua opcional (entregador a pé/bicicleta não tem).
   @IsOptional()
   @IsString()
   @MaxLength(500)

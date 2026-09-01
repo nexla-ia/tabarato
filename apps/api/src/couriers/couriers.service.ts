@@ -200,6 +200,15 @@ export class CouriersService {
       throw new ForbiddenException('Ative sua localização para aceitar entregas.')
     }
 
+    // UMA entrega ativa por vez: sem isso o entregador podia aceitar várias corridas
+    // simultâneas, deixando clientes esperando um motoboy que já está em outra rota.
+    const activeCount = await this.prisma.delivery.count({
+      where: { courierId: courier.id, status: { notIn: ['SEARCHING_COURIER', 'DELIVERED', 'FAILED'] } },
+    })
+    if (activeCount > 0) {
+      throw new ConflictException('Finalize a entrega atual antes de aceitar outra.')
+    }
+
     // Não aceitar entrega FORA do raio (o poll já filtra, mas isto blinda a chamada direta).
     const target = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },
@@ -272,6 +281,12 @@ export class CouriersService {
   async requestWithdrawal(userId: string, amount: number) {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier not found')
+    // Entregador suspenso/reprovado não pode SACAR (o dinheiro pode até acumular
+    // na carteira enquanto ele finaliza corridas já aceitas, mas fica travado até
+    // a conta voltar a APPROVED — recheque explícito, o ownership sozinho não basta).
+    if (courier.status !== 'APPROVED') {
+      throw new ForbiddenException('Sua conta está suspensa. O saque fica indisponível até a regularização.')
+    }
     if (!courier.pixKey) throw new BadRequestException('Cadastre sua chave PIX antes de solicitar o saque.')
     // O débito cria um lançamento DEBIT no ledger (referenceId = saque-<uuid>),
     // que serve de registro auditável do saque até o repasse PIX manual.
@@ -285,6 +300,7 @@ export class CouriersService {
     if (!courier) throw new NotFoundException('Courier not found')
     const key = (pixKey ?? '').trim()
     if (!key) throw new BadRequestException('Informe uma chave PIX válida.')
+    if (key.length > 140) throw new BadRequestException('Chave PIX inválida.')
     await this.prisma.courier.update({ where: { id: courier.id }, data: { pixKey: key } })
     return { pixKey: key }
   }

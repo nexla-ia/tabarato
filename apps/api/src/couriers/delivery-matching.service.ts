@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
 
@@ -24,6 +25,13 @@ interface MatchState {
 export class DeliveryMatchingService implements OnModuleInit {
   private readonly logger = new Logger(DeliveryMatchingService.name)
   private readonly state = new Map<string, MatchState>()
+  // Entregas órfãs já alertadas ao lojista — evita reenviar o mesmo push a cada varredura.
+  private readonly alertedOrphans = new Set<string>()
+
+  // Re-oferece entregas que ficaram órfãs (matching desistiu após 3km e a corrida
+  // ficou "aberta" sem ninguém sendo notificado) e, se demorar demais, avisa o lojista.
+  private static readonly RESWEEP_AFTER_MIN = 10
+  private static readonly ALERT_AFTER_MIN = 45
 
   constructor(
     private prisma: PrismaService,
@@ -47,6 +55,57 @@ export class DeliveryMatchingService implements OnModuleInit {
       }
     } catch (err) {
       this.logger.warn('[Match] Failed to resume stuck deliveries on startup', err)
+    }
+  }
+
+  // Varredura periódica de entregas "esquecidas": SEARCHING_COURIER sem entregador,
+  // que já saíram do ciclo de matching em memória (nenhum motoboy achado nos 3km, ou
+  // um return sem re-match). Antes elas ficavam abertas para sempre — o cliente pagou
+  // e nunca aparecia entregador, sem ninguém ser avisado.
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async resweepOrphanDeliveries() {
+    try {
+      const orphans = await this.prisma.delivery.findMany({
+        where: { status: 'SEARCHING_COURIER', courierId: null },
+        include: { order: { include: { store: { select: { name: true, lat: true, lng: true, user: { select: { pushToken: true } } } } } } },
+      })
+      const now = Date.now()
+      for (const d of orphans) {
+        // Já está sendo trabalhada em memória (ciclo de matching ativo) — não mexe.
+        if (this.state.has(d.id)) continue
+        const ageMin = (now - new Date(d.createdAt).getTime()) / 60000
+        if (ageMin < DeliveryMatchingService.RESWEEP_AFTER_MIN) continue
+
+        const store = d.order?.store
+        if (!store || store.lat == null || store.lng == null) continue
+
+        // Re-abre o ciclo do zero (raio 1km) — dá chance a entregadores que ficaram
+        // online depois que o matching original desistiu.
+        this.logger.log(`[Match] Re-sweeping orphan delivery ${d.id.slice(0, 8)} (${Math.round(ageMin)}min aberta)`)
+        await this.startMatching(d.id, store.lat, store.lng)
+
+        // Passou do limite e ainda ninguém: avisa o lojista UMA vez para ele decidir
+        // (entrega própria / cancelar). Não cancela nem estorna automático — decisão de negócio.
+        if (ageMin >= DeliveryMatchingService.ALERT_AFTER_MIN && !this.alertedOrphans.has(d.id)) {
+          this.alertedOrphans.add(d.id)
+          const token = store.user?.pushToken
+          if (token) {
+            this.push.send(
+              token,
+              '⚠️ Pedido sem entregador',
+              `O pedido #${d.orderId.slice(0, 8)} está há mais de ${DeliveryMatchingService.ALERT_AFTER_MIN}min sem entregador. Considere entrega própria ou cancelar.`,
+              { orderId: d.orderId, type: 'NO_COURIER' },
+            ).catch(() => {})
+          }
+        }
+      }
+      // Limpa da memória alertas de entregas que já saíram de SEARCHING_COURIER.
+      if (this.alertedOrphans.size) {
+        const stillOpen = new Set(orphans.map((o) => o.id))
+        for (const id of this.alertedOrphans) if (!stillOpen.has(id)) this.alertedOrphans.delete(id)
+      }
+    } catch (err) {
+      this.logger.warn('[Match] resweepOrphanDeliveries failed', err)
     }
   }
 
