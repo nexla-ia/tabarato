@@ -264,7 +264,13 @@ export class CouriersService {
 
     const start = new Date(); start.setHours(0, 0, 0, 0)
     const today = await this.prisma.delivery.findMany({
-      where: { courierId: courier.id, status: 'DELIVERED', deliveredAt: { gte: start } },
+      // Só entregas de pedidos PAGOS entram no ganho do dia — antes uma entrega
+      // finalizada de pedido não pago (ou estornado) inflava o "ganho de hoje"
+      // sem que o valor tivesse caído de fato na carteira.
+      where: {
+        courierId: courier.id, status: 'DELIVERED', deliveredAt: { gte: start },
+        order: { payment: { status: 'PAID' } },
+      },
       select: { courierFee: true },
     })
     const todayCount = today.length
