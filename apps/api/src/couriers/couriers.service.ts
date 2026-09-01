@@ -24,6 +24,10 @@ function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number):
   return R * 2 * Math.asin(Math.sqrt(a))
 }
 
+// Raio máximo (metros) em que uma entrega aberta é visível/aceitável pelo entregador
+// no poll. Limita a exposição de endereço de cliente e evita aceite de longe.
+const AVAILABLE_RADIUS_M = 10000 // 10 km
+
 @Injectable()
 export class CouriersService {
   private readonly logger = new Logger(CouriersService.name)
@@ -149,11 +153,13 @@ export class CouriersService {
   }
 
   async findAvailableDeliveries(userId: string) {
-    // Só entregador APROVADO pode ver entregas disponíveis (elas expõem endereço
-    // do cliente — PII). Um cadastro PENDING/suspenso não deve enumerar isso.
+    // Só entregador APROVADO e ONLINE, com localização conhecida, vê entregas — elas
+    // expõem endereço do cliente (PII). Sem isso, qualquer aprovado enumeraria o
+    // endereço de TODOS os pedidos abertos da plataforma.
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier profile not found')
-    if (courier.status !== 'APPROVED') return []
+    if (courier.status !== 'APPROVED' || !courier.isOnline) return []
+    if (courier.currentLat == null || courier.currentLng == null) return []
 
     const deliveries = await this.prisma.delivery.findMany({
       where: { courierId: null, status: 'SEARCHING_COURIER' },
@@ -161,14 +167,24 @@ export class CouriersService {
         order: {
           include: {
             store: { select: { name: true, lat: true, lng: true } },
-            address: { select: { street: true, number: true, district: true, lat: true, lng: true } },
+            // Antes do aceite NÃO expõe número/coords exatos do cliente — só bairro/rua
+            // e a distância da entrega (delivery.distanceKm). Endereço completo só em
+            // findMyDeliveries (após aceitar), pra navegar.
+            address: { select: { street: true, district: true } },
           },
         },
       },
       orderBy: { createdAt: 'asc' },
     })
-    for (const d of deliveries) if ((d as any).order) (d as any).order.deliveryCode = null
-    return deliveries
+
+    // Só entregas cuja LOJA está dentro do raio da posição atual do entregador.
+    const nearby = deliveries.filter((d) => {
+      const s = (d as any).order?.store
+      if (s?.lat == null || s?.lng == null) return false
+      return distanceMeters(courier.currentLat!, courier.currentLng!, s.lat, s.lng) <= AVAILABLE_RADIUS_M
+    })
+    for (const d of nearby) if ((d as any).order) (d as any).order.deliveryCode = null
+    return nearby
   }
 
   async acceptDelivery(userId: string, deliveryId: string) {
@@ -177,6 +193,25 @@ export class CouriersService {
     // Entregador suspenso/pendente não pode aceitar entregas
     if (courier.status !== 'APPROVED') {
       throw new ForbiddenException('Sua conta de entregador ainda não está aprovada.')
+    }
+    // Precisa estar ONLINE e com localização (o online/offline deixa de ser decorativo).
+    if (!courier.isOnline) throw new ForbiddenException('Fique online para aceitar entregas.')
+    if (courier.currentLat == null || courier.currentLng == null) {
+      throw new ForbiddenException('Ative sua localização para aceitar entregas.')
+    }
+
+    // Não aceitar entrega FORA do raio (o poll já filtra, mas isto blinda a chamada direta).
+    const target = await this.prisma.delivery.findUnique({
+      where: { id: deliveryId },
+      include: { order: { include: { store: { select: { lat: true, lng: true } } } } },
+    })
+    if (!target || target.courierId || target.status !== 'SEARCHING_COURIER') {
+      throw new ConflictException('Esta entrega já foi aceita por outro entregador.')
+    }
+    const st = (target as any).order?.store
+    if (st?.lat != null && st?.lng != null &&
+        distanceMeters(courier.currentLat, courier.currentLng, st.lat, st.lng) > AVAILABLE_RADIUS_M) {
+      throw new ForbiddenException('Esta entrega está fora do seu raio de atuação.')
     }
 
     // Atomic update: only succeeds if delivery is still unassigned (prevents TOCTOU race)
