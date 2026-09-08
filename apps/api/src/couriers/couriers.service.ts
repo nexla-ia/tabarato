@@ -29,6 +29,16 @@ function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number):
 // no poll. Limita a exposição de endereço de cliente e evita aceite de longe.
 const AVAILABLE_RADIUS_M = 10000 // 10 km
 
+// Rondônia (Vilhena) é UTC-4 (Amazon Time, sem horário de verão). O servidor roda
+// em UTC no Railway, então "início do dia" precisa ser o meia-noite LOCAL, senão as
+// entregas das 20h–24h locais caíam no dia seguinte no "ganho de hoje".
+const BUSINESS_TZ_OFFSET_MS = -4 * 60 * 60 * 1000
+function startOfBusinessDay(): Date {
+  const local = new Date(Date.now() + BUSINESS_TZ_OFFSET_MS)
+  local.setUTCHours(0, 0, 0, 0)
+  return new Date(local.getTime() - BUSINESS_TZ_OFFSET_MS)
+}
+
 @Injectable()
 export class CouriersService {
   private readonly logger = new Logger(CouriersService.name)
@@ -315,7 +325,7 @@ export class CouriersService {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier profile not found')
 
-    const start = new Date(); start.setHours(0, 0, 0, 0)
+    const start = startOfBusinessDay()
     const today = await this.prisma.delivery.findMany({
       // Só entregas de pedidos PAGOS entram no ganho do dia — antes uma entrega
       // finalizada de pedido não pago (ou estornado) inflava o "ganho de hoje"
