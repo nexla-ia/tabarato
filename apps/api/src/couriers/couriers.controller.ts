@@ -102,8 +102,8 @@ export class CouriersController {
   @UseGuards(RolesGuard)
   @Roles('COURIER')
   @Patch('me/pix')
-  updatePixKey(@CurrentUser() user: any, @Body() body: { pixKey: string }) {
-    return this.couriersService.updatePixKey(user.sub, body.pixKey)
+  updatePixKey(@CurrentUser() user: any, @Body() body: { pixKey: string; pixKeyType?: string }) {
+    return this.couriersService.updatePixKey(user.sub, body.pixKey, body.pixKeyType)
   }
 
   @UseGuards(RolesGuard)

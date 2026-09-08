@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { JwtModule } from '@nestjs/jwt'
 import { CouriersController } from './couriers.controller'
+import { AsaasWebhookController } from './asaas-webhook.controller'
 import { CouriersService } from './couriers.service'
 import { DeliveryMatchingService } from './delivery-matching.service'
 import { DeliveryGateway } from './delivery.gateway'
@@ -28,7 +29,7 @@ import { UploadsModule } from '../uploads/uploads.module'
     PaymentsModule,
     UploadsModule,
   ],
-  controllers: [CouriersController],
+  controllers: [CouriersController, AsaasWebhookController],
   providers: [CouriersService, PushService, DeliveryMatchingService, DeliveryGateway],
   exports: [DeliveryMatchingService, DeliveryGateway],
 })

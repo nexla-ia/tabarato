@@ -8,6 +8,7 @@ import { WalletService } from '../wallet/wallet.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { LoyaltyService } from '../loyalty/loyalty.service'
 import { MpOauthService } from '../payments/mp-oauth.service'
+import { AsaasService } from '../payments/asaas.service'
 import { DeliveryMatchingService } from './delivery-matching.service'
 import { DeliveryGateway } from './delivery.gateway'
 import { CreateCourierDto } from './dto/create-courier.dto'
@@ -51,6 +52,7 @@ export class CouriersService {
     private loyalty: LoyaltyService,
     private config: ConfigService,
     private mpOauth: MpOauthService,
+    private asaas: AsaasService,
     private uploads: UploadsService,
     @Optional() private matching: DeliveryMatchingService,
     @Optional() private gateway: DeliveryGateway,
@@ -369,21 +371,100 @@ export class CouriersService {
       throw new ForbiddenException('Sua conta está suspensa. O saque fica indisponível até a regularização.')
     }
     if (!courier.pixKey) throw new BadRequestException('Cadastre sua chave PIX antes de solicitar o saque.')
-    // O débito cria um lançamento DEBIT no ledger (referenceId = saque-<uuid>),
-    // que serve de registro auditável do saque até o repasse PIX manual.
-    await this.wallet.debit(courier.id, 'COURIER', amount, `Saque via PIX (${courier.pixKey})`, `saque-${randomUUID()}`)
+
+    // 1) Debita a carteira PRIMEIRO (atômico, barra saldo insuficiente). O dinheiro
+    //    fica "reservado"; se o PIX falhar, estornamos.
+    const ref = `saque-${randomUUID()}`
+    await this.wallet.debit(courier.id, 'COURIER', amount, `Saque via PIX (${courier.pixKey})`, ref)
+
+    // 2) Registra o saque como entidade com STATUS (rastreável no admin / pro entregador).
+    const withdrawal = await this.prisma.withdrawal.create({
+      data: {
+        courierId: courier.id,
+        amount,
+        pixKey: courier.pixKey,
+        pixKeyType: courier.pixKeyType,
+        status: 'PENDING',
+      },
+    })
+
+    // 3) Se o Asaas estiver ligado, envia o PIX automático; senão fica PENDING na
+    //    fila manual (admin paga e marca). Falha no envio → ESTORNA a carteira.
+    if (this.asaas.enabled) {
+      try {
+        const transfer = await this.asaas.createPixTransfer({
+          value: Number(amount),
+          pixAddressKey: courier.pixKey,
+          pixAddressKeyType: courier.pixKeyType,
+          externalReference: withdrawal.id,
+          description: `Repasse Tá Barato — entregador ${courier.id.slice(0, 8)}`,
+        })
+        await this.prisma.withdrawal.update({
+          where: { id: withdrawal.id },
+          data: { status: 'PROCESSING', asaasTransferId: transfer.id },
+        })
+        return { message: 'Saque solicitado! O PIX está sendo processado e cai em instantes.' }
+      } catch (err: any) {
+        // Estorna: o PIX não saiu, o dinheiro volta pra carteira.
+        await this.wallet.credit(courier.id, 'COURIER', amount, 'Estorno de saque não concluído', `estorno-${ref}`)
+        await this.prisma.withdrawal.update({
+          where: { id: withdrawal.id },
+          data: { status: 'FAILED', failReason: String(err?.message ?? err).slice(0, 300) },
+        })
+        this.logger.error(`Saque ${withdrawal.id} falhou no Asaas — carteira estornada`, err)
+        throw new BadRequestException('Não foi possível enviar o PIX agora. Seu saldo foi mantido. Tente novamente em instantes.')
+      }
+    }
+
     return { message: 'Saque solicitado! O valor será enviado via PIX para a chave cadastrada.' }
   }
 
+  /**
+   * Webhook do Asaas (status da transferência). Marca o saque DONE ou, na falha,
+   * FAILED + estorna a carteira. Idempotente: a transição só acontece uma vez
+   * (updateMany com guarda de status).
+   */
+  async handleAsaasTransferWebhook(event: string, transfer: { id?: string; externalReference?: string; failReason?: string }) {
+    const withdrawal = transfer.externalReference
+      ? await this.prisma.withdrawal.findUnique({ where: { id: transfer.externalReference } })
+      : transfer.id
+        ? await this.prisma.withdrawal.findFirst({ where: { asaasTransferId: transfer.id } })
+        : null
+    if (!withdrawal) return
+
+    if (event === 'TRANSFER_DONE') {
+      await this.prisma.withdrawal.updateMany({
+        where: { id: withdrawal.id, status: 'PROCESSING' },
+        data: { status: 'DONE' },
+      })
+      return
+    }
+
+    if (event === 'TRANSFER_FAILED' || event === 'TRANSFER_CANCELLED' || event === 'TRANSFER_BLOCKED') {
+      // Estorna só uma vez: a transição PROCESSING→FAILED serve de guarda de idempotência.
+      const res = await this.prisma.withdrawal.updateMany({
+        where: { id: withdrawal.id, status: 'PROCESSING' },
+        data: { status: 'FAILED', failReason: (transfer.failReason ?? event).slice(0, 300) },
+      })
+      if (res.count > 0) {
+        await this.wallet.credit(withdrawal.courierId, 'COURIER', Number(withdrawal.amount),
+          'Estorno de saque não concluído', `estorno-${withdrawal.id}`)
+      }
+    }
+  }
+
   /** Cadastra/atualiza a chave PIX do entregador (pra receber os saques). */
-  async updatePixKey(userId: string, pixKey: string) {
+  async updatePixKey(userId: string, pixKey: string, pixKeyType?: string) {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier not found')
     const key = (pixKey ?? '').trim()
     if (!key) throw new BadRequestException('Informe uma chave PIX válida.')
     if (key.length > 140) throw new BadRequestException('Chave PIX inválida.')
-    await this.prisma.courier.update({ where: { id: courier.id }, data: { pixKey: key } })
-    return { pixKey: key }
+    await this.prisma.courier.update({
+      where: { id: courier.id },
+      data: { pixKey: key, ...(pixKeyType ? { pixKeyType } : {}) },
+    })
+    return { pixKey: key, pixKeyType: pixKeyType ?? courier.pixKeyType }
   }
 
   async returnDelivery(userId: string, deliveryId: string) {

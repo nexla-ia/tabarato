@@ -423,6 +423,7 @@ model Courier {
   vehiclePlate       String        @map("vehicle_plate")
   vehicleType        String        @default("moto") @map("vehicle_type")
   pixKey             String?       @map("pix_key")
+  pixKeyType         String?       @map("pix_key_type") // CPF | CNPJ | EMAIL | PHONE | EVP (p/ transferência via Asaas)
   // Mercado Pago — recebimento automático (split 1:N / disbursement)
   mpUserId          String?   @map("mp_user_id")
   mpAccessToken     String?   @map("mp_access_token")
@@ -447,8 +448,35 @@ model Courier {
   user           User            @relation(fields: [userId], references: [id])
   deliveries     Delivery[]
   courierReviews CourierReview[]
+  withdrawals    Withdrawal[]
 
   @@map("couriers")
+}
+
+enum WithdrawalStatus {
+  PENDING    // criado; aguardando envio (fila manual) ou processamento
+  PROCESSING // enviado ao provedor (Asaas), aguardando confirmação por webhook
+  DONE       // PIX concluído
+  FAILED     // falhou/cancelado — carteira estornada
+}
+
+model Withdrawal {
+  id              String           @id @default(uuid())
+  courierId       String           @map("courier_id")
+  amount          Decimal
+  pixKey          String           @map("pix_key")
+  pixKeyType      String?          @map("pix_key_type")
+  status          WithdrawalStatus @default(PENDING)
+  asaasTransferId String?          @map("asaas_transfer_id")
+  failReason      String?          @map("fail_reason")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  courier Courier @relation(fields: [courierId], references: [id])
+
+  @@index([courierId])
+  @@index([status])
+  @@map("withdrawals")
 }
 
 model Delivery {

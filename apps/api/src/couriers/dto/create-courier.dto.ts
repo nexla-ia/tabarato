@@ -28,6 +28,11 @@ export class CreateCourierDto {
   @MaxLength(140)
   pixKey?: string
 
+  // Tipo da chave PIX — necessário pro repasse automático via Asaas.
+  @IsOptional()
+  @IsIn(['CPF', 'CNPJ', 'EMAIL', 'PHONE', 'EVP'])
+  pixKeyType?: string
+
   // Documentos OBRIGATÓRIOS para cadastro — o admin precisa deles para aprovar o
   // entregador (antes eram opcionais, dava pra se cadastrar às cegas, sem nada
   // para conferir). A URL deve apontar para o bucket de documentos do Storage.
