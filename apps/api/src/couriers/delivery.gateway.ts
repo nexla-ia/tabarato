@@ -96,6 +96,23 @@ export class DeliveryGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     this.server.to(`order:${orderId}`).emit('courier:position', { lat, lng, ts: Date.now() })
   }
 
+  // ── Ofertas de entrega em tempo real ────────────────────────────────────────
+
+  /** O app do entregador entra na própria sala pra receber ofertas na hora
+   *  (em vez de esperar o poll de 15s). Só COURIER. */
+  @SubscribeMessage('courier:subscribe')
+  handleCourierSubscribe(@ConnectedSocket() client: Socket) {
+    const user = (client as any).user as { sub: string; role: string } | undefined
+    if (!user?.sub || user.role !== 'COURIER') return
+    client.join(`courier:${user.sub}`)
+  }
+
+  /** Avisa UM entregador que há nova entrega disponível — o app re-busca a lista
+   *  imediatamente (o payload é só o id; a lista filtrada/segura vem pela API). */
+  notifyCourierNewDelivery(courierUserId: string, deliveryId: string) {
+    this.server.to(`courier:${courierUserId}`).emit('delivery:new', { deliveryId })
+  }
+
   /**
    * Remove os sockets de um usuário da sala de um pedido. Usado quando o entregador
    * DEVOLVE a corrida: sem isso ele continuaria na sala `order:<id>` recebendo o GPS

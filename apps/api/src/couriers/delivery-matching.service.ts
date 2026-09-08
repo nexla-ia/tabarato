@@ -1,7 +1,8 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import { Injectable, Logger, Optional, OnModuleInit } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
+import { DeliveryGateway } from './delivery.gateway'
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371
@@ -33,9 +34,14 @@ export class DeliveryMatchingService implements OnModuleInit {
   private static readonly RESWEEP_AFTER_MIN = 10
   private static readonly ALERT_AFTER_MIN = 45
 
+  // Quantos entregadores recebem a oferta por vez (primeiro que aceitar leva). Antes
+  // ofertava só o mais próximo → se ele ignorasse, 30s perdidos.
+  private static readonly OFFER_BATCH = 3
+
   constructor(
     private prisma: PrismaService,
     private push: PushService,
+    @Optional() private gateway: DeliveryGateway,
   ) {}
 
   // On startup, resume matching for any deliveries stuck in SEARCHING_COURIER
@@ -161,19 +167,20 @@ export class DeliveryMatchingService implements OnModuleInit {
         haversineKm(storeLat, storeLng, b.currentLat!, b.currentLng!),
       )
 
-    if (nearby.length > 0) {
-      const closest = nearby[0]
-      entry.offeredTo.add(closest.id)
-      this.logger.log(`[Match] Offering to courier ${closest.id.slice(0, 8)} within ${radiusKm}km`)
-
-      if (closest.user?.pushToken) {
-        this.push.send(
-          closest.user.pushToken,
-          '🛵 Nova entrega disponível!',
-          `R$ ${Number(delivery.courierFee).toFixed(2)} · ${Number(delivery.distanceKm).toFixed(1)} km — aceite em 30s`,
-          { deliveryId, type: 'NEW_DELIVERY' },
-        )
+    // Oferta em LOTE: os N mais próximos ainda não ofertados (nearby já exclui os
+    // de offeredTo pela query). Primeiro a aceitar leva (acceptDelivery é atômico).
+    const targets = nearby.slice(0, DeliveryMatchingService.OFFER_BATCH)
+    if (targets.length > 0) {
+      const body = `R$ ${Number(delivery.courierFee).toFixed(2)} · ${Number(delivery.distanceKm).toFixed(1)} km — aceite em 30s`
+      for (const c of targets) {
+        entry.offeredTo.add(c.id)
+        // Push (chega com o app fechado) + socket (re-busca na hora, app aberto).
+        if (c.user?.pushToken) {
+          this.push.send(c.user.pushToken, '🛵 Nova entrega disponível!', body, { deliveryId, type: 'NEW_DELIVERY' })
+        }
+        this.gateway?.notifyCourierNewDelivery(c.userId, deliveryId)
       }
+      this.logger.log(`[Match] Offered to ${targets.length} courier(s) within ${radiusKm}km`)
     } else {
       this.logger.log(`[Match] No couriers within ${radiusKm}km — waiting 30s to expand`)
     }
