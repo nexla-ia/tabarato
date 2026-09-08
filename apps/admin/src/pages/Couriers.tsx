@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { Courier } from '../types'
 import { useToast } from '../context/ToastContext'
@@ -38,7 +38,7 @@ function DocStatusDot({ status }: { status: DocStatus }) {
   return <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
 }
 
-function DocViewer({ url }: { url: string | null }) {
+function DocViewer({ url, onExpired }: { url: string | null; onExpired?: () => void }) {
   if (!url) {
     return (
       <div style={{
@@ -54,7 +54,14 @@ function DocViewer({ url }: { url: string | null }) {
   const isPdf = /\.pdf($|\?)/i.test(url) || url.includes('application/pdf')
   if (isPdf) return <iframe src={url} title="PDF" style={{ width: '100%', height: 320, border: 'none', borderRadius: 10 }} />
   return (
-    <img src={url} alt="Documento" style={{ width: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 10, background: '#FDF8F3' }} />
+    // onError: a signed URL pode ter expirado → pede recarga (re-assina). O guard de
+    // loop fica no pai (só re-assina uma vez por URL).
+    <img
+      src={url}
+      alt="Documento"
+      onError={() => onExpired?.()}
+      style={{ width: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 10, background: '#FDF8F3' }}
+    />
   )
 }
 
@@ -82,6 +89,10 @@ export function Couriers() {
   const [actioning, setActioning] = useState<string | null>(null) // 'approve' | 'reject' | 'doc-cnh-APPROVED' etc.
   const { showToast } = useToast()
 
+  // Evita loop de recarga quando um doc realmente quebrado dispara onError repetido:
+  // só re-assina uma vez por URL.
+  const resignedUrls = useRef<Set<string>>(new Set())
+
   useEffect(() => {
     let active = true
     setLoading(true)
@@ -91,6 +102,21 @@ export function Couriers() {
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [filter, refresh]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Com a lista re-buscada (URLs assinadas frescas), sincroniza o modal aberto para
+  // ele passar a usar as URLs novas em vez das expiradas capturadas no clique.
+  useEffect(() => {
+    if (!selected) return
+    const fresh = couriers.find(c => c.id === selected.id)
+    if (fresh && fresh !== selected) setSelected(fresh)
+  }, [couriers]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Doc expirou (img 404) → re-assina a lista uma vez por URL.
+  const handleDocExpired = (url: string | null) => {
+    if (!url || resignedUrls.current.has(url)) return
+    resignedUrls.current.add(url)
+    setRefresh(r => r + 1)
+  }
 
   const handleOverallAction = async (status: 'APPROVED' | 'REJECTED') => {
     if (!selected) return
@@ -289,7 +315,17 @@ export function Couriers() {
 
             {/* Doc content */}
             <div style={{ flex: 1, overflow: 'auto', padding: '20px 22px 16px', background: '#FDF8F3' }}>
-              <DocViewer url={currentDocUrl ?? null} />
+              <DocViewer url={currentDocUrl ?? null} onExpired={() => handleDocExpired(currentDocUrl ?? null)} />
+              {currentDocUrl && (
+                <div style={{ textAlign: 'right', marginTop: 6 }}>
+                  <button
+                    onClick={() => setRefresh(r => r + 1)}
+                    style={{ background: 'none', border: 'none', color: LIGHT, fontSize: 12, cursor: 'pointer', fontFamily: SANS, textDecoration: 'underline' }}
+                  >
+                    Documento não carregou? Recarregar
+                  </button>
+                </div>
+              )}
 
               {/* Per-document action buttons */}
               <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>

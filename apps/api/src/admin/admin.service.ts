@@ -51,9 +51,11 @@ export class AdminService {
       take: 500,
     })
     // Assina TODOS os documentos numa única chamada (createSignedUrls em lote),
-    // em vez de uma por entregador.
+    // em vez de uma por entregador. Validade de 12h: o admin costuma deixar a aba
+    // aberta durante o expediente; com 1h os docs quebravam (404) ao revisar depois.
     const signed = await this.uploads.signDocuments(
       couriers.flatMap((c) => [c.cnhPhotoUrl, c.identityPhotoUrl, c.vehicleDocPhotoUrl]),
+      12 * 60 * 60,
     )
     return couriers.map((c) => ({
       ...c,
