@@ -6,6 +6,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { CouriersService } from './couriers.service'
 import { CreateCourierDto } from './dto/create-courier.dto'
 import { UpdateLocationDto } from './dto/update-location.dto'
+import { AdvanceDeliveryDto } from './dto/advance-delivery.dto'
 
 @UseGuards(JwtAuthGuard)
 @Controller('couriers')
@@ -99,8 +100,8 @@ export class CouriersController {
   @UseGuards(RolesGuard)
   @Roles('COURIER')
   @Patch('me/deliveries/:id/advance')
-  advanceDelivery(@CurrentUser() user: any, @Param('id') id: string, @Body() body: { photoUrl?: string; code?: string; lat?: number; lng?: number }) {
-    return this.couriersService.advanceDelivery(user.sub, id, body.photoUrl, body.code, body.lat, body.lng)
+  advanceDelivery(@CurrentUser() user: any, @Param('id') id: string, @Body() dto: AdvanceDeliveryDto) {
+    return this.couriersService.advanceDelivery(user.sub, id, dto.photoUrl, dto.code, dto.lat, dto.lng)
   }
 
   @UseGuards(RolesGuard)

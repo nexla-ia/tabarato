@@ -177,11 +177,12 @@ export class CouriersService {
       where: { courierId: null, status: 'SEARCHING_COURIER' },
       include: {
         order: {
-          include: {
+          // SELECT explícito: antes do aceite só expõe o mínimo. Com `include` sem
+          // select o pedido inteiro vazava (notes com PII do cliente — "apto 501,
+          // ligar 9xxxx" —, total, userId, paymentId). Número/coords do endereço e
+          // o deliveryCode NÃO entram aqui; endereço completo só em findMyDeliveries.
+          select: {
             store: { select: { name: true, lat: true, lng: true } },
-            // Antes do aceite NÃO expõe número/coords exatos do cliente — só bairro/rua
-            // e a distância da entrega (delivery.distanceKm). Endereço completo só em
-            // findMyDeliveries (após aceitar), pra navegar.
             address: { select: { street: true, district: true } },
           },
         },
@@ -195,7 +196,6 @@ export class CouriersService {
       if (s?.lat == null || s?.lng == null) return false
       return distanceMeters(courier.currentLat!, courier.currentLng!, s.lat, s.lng) <= AVAILABLE_RADIUS_M
     })
-    for (const d of nearby) if ((d as any).order) (d as any).order.deliveryCode = null
     return nearby
   }
 
@@ -386,25 +386,39 @@ export class CouriersService {
     if (!nextStatus) throw new BadRequestException('Cannot advance from current delivery status')
 
     // ANTI-FRAUDE: para finalizar (→ DELIVERED) o entregador precisa informar o
-    // código de 4 dígitos que o CLIENTE vê no app. Sem o código correto, não
+    // código de 6 dígitos que o CLIENTE vê no app. Sem o código correto, não
     // finaliza e não recebe. Impede "marcar entregue" sem entregar de fato.
     if (nextStatus === 'DELIVERED') {
       const expected = (delivery as any).order?.deliveryCode as string | null | undefined
       // Só exige código quando o pedido tem um (pedidos antigos sem código ficam liberados).
       if (expected) {
-        const attempts = (delivery as any).order?.deliveryCodeAttempts ?? 0
-        // Bloqueio anti-brute-force: após 5 tentativas erradas, trava o código.
-        if (attempts >= 5) {
-          throw new BadRequestException('Muitas tentativas de código incorreto. Contate o suporte para concluir a entrega.')
-        }
         const provided = (code ?? '').trim()
         if (!provided) throw new BadRequestException('Informe o código de entrega do cliente.')
         if (provided !== expected) {
-          await this.prisma.order.update({
-            where: { id: delivery.orderId }, data: { deliveryCodeAttempts: { increment: 1 } },
-          }).catch(() => {})
-          const left = Math.max(0, 5 - (attempts + 1))
+          // Consome UMA tentativa de forma ATÔMICA e limitada: o UPDATE só ocorre se
+          // ainda houver tentativas (< 5). Assim N requisições concorrentes com códigos
+          // diferentes não furam o limite — antes o gate lia um contador do snapshot
+          // velho e o brute-force paralelo passava batido.
+          const bumped = await this.prisma.order.updateMany({
+            where: { id: delivery.orderId, deliveryCodeAttempts: { lt: 5 } },
+            data: { deliveryCodeAttempts: { increment: 1 } },
+          })
+          if (bumped.count === 0) {
+            throw new BadRequestException('Muitas tentativas de código incorreto. Contate o suporte para concluir a entrega.')
+          }
+          const fresh = await this.prisma.order.findUnique({
+            where: { id: delivery.orderId }, select: { deliveryCodeAttempts: true },
+          })
+          const left = Math.max(0, 5 - (fresh?.deliveryCodeAttempts ?? 5))
           throw new BadRequestException(`Código de entrega incorreto.${left > 0 ? ` ${left} tentativa(s) restante(s).` : ''}`)
+        }
+        // Código correto, mas bloqueia mesmo assim se o pedido já estourou o limite
+        // (lockout anti-brute-force) — re-lê o contador atômico, não o snapshot.
+        const fresh = await this.prisma.order.findUnique({
+          where: { id: delivery.orderId }, select: { deliveryCodeAttempts: true },
+        })
+        if ((fresh?.deliveryCodeAttempts ?? 0) >= 5) {
+          throw new BadRequestException('Muitas tentativas de código incorreto. Contate o suporte para concluir a entrega.')
         }
       }
 

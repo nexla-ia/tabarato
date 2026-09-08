@@ -146,6 +146,10 @@ export class DeliveryMatchingService implements OnModuleInit {
         currentLat: { not: null },
         currentLng: { not: null },
         id: entry.offeredTo.size ? { notIn: [...entry.offeredTo] } : undefined,
+        // Não ofertar a quem já tem entrega ativa (o aceite recusaria de qualquer
+        // forma por causa do limite de 1 ativa) — evita push-spam e "queimar" o
+        // slot de 30s do raio com um motoboy que não pode pegar a corrida.
+        deliveries: { none: { status: { notIn: ['SEARCHING_COURIER', 'DELIVERED', 'FAILED'] } } },
       },
       include: { user: { select: { pushToken: true, name: true } } },
     })
