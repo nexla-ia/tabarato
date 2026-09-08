@@ -36,12 +36,19 @@ export class DeliveryGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     this.logger.log('DeliveryGateway initialized')
   }
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     try {
       const token = this.extractToken(client)
       if (!token) { client.disconnect(true); return }
 
       const payload = this.jwt.verify(token) as { sub: string; role: string }
+      // Revalida no banco: um usuário DESATIVADO com token ainda válido (7 dias)
+      // não deve manter um socket vivo (paridade com a revalidação do JwtStrategy
+      // no HTTP, que recheca isActive a cada request).
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub }, select: { isActive: true },
+      })
+      if (!user?.isActive) { client.disconnect(true); return }
       ;(client as any).user = payload
     } catch {
       this.logger.warn('WS connection rejected: invalid or missing token')
@@ -87,6 +94,23 @@ export class DeliveryGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
   broadcastPosition(orderId: string, lat: number, lng: number) {
     this.server.to(`order:${orderId}`).emit('courier:position', { lat, lng, ts: Date.now() })
+  }
+
+  /**
+   * Remove os sockets de um usuário da sala de um pedido. Usado quando o entregador
+   * DEVOLVE a corrida: sem isso ele continuaria na sala `order:<id>` recebendo o GPS
+   * (broadcastPosition) e o chat do próximo entregador — vazamento de localização.
+   */
+  async evictUserFromOrder(orderId: string, userId: string) {
+    try {
+      const room = `order:${orderId}`
+      const sockets = await this.server.in(room).fetchSockets()
+      for (const s of sockets) {
+        if ((s as any).user?.sub === userId) s.leave(room)
+      }
+    } catch (err) {
+      this.logger.warn('evictUserFromOrder failed', err)
+    }
   }
 
   // ── Chat ──────────────────────────────────────────────────────────────────
@@ -200,7 +224,9 @@ export class DeliveryGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   private extractToken(client: Socket): string | null {
     const authHeader = client.handshake.headers?.authorization
     if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7)
-    const queryToken = client.handshake.auth?.token ?? client.handshake.query?.token
-    return typeof queryToken === 'string' ? queryToken : null
+    // Só via handshake.auth (consumer e web já usam `auth: { token }`). Não aceitar
+    // pela query-string — token em URL vaza em logs de proxy/servidor.
+    const authToken = client.handshake.auth?.token
+    return typeof authToken === 'string' ? authToken : null
   }
 }

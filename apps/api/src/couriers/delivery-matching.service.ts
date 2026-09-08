@@ -182,18 +182,27 @@ export class DeliveryMatchingService implements OnModuleInit {
     const nextRadius = NEXT[radiusKm]
 
     const timeout = setTimeout(async () => {
-      if (!this.state.has(deliveryId)) return
+      // try/catch OBRIGATÓRIO: sem ele, uma falha de DB neste callback vira unhandled
+      // rejection E deixa a entrega presa no `state` Map pra sempre (o resweep pula o
+      // que está em state) — órfã silenciosa até reiniciar o servidor. No erro,
+      // limpamos o state pra o cron de órfãs poder retomá-la.
+      try {
+        if (!this.state.has(deliveryId)) return
 
-      const current = await this.prisma.delivery.findUnique({ where: { id: deliveryId } })
-      if (!current || current.courierId || current.status !== 'SEARCHING_COURIER') {
-        this.cancelMatching(deliveryId)
-        return
-      }
+        const current = await this.prisma.delivery.findUnique({ where: { id: deliveryId } })
+        if (!current || current.courierId || current.status !== 'SEARCHING_COURIER') {
+          this.cancelMatching(deliveryId)
+          return
+        }
 
-      if (nextRadius) {
-        await this.tryRadius(deliveryId, storeLat, storeLng, nextRadius)
-      } else {
-        this.logger.log(`[Match] No courier found after 3km for ${deliveryId.slice(0, 8)} — delivery stays open`)
+        if (nextRadius) {
+          await this.tryRadius(deliveryId, storeLat, storeLng, nextRadius)
+        } else {
+          this.logger.log(`[Match] No courier found after 3km for ${deliveryId.slice(0, 8)} — delivery stays open`)
+          this.cancelMatching(deliveryId)
+        }
+      } catch (err) {
+        this.logger.warn(`[Match] radius timer failed for ${deliveryId.slice(0, 8)} — cleaning state`, err)
         this.cancelMatching(deliveryId)
       }
     }, 30_000)

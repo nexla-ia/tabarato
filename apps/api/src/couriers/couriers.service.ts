@@ -245,6 +245,21 @@ export class CouriersService {
       throw new ConflictException('Esta entrega já foi aceita por outro entregador.')
     }
 
+    // CLAIM-THEN-VERIFY: o count() acima é pré-checagem (caminho normal), mas dois
+    // aceites concorrentes em entregas DIFERENTES poderiam passar os dois. Depois de
+    // reivindicar, reconta as entregas ativas deste entregador; se ficou com mais de
+    // uma, devolve ESTA ao pool e recusa — garante no máximo 1 ativa por entregador.
+    const activeAfter = await this.prisma.delivery.count({
+      where: { courierId: courier.id, status: { notIn: ['SEARCHING_COURIER', 'DELIVERED', 'FAILED'] } },
+    })
+    if (activeAfter > 1) {
+      await this.prisma.delivery.updateMany({
+        where: { id: deliveryId, courierId: courier.id, status: 'COURIER_HEADING_TO_STORE' },
+        data: { courierId: null, status: 'SEARCHING_COURIER' },
+      })
+      throw new ConflictException('Finalize a entrega atual antes de aceitar outra.')
+    }
+
     // Cancel auto-match timer — delivery is taken
     this.matching?.cancelMatching(deliveryId)
 
@@ -332,15 +347,26 @@ export class CouriersService {
     })
     if (!delivery) throw new NotFoundException('Delivery not found')
 
-    const returnable = ['COURIER_HEADING_TO_STORE', 'COURIER_AT_STORE']
+    const returnable: DeliveryStatus[] = ['COURIER_HEADING_TO_STORE', 'COURIER_AT_STORE']
     if (!returnable.includes(delivery.status)) {
       throw new BadRequestException('Não é possível devolver após coletar o pedido.')
     }
 
-    const updated = await this.prisma.delivery.update({
-      where: { id: deliveryId },
+    // Devolução ATÔMICA: só libera se o status AINDA for devolvível e ainda for deste
+    // entregador. Sem isso, um "avançar" concorrente (ex.: COURIER_AT_STORE → PICKED_UP)
+    // entre a leitura e a escrita era sobrescrito, reabrindo pra matching um pedido
+    // que o entregador já tinha coletado.
+    const claim = await this.prisma.delivery.updateMany({
+      where: { id: deliveryId, courierId: courier.id, status: { in: returnable } },
       data: { courierId: null, status: 'SEARCHING_COURIER' },
     })
+    if (claim.count === 0) {
+      throw new ConflictException('Não foi possível devolver: o status da entrega mudou.')
+    }
+
+    // Tira o entregador que devolveu da sala do pedido — senão ele continuaria
+    // recebendo o GPS/chat do PRÓXIMO entregador (vazamento de localização).
+    await this.gateway?.evictUserFromOrder(delivery.orderId, userId)
 
     // Reinicia a busca por entregador — antes a entrega devolvida ficava "silenciosa"
     // (nenhum push a outros entregadores) até reiniciar o servidor.
@@ -353,7 +379,7 @@ export class CouriersService {
         .catch((err) => this.logger.warn('Re-match after return failed', err))
     }
 
-    return updated
+    return this.prisma.delivery.findUnique({ where: { id: deliveryId } })
   }
 
   async advanceDelivery(userId: string, deliveryId: string, photoUrl?: string, code?: string, lat?: number, lng?: number) {
