@@ -7,6 +7,7 @@ import { CouriersService } from './couriers.service'
 import { CreateCourierDto } from './dto/create-courier.dto'
 import { UpdateLocationDto } from './dto/update-location.dto'
 import { AdvanceDeliveryDto } from './dto/advance-delivery.dto'
+import { ResubmitDocumentDto } from './dto/resubmit-document.dto'
 
 @UseGuards(JwtAuthGuard)
 @Controller('couriers')
@@ -25,6 +26,14 @@ export class CouriersController {
   @Get('me')
   getMe(@CurrentUser() user: any) {
     return this.couriersService.findMe(user.sub)
+  }
+
+  // Reenvio de documento reprovado (volta a conta pra análise).
+  @UseGuards(RolesGuard)
+  @Roles('COURIER')
+  @Patch('me/documents')
+  resubmitDocument(@CurrentUser() user: any, @Body() dto: ResubmitDocumentDto) {
+    return this.couriersService.resubmitDocument(user.sub, dto.document, dto.url)
   }
 
   @UseGuards(RolesGuard)

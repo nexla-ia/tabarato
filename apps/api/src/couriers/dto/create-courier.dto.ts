@@ -35,9 +35,10 @@ export class CreateCourierDto {
   @MaxLength(500)
   identityPhotoUrl: string
 
-  // Documento do veículo continua opcional (entregador a pé/bicicleta não tem).
-  @IsOptional()
+  // Doc. do veículo OBRIGATÓRIO — plataforma é moto-only por ora. Sem ele o
+  // vehicleDocStatus ficava null pra sempre e a auto-aprovação (que exige os 3
+  // docs APPROVED) nunca disparava → entregador preso em PENDING.
   @IsString()
   @MaxLength(500)
-  vehicleDocPhotoUrl?: string
+  vehicleDocPhotoUrl: string
 }

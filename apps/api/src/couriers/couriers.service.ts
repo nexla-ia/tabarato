@@ -82,8 +82,16 @@ export class CouriersService {
       include: { user: { select: { name: true, email: true, phone: true } } },
     })
     if (!courier) throw new NotFoundException('Courier profile not found')
-    // Documentos ficam num bucket privado — devolve signed URLs para o próprio
-    // entregador ver o que enviou (o campo guarda o path, não uma URL pública).
+    return this.withSignedDocs(courier)
+  }
+
+  /**
+   * Troca os PATHs privados dos documentos por signed URLs exibíveis (o próprio
+   * entregador ver o que enviou). O campo guarda o path, não uma URL pública.
+   */
+  private async withSignedDocs<T extends {
+    cnhPhotoUrl?: string | null; identityPhotoUrl?: string | null; vehicleDocPhotoUrl?: string | null
+  }>(courier: T): Promise<T> {
     const signed = await this.uploads.signDocuments([
       courier.cnhPhotoUrl, courier.identityPhotoUrl, courier.vehicleDocPhotoUrl,
     ])
@@ -93,6 +101,36 @@ export class CouriersService {
       identityPhotoUrl: courier.identityPhotoUrl ? signed[courier.identityPhotoUrl] ?? null : null,
       vehicleDocPhotoUrl: courier.vehicleDocPhotoUrl ? signed[courier.vehicleDocPhotoUrl] ?? null : null,
     }
+  }
+
+  /**
+   * Reenvio de documento reprovado: reprovar 1 doc marca a conta como REJECTED;
+   * aqui o entregador manda a nova foto, o status daquele doc volta a "pendente"
+   * (null) e a conta volta a PENDING pra nova análise. Não mexe em conta já
+   * APPROVED (não teria doc reprovado a corrigir).
+   */
+  async resubmitDocument(userId: string, document: 'cnh' | 'identity' | 'vehicle', url: string) {
+    const courier = await this.prisma.courier.findUnique({ where: { userId } })
+    if (!courier) throw new NotFoundException('Courier profile not found')
+    if (courier.status === 'APPROVED') {
+      throw new BadRequestException('Sua conta já está aprovada — não há documento a reenviar.')
+    }
+    const path = (url ?? '').trim()
+    if (!path) throw new BadRequestException('Envie o documento.')
+
+    const fieldMap = {
+      cnh:      { photo: 'cnhPhotoUrl',        status: 'cnhStatus' },
+      identity: { photo: 'identityPhotoUrl',   status: 'identityStatus' },
+      vehicle:  { photo: 'vehicleDocPhotoUrl', status: 'vehicleDocStatus' },
+    } as const
+    const f = fieldMap[document]
+
+    const data: Record<string, any> = { status: 'PENDING' }
+    data[f.photo] = path
+    data[f.status] = null // volta a "não analisado" → some do "reprovado"
+
+    const updated = await this.prisma.courier.update({ where: { id: courier.id }, data })
+    return this.withSignedDocs(updated)
   }
 
   async updateLocation(userId: string, dto: UpdateLocationDto) {
