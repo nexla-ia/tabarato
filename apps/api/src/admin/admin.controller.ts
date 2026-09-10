@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -51,5 +51,18 @@ export class AdminController {
   @Get('orders')
   getOrders(@Query('status') status?: string) {
     return this.adminService.getOrders(status)
+  }
+
+  // Painel de operação ao vivo do motoboy: pedidos aguardando, entregas em
+  // andamento e entregadores online.
+  @Get('operations')
+  getOperations() {
+    return this.adminService.getOperations()
+  }
+
+  // Atribuição manual de um entregador a um pedido que está aguardando.
+  @Post('deliveries/:id/assign')
+  assignDelivery(@Param('id') id: string, @Body() body: { courierId: string }) {
+    return this.adminService.assignDelivery(id, body?.courierId)
   }
 }

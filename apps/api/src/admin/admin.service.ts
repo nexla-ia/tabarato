@@ -1,15 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { UploadsService } from '../uploads/uploads.service'
+import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
 import { UpdateCourierStatusDto } from './dto/update-courier-status.dto'
 import { UpdateCourierDocStatusDto } from './dto/update-courier-doc-status.dto'
 import { UpdateStoreStatusDto } from './dto/update-store-status.dto'
+
+// Status de entrega considerados "ativos" (fora da fila e não finalizados).
+const ACTIVE_DELIVERY_STATUS = ['COURIER_ASSIGNED', 'COURIER_HEADING_TO_STORE', 'COURIER_AT_STORE', 'PICKED_UP', 'HEADING_TO_CLIENT'] as const
 
 @Injectable()
 export class AdminService {
   constructor(
     private prisma: PrismaService,
     private uploads: UploadsService,
+    @Optional() private matching: DeliveryMatchingService,
   ) {}
 
   /**
@@ -160,5 +165,84 @@ export class AdminService {
       orderBy: { createdAt: 'desc' },
       take: 200,
     })
+  }
+
+  /** Painel de operação ao vivo: pedidos aguardando entregador, entregas em
+   *  andamento e entregadores online. */
+  async getOperations() {
+    const now = Date.now()
+    const [waiting, active, online] = await Promise.all([
+      this.prisma.delivery.findMany({
+        where: { status: 'SEARCHING_COURIER', courierId: null },
+        include: {
+          order: { select: { store: { select: { name: true, lat: true, lng: true } }, address: { select: { district: true } } } },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 100,
+      }),
+      this.prisma.delivery.findMany({
+        where: { status: { in: ACTIVE_DELIVERY_STATUS as any } },
+        include: {
+          order: { select: { store: { select: { name: true } }, address: { select: { district: true } } } },
+          courier: { select: { id: true, currentLat: true, currentLng: true, user: { select: { name: true } } } },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 200,
+      }),
+      this.prisma.courier.findMany({
+        where: { status: 'APPROVED', isOnline: true },
+        select: {
+          id: true, currentLat: true, currentLng: true, updatedAt: true,
+          user: { select: { name: true } },
+          deliveries: { where: { status: { notIn: ['SEARCHING_COURIER', 'DELIVERED', 'FAILED'] } }, select: { id: true }, take: 1 },
+        },
+      }),
+    ])
+
+    return {
+      waiting: waiting.map((d) => ({
+        deliveryId: d.id, orderId: d.orderId, createdAt: d.createdAt,
+        waitingMin: Math.floor((now - new Date(d.createdAt).getTime()) / 60000),
+        courierFee: d.courierFee,
+        store: (d as any).order?.store ?? null,
+        district: (d as any).order?.address?.district ?? null,
+      })),
+      active: active.map((d) => ({
+        deliveryId: d.id, orderId: d.orderId, status: d.status,
+        store: (d as any).order?.store ?? null,
+        district: (d as any).order?.address?.district ?? null,
+        courier: d.courier
+          ? { id: d.courier.id, name: d.courier.user?.name ?? null, lat: d.courier.currentLat, lng: d.courier.currentLng }
+          : null,
+      })),
+      onlineCouriers: online.map((c) => ({
+        id: c.id, name: c.user?.name ?? null, lat: c.currentLat, lng: c.currentLng,
+        updatedAt: c.updatedAt, busy: c.deliveries.length > 0,
+      })),
+    }
+  }
+
+  /** Atribuição manual: liga um entregador a um pedido que está aguardando. */
+  async assignDelivery(deliveryId: string, courierId: string) {
+    if (!courierId) throw new BadRequestException('Selecione um entregador.')
+    const courier = await this.prisma.courier.findUnique({ where: { id: courierId } })
+    if (!courier) throw new NotFoundException('Entregador não encontrado.')
+    if (courier.status !== 'APPROVED') throw new BadRequestException('Entregador não está aprovado.')
+
+    const active = await this.prisma.delivery.count({
+      where: { courierId, status: { notIn: ['SEARCHING_COURIER', 'DELIVERED', 'FAILED'] } },
+    })
+    if (active > 0) throw new ConflictException('Esse entregador já está em uma entrega.')
+
+    // Claim atômico: só atribui se ainda estiver aguardando (evita corrida com o
+    // aceite de um entregador pelo app).
+    const claim = await this.prisma.delivery.updateMany({
+      where: { id: deliveryId, status: 'SEARCHING_COURIER', courierId: null },
+      data: { courierId, status: 'COURIER_HEADING_TO_STORE' },
+    })
+    if (claim.count === 0) throw new ConflictException('Este pedido não está mais aguardando entregador.')
+
+    this.matching?.cancelMatching(deliveryId)
+    return this.prisma.delivery.findUnique({ where: { id: deliveryId } })
   }
 }
