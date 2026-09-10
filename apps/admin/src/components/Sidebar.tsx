@@ -71,6 +71,15 @@ function ReceiptIcon() {
   )
 }
 
+function TagIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/>
+      <line x1="7" y1="7" x2="7.01" y2="7"/>
+    </svg>
+  )
+}
+
 const NAV = [
   { to: '/dashboard', label: 'Dashboard',    Icon: LayoutIcon },
   { to: '/operacoes', label: 'Operação',     Icon: PulseIcon },
@@ -78,6 +87,7 @@ const NAV = [
   { to: '/couriers',  label: 'Entregadores', Icon: BikeIcon },
   { to: '/stores',    label: 'Lojas',        Icon: ShopIcon },
   { to: '/users',     label: 'Usuários',     Icon: PeopleIcon },
+  { to: '/precos',    label: 'Preços',       Icon: TagIcon },
 ]
 
 export function Sidebar() {

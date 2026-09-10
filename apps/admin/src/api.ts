@@ -68,6 +68,19 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ courierId }),
     }),
+
+  getSettings: () => request<Pricing>('/admin/settings'),
+  updateSettings: (patch: Partial<Pricing>) =>
+    request<Pricing>('/admin/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
+}
+
+export interface Pricing {
+  deliveryBaseFee: number
+  deliveryPerKm: number
+  deliveryMinFee: number
+  courierBaseFee: number
+  courierPerKm: number
+  platformCommissionPct: number
 }
 
 export interface OpWaiting {

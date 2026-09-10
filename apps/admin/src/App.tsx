@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar'
 import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Operacoes } from './pages/Operacoes'
+import { Precos } from './pages/Precos'
 import { Couriers } from './pages/Couriers'
 import { Stores } from './pages/Stores'
 import { Users } from './pages/Users'
@@ -57,6 +58,7 @@ export default function App() {
                 <Route path="/couriers" element={<Couriers />} />
                 <Route path="/stores" element={<Stores />} />
                 <Route path="/users" element={<Users />} />
+                <Route path="/precos" element={<Precos />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
