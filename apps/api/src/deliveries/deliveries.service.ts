@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { PlatformSettingsService } from '../settings/platform-settings.service'
 
 const COURIER_INCLUDE = {
   courier: { include: { user: { select: { name: true, phone: true } } } },
@@ -12,13 +13,13 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
   return R * 2 * Math.asin(Math.sqrt(a))
 }
-function calcCourierFee(distanceKm: number): number {
-  return Math.round((10 + distanceKm * 2) * 100) / 100
-}
 
 @Injectable()
 export class DeliveriesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private settings: PlatformSettingsService,
+  ) {}
 
   async assign(userId: string, orderId: string, courierId: string) {
     const store = await this.prisma.store.findUnique({ where: { userId } })
@@ -42,7 +43,7 @@ export class DeliveriesService {
 
     // Calcula a distância e a taxa reais (antes ficava 0 — entregador não recebia)
     const distanceKm = haversineKm(store.lat, store.lng, order.address.lat, order.address.lng)
-    const courierFee = calcCourierFee(distanceKm)
+    const courierFee = await this.settings.courierFeeFor(distanceKm)
 
     try {
       return await this.prisma.delivery.create({

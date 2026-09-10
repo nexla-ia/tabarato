@@ -453,6 +453,22 @@ model Courier {
   @@map("couriers")
 }
 
+// Configuração de preços da plataforma (linha única, id fixo "default"), editável
+// no admin sem redeploy. Padrões = comportamento atual (entrega 10 + 2/km,
+// comissão 10%, motoboy recebe a taxa cheia).
+model PlatformSettings {
+  id                    String   @id @default("default")
+  deliveryBaseFee       Decimal  @default(10) @map("delivery_base_fee")        // taxa base ao cliente
+  deliveryPerKm         Decimal  @default(2) @map("delivery_per_km")           // por km ao cliente
+  deliveryMinFee        Decimal  @default(0) @map("delivery_min_fee")          // piso da taxa ao cliente
+  courierBaseFee        Decimal  @default(10) @map("courier_base_fee")         // base que o motoboy recebe
+  courierPerKm          Decimal  @default(2) @map("courier_per_km")            // por km ao motoboy
+  platformCommissionPct Decimal  @default(10) @map("platform_commission_pct")  // % sobre o subtotal (10 = 10%)
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
+
 enum WithdrawalStatus {
   PENDING    // criado; aguardando envio (fila manual) ou processamento
   PROCESSING // enviado ao provedor (Asaas), aguardando confirmação por webhook

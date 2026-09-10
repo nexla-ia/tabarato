@@ -20,6 +20,7 @@ import { CourierReviewsModule } from './courier-reviews/courier-reviews.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { PaymentsModule } from './payments/payments.module'
 import { LoyaltyModule } from './loyalty/loyalty.module'
+import { PlatformSettingsModule } from './settings/platform-settings.module'
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { LoyaltyModule } from './loyalty/loyalty.module'
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     ScheduleModule.forRoot(),
     PrismaModule,
+    PlatformSettingsModule,
     AuthModule,
     UsersModule,
     StoresModule,

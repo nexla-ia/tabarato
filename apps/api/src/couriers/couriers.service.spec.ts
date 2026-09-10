@@ -21,13 +21,14 @@ function makeService(over: any = {}) {
   const uploads = { signDocuments: jest.fn().mockResolvedValue({}), ...(over.uploads ?? {}) }
   const matching = { cancelMatching: jest.fn(), startMatching: jest.fn().mockResolvedValue(undefined), ...(over.matching ?? {}) }
   const gateway = { evictUserFromOrder: jest.fn().mockResolvedValue(undefined), ...(over.gateway ?? {}) }
+  const settings = { commissionFor: jest.fn().mockResolvedValue(0), courierFeeFor: jest.fn().mockResolvedValue(0), get: jest.fn(), ...(over.settings ?? {}) }
   const config = { get: jest.fn() }
 
   const svc = new CouriersService(
     prisma as any, {} as any, wallet as any, {} as any, {} as any,
-    config as any, {} as any, asaas as any, uploads as any, matching as any, gateway as any,
+    config as any, {} as any, asaas as any, uploads as any, settings as any, matching as any, gateway as any,
   )
-  return { svc, prisma, wallet, asaas, uploads, matching, gateway }
+  return { svc, prisma, wallet, asaas, uploads, matching, gateway, settings }
 }
 
 describe('CouriersService.requestWithdrawal', () => {

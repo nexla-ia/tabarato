@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException, 
 import { PrismaService } from '../prisma/prisma.service'
 import { UploadsService } from '../uploads/uploads.service'
 import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
+import { PlatformSettingsService, Pricing } from '../settings/platform-settings.service'
 import { UpdateCourierStatusDto } from './dto/update-courier-status.dto'
 import { UpdateCourierDocStatusDto } from './dto/update-courier-doc-status.dto'
 import { UpdateStoreStatusDto } from './dto/update-store-status.dto'
@@ -14,8 +15,18 @@ export class AdminService {
   constructor(
     private prisma: PrismaService,
     private uploads: UploadsService,
+    private settings: PlatformSettingsService,
     @Optional() private matching: DeliveryMatchingService,
   ) {}
+
+  /** Configuração de preços (taxa de entrega, repasse do motoboy, comissão). */
+  getSettings() {
+    return this.settings.get()
+  }
+
+  updateSettings(patch: Partial<Pricing>) {
+    return this.settings.update(patch)
+  }
 
   /**
    * Troca os PATHs privados dos documentos por signed URLs exibíveis (1h). Os

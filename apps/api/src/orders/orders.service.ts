@@ -10,6 +10,7 @@ import { MpOauthService } from '../payments/mp-oauth.service'
 import { PIX_EXPIRATION_MS } from '../payments/pix.constants'
 import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
 import { OrderConsumptionService } from './order-consumption.service'
+import { PlatformSettingsService } from '../settings/platform-settings.service'
 import { CreateOrderDto } from './dto/create-order.dto'
 
 function isStoreOpenNow(openingHours: any, scheduleExceptions?: any, atMs: number = Date.now()): boolean | null {
@@ -44,12 +45,6 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
     Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
   return R * 2 * Math.asin(Math.sqrt(a))
-}
-
-function calcCourierFee(distanceKm: number): number {
-  const BASE = 10
-  const RATE = 2
-  return Math.round((BASE + distanceKm * RATE) * 100) / 100
 }
 
 // Desconto progressivo "Leve X Pague Y": a cada X unidades, (X-Y) saem de graça.
@@ -96,6 +91,7 @@ export class OrdersService {
     private payments: PaymentsService,
     private mpOauth: MpOauthService,
     private orderConsumption: OrderConsumptionService,
+    private settings: PlatformSettingsService,
     @Optional() private matching: DeliveryMatchingService,
   ) {}
 
@@ -275,7 +271,7 @@ export class OrdersService {
     promoDiscount = Math.round(promoDiscount * 100) / 100
 
     const distanceKm = distToAddress // already calculated above
-    const deliveryFee = calcCourierFee(distanceKm)
+    const deliveryFee = await this.settings.deliveryFeeFor(distanceKm)
 
     // Descontos separados por QUEM os custeia:
     //  • cupom  → absorvido pela LOJA (promoção dela)
@@ -433,7 +429,7 @@ export class OrdersService {
     let splitOpts: { sellerToken?: string | null; applicationFee?: number } | undefined
     if (marketplaceOn) {
       const sellerToken = await this.mpOauth.getValidSellerToken(store as any)
-      const platformCommission = Math.round(subtotal * 0.10 * 100) / 100
+      const platformCommission = await this.settings.commissionFor(subtotal)
       // Loja recebe (total − fee). Queremos que a loja fique com:
       //   subtotal − cupom − comissão  (absorve o cupom, NÃO a fidelidade)
       // → fee = comissão + entrega − fidelidade (a plataforma banca a fidelidade).
@@ -638,7 +634,7 @@ export class OrdersService {
     }
     subtotal = Math.round(subtotal * 100) / 100
     promoDiscount = Math.round(promoDiscount * 100) / 100
-    const deliveryFee = calcCourierFee(distToAddress)
+    const deliveryFee = await this.settings.deliveryFeeFor(distToAddress)
 
     let couponDiscount = 0, couponId: string | undefined, couponMaxUses: number | null = null, couponFreeShipping = false
     if (group.couponCode) {
@@ -807,7 +803,7 @@ export class OrdersService {
     if (!multiStore && marketplaceOn) {
       const g = prepared[0]
       const sellerToken = await this.mpOauth.getValidSellerToken(g.store as any)
-      const platformCommission = Math.round(g.subtotal * 0.10 * 100) / 100
+      const platformCommission = await this.settings.commissionFor(g.subtotal)
       const rawFee = platformCommission + g.deliveryFee - g.loyaltyDiscount
       const applicationFee = Math.max(0, Math.min(Math.round(rawFee * 100) / 100, grandTotal))
       splitOpts = { sellerToken, applicationFee }
@@ -1007,7 +1003,7 @@ export class OrdersService {
       const existing = await this.prisma.delivery.findUnique({ where: { orderId } })
       if (!existing) {
         const distanceKm = haversineKm(store.lat, store.lng, order.address.lat, order.address.lng)
-        const courierFee  = calcCourierFee(distanceKm)
+        const courierFee  = await this.settings.courierFeeFor(distanceKm)
         const delivery    = await this.prisma.delivery.create({
           data: {
             orderId,

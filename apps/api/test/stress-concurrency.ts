@@ -41,6 +41,7 @@ function makeService() {
     {} as any,                                          // mpOauth
     { enabled: false } as any,                          // asaas
     { signDocuments: async () => ({}) } as any,         // uploads
+    { commissionFor: async () => 0, courierFeeFor: async () => 5, get: async () => ({}) } as any, // settings
     undefined as any, undefined as any,                 // matching, gateway (@Optional)
   )
 }

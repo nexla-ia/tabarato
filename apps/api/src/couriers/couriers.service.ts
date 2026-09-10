@@ -9,6 +9,7 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { LoyaltyService } from '../loyalty/loyalty.service'
 import { MpOauthService } from '../payments/mp-oauth.service'
 import { AsaasService } from '../payments/asaas.service'
+import { PlatformSettingsService } from '../settings/platform-settings.service'
 import { DeliveryMatchingService } from './delivery-matching.service'
 import { DeliveryGateway } from './delivery.gateway'
 import { CreateCourierDto } from './dto/create-courier.dto'
@@ -54,6 +55,7 @@ export class CouriersService {
     private mpOauth: MpOauthService,
     private asaas: AsaasService,
     private uploads: UploadsService,
+    private settings: PlatformSettingsService,
     @Optional() private matching: DeliveryMatchingService,
     @Optional() private gateway: DeliveryGateway,
   ) {}
@@ -619,7 +621,7 @@ export class CouriersService {
       // Só movimenta dinheiro se o pedido foi realmente pago.
       const isPaid = fullOrder.payment?.status === 'PAID'
       const courierFee = Number(delivery.courierFee)
-      const platformCommission = Math.round(Number(fullOrder.subtotal) * 0.10 * 100) / 100
+      const platformCommission = await this.settings.commissionFor(Number(fullOrder.subtotal))
       // Cupom de frete grátis: a LOJA absorve a entrega → desconta do repasse dela
       // (o entregador continua recebendo a taxa normalmente, paga pela plataforma).
       const storeDeliveryAbsorbed = fullOrder.freeShipping ? Number(fullOrder.deliveryFee) : 0

@@ -6,6 +6,7 @@ import { AdminService } from './admin.service'
 import { UpdateCourierStatusDto } from './dto/update-courier-status.dto'
 import { UpdateCourierDocStatusDto } from './dto/update-courier-doc-status.dto'
 import { UpdateStoreStatusDto } from './dto/update-store-status.dto'
+import { UpdatePricingDto } from './dto/update-pricing.dto'
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
@@ -64,5 +65,16 @@ export class AdminController {
   @Post('deliveries/:id/assign')
   assignDelivery(@Param('id') id: string, @Body() body: { courierId: string }) {
     return this.adminService.assignDelivery(id, body?.courierId)
+  }
+
+  // Preços: taxa de entrega, repasse do motoboy e comissão (editável sem redeploy).
+  @Get('settings')
+  getSettings() {
+    return this.adminService.getSettings()
+  }
+
+  @Patch('settings')
+  updateSettings(@Body() dto: UpdatePricingDto) {
+    return this.adminService.updateSettings(dto)
   }
 }
