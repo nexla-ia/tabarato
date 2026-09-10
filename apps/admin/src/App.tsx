@@ -5,6 +5,7 @@ import { Toast } from './components/Toast'
 import { Sidebar } from './components/Sidebar'
 import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
+import { Operacoes } from './pages/Operacoes'
 import { Couriers } from './pages/Couriers'
 import { Stores } from './pages/Stores'
 import { Users } from './pages/Users'
@@ -51,6 +52,7 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/operacoes" element={<Operacoes />} />
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/couriers" element={<Couriers />} />
                 <Route path="/stores" element={<Stores />} />

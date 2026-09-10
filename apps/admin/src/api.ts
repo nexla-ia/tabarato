@@ -60,4 +60,43 @@ export const api = {
 
   orders: (status?: string) =>
     request<any[]>(`/admin/orders${status ? `?status=${status}` : ''}`),
+
+  operations: () => request<Operations>('/admin/operations'),
+
+  assignDelivery: (deliveryId: string, courierId: string) =>
+    request<any>(`/admin/deliveries/${deliveryId}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ courierId }),
+    }),
+}
+
+export interface OpWaiting {
+  deliveryId: string
+  orderId: string
+  createdAt: string
+  waitingMin: number
+  courierFee: number | string
+  store: { name: string; lat: number; lng: number } | null
+  district: string | null
+}
+export interface OpActive {
+  deliveryId: string
+  orderId: string
+  status: string
+  store: { name: string } | null
+  district: string | null
+  courier: { id: string; name: string | null; lat: number | null; lng: number | null } | null
+}
+export interface OpCourier {
+  id: string
+  name: string | null
+  lat: number | null
+  lng: number | null
+  updatedAt: string
+  busy: boolean
+}
+export interface Operations {
+  waiting: OpWaiting[]
+  active: OpActive[]
+  onlineCouriers: OpCourier[]
 }
