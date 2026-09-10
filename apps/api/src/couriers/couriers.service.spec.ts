@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common'
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common'
 import { CouriersService } from './couriers.service'
 
 // Constrói o service com todas as dependências mockadas (teste unitário puro, sem DB).
@@ -9,18 +9,25 @@ function makeService(over: any = {}) {
       create: jest.fn(), update: jest.fn(), updateMany: jest.fn(),
       findUnique: jest.fn(), findFirst: jest.fn(),
     },
+    delivery: {
+      findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(),
+      count: jest.fn(), updateMany: jest.fn(),
+    },
+    order: { updateMany: jest.fn(), findUnique: jest.fn() },
     ...(over.prisma ?? {}),
   }
   const wallet = { debit: jest.fn(), credit: jest.fn(), ...(over.wallet ?? {}) }
   const asaas = { enabled: false, createPixTransfer: jest.fn(), ...(over.asaas ?? {}) }
   const uploads = { signDocuments: jest.fn().mockResolvedValue({}), ...(over.uploads ?? {}) }
+  const matching = { cancelMatching: jest.fn(), startMatching: jest.fn().mockResolvedValue(undefined), ...(over.matching ?? {}) }
+  const gateway = { evictUserFromOrder: jest.fn().mockResolvedValue(undefined), ...(over.gateway ?? {}) }
   const config = { get: jest.fn() }
 
   const svc = new CouriersService(
     prisma as any, {} as any, wallet as any, {} as any, {} as any,
-    config as any, {} as any, asaas as any, uploads as any, undefined as any, undefined as any,
+    config as any, {} as any, asaas as any, uploads as any, matching as any, gateway as any,
   )
-  return { svc, prisma, wallet, asaas, uploads }
+  return { svc, prisma, wallet, asaas, uploads, matching, gateway }
 }
 
 describe('CouriersService.requestWithdrawal', () => {
@@ -149,5 +156,167 @@ describe('CouriersService.resubmitDocument', () => {
       }),
     )
     expect(uploads.signDocuments).toHaveBeenCalled()
+  })
+})
+
+describe('CouriersService.findAvailableDeliveries (guardas de PII)', () => {
+  it('não-APROVADO → lista vazia (não enumera endereços)', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1', status: 'PENDING', isOnline: true, currentLat: 1, currentLng: 1 })
+    expect(await svc.findAvailableDeliveries('u1')).toEqual([])
+    expect(prisma.delivery.findMany).not.toHaveBeenCalled()
+  })
+  it('offline → lista vazia', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1', status: 'APPROVED', isOnline: false, currentLat: 1, currentLng: 1 })
+    expect(await svc.findAvailableDeliveries('u1')).toEqual([])
+  })
+  it('sem localização → lista vazia', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1', status: 'APPROVED', isOnline: true, currentLat: null, currentLng: null })
+    expect(await svc.findAvailableDeliveries('u1')).toEqual([])
+  })
+})
+
+describe('CouriersService.acceptDelivery', () => {
+  const approved = { id: 'c1', status: 'APPROVED', isOnline: true, currentLat: -12.7, currentLng: -60.1 }
+
+  it('recusa entregador não aprovado', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ ...approved, status: 'SUSPENDED' })
+    await expect(svc.acceptDelivery('u1', 'd1')).rejects.toBeInstanceOf(ForbiddenException)
+  })
+  it('recusa offline', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ ...approved, isOnline: false })
+    await expect(svc.acceptDelivery('u1', 'd1')).rejects.toBeInstanceOf(ForbiddenException)
+  })
+  it('recusa sem localização', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ ...approved, currentLat: null, currentLng: null })
+    await expect(svc.acceptDelivery('u1', 'd1')).rejects.toBeInstanceOf(ForbiddenException)
+  })
+  it('pré-checagem: já tem entrega ativa → Conflict', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue(approved)
+    prisma.delivery.count.mockResolvedValueOnce(1) // activeCount
+    await expect(svc.acceptDelivery('u1', 'd1')).rejects.toBeInstanceOf(ConflictException)
+  })
+  it('claim perdido (count=0) → Conflict', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue(approved)
+    prisma.delivery.count.mockResolvedValueOnce(0)
+    prisma.delivery.findUnique.mockResolvedValueOnce({ id: 'd1', courierId: null, status: 'SEARCHING_COURIER', order: { store: { lat: -12.7, lng: -60.1 } } })
+    prisma.delivery.updateMany.mockResolvedValueOnce({ count: 0 })
+    await expect(svc.acceptDelivery('u1', 'd1')).rejects.toBeInstanceOf(ConflictException)
+  })
+  it('claim-then-verify: acabou com 2 ativas → devolve ao pool e recusa', async () => {
+    const { svc, prisma, matching } = makeService()
+    prisma.courier.findUnique.mockResolvedValue(approved)
+    prisma.delivery.count.mockResolvedValueOnce(0).mockResolvedValueOnce(2) // pré=0, pós=2
+    prisma.delivery.findUnique.mockResolvedValueOnce({ id: 'd1', courierId: null, status: 'SEARCHING_COURIER', order: { store: { lat: -12.7, lng: -60.1 } } })
+    prisma.delivery.updateMany.mockResolvedValueOnce({ count: 1 }) // claim
+      .mockResolvedValueOnce({ count: 1 }) // release
+    await expect(svc.acceptDelivery('u1', 'd1')).rejects.toBeInstanceOf(ConflictException)
+    // 2ª chamada de updateMany = devolução ao pool
+    expect(prisma.delivery.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: { courierId: null, status: 'SEARCHING_COURIER' } }),
+    )
+    expect(matching.cancelMatching).not.toHaveBeenCalled()
+  })
+  it('caminho feliz: 1 ativa → cancela matching e retorna', async () => {
+    const { svc, prisma, matching } = makeService()
+    prisma.courier.findUnique.mockResolvedValue(approved)
+    prisma.delivery.count.mockResolvedValueOnce(0).mockResolvedValueOnce(1)
+    prisma.delivery.findUnique
+      .mockResolvedValueOnce({ id: 'd1', courierId: null, status: 'SEARCHING_COURIER', order: { store: { lat: -12.7, lng: -60.1 } } })
+      .mockResolvedValueOnce({ id: 'd1', status: 'COURIER_HEADING_TO_STORE' })
+    prisma.delivery.updateMany.mockResolvedValueOnce({ count: 1 })
+    const r = await svc.acceptDelivery('u1', 'd1')
+    expect(matching.cancelMatching).toHaveBeenCalledWith('d1')
+    expect(r).toEqual({ id: 'd1', status: 'COURIER_HEADING_TO_STORE' })
+  })
+})
+
+describe('CouriersService.returnDelivery', () => {
+  it('status não devolvível (já coletou) → BadRequest', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    prisma.delivery.findFirst.mockResolvedValue({ id: 'd1', courierId: 'c1', orderId: 'o1', status: 'PICKED_UP' })
+    await expect(svc.returnDelivery('u1', 'd1')).rejects.toBeInstanceOf(BadRequestException)
+  })
+  it('devolução atômica perdida (status mudou) → Conflict', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    prisma.delivery.findFirst.mockResolvedValue({ id: 'd1', courierId: 'c1', orderId: 'o1', status: 'COURIER_AT_STORE' })
+    prisma.delivery.updateMany.mockResolvedValue({ count: 0 })
+    await expect(svc.returnDelivery('u1', 'd1')).rejects.toBeInstanceOf(ConflictException)
+  })
+  it('caminho feliz: updateMany com guarda de status + evict + re-match', async () => {
+    const { svc, prisma, gateway, matching } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    prisma.delivery.findFirst.mockResolvedValue({ id: 'd1', courierId: 'c1', orderId: 'o1', status: 'COURIER_AT_STORE' })
+    prisma.delivery.updateMany.mockResolvedValue({ count: 1 })
+    prisma.order.findUnique.mockResolvedValue({ store: { lat: -12.7, lng: -60.1 } })
+    prisma.delivery.findUnique.mockResolvedValue({ id: 'd1', status: 'SEARCHING_COURIER' })
+    await svc.returnDelivery('u1', 'd1')
+    expect(prisma.delivery.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: 'd1', courierId: 'c1', status: { in: ['COURIER_HEADING_TO_STORE', 'COURIER_AT_STORE'] } }) }),
+    )
+    expect(gateway.evictUserFromOrder).toHaveBeenCalledWith('o1', 'u1')
+    expect(matching.startMatching).toHaveBeenCalled()
+  })
+})
+
+describe('CouriersService.advanceDelivery (código de entrega anti-fraude)', () => {
+  function pickedUp(deliveryCode: string | null) {
+    return {
+      id: 'd1', courierId: 'c1', status: 'PICKED_UP',
+      orderId: 'o1', order: { deliveryCode, address: { lat: null, lng: null } },
+    }
+  }
+  it('transição inválida (status final) → BadRequest', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    prisma.delivery.findFirst.mockResolvedValue({ id: 'd1', courierId: 'c1', status: 'DELIVERED', orderId: 'o1', order: {} })
+    await expect(svc.advanceDelivery('u1', 'd1')).rejects.toBeInstanceOf(BadRequestException)
+  })
+  it('finalizar sem código → pede o código', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    prisma.delivery.findFirst.mockResolvedValue(pickedUp('123456'))
+    await expect(svc.advanceDelivery('u1', 'd1', undefined, undefined)).rejects.toThrow('Informe o código')
+    expect(prisma.order.updateMany).not.toHaveBeenCalled()
+  })
+  it('código errado → incrementa tentativa ATOMICAMENTE (lt:5) e recusa', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    prisma.delivery.findFirst.mockResolvedValue(pickedUp('123456'))
+    prisma.order.updateMany.mockResolvedValue({ count: 1 })
+    prisma.order.findUnique.mockResolvedValue({ deliveryCodeAttempts: 1 })
+    await expect(svc.advanceDelivery('u1', 'd1', undefined, '000000')).rejects.toThrow('incorreto')
+    expect(prisma.order.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'o1', deliveryCodeAttempts: { lt: 5 } }, data: { deliveryCodeAttempts: { increment: 1 } } }),
+    )
+  })
+  it('lockout: já estourou 5 tentativas (updateMany count=0) → bloqueia', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    prisma.delivery.findFirst.mockResolvedValue(pickedUp('123456'))
+    prisma.order.updateMany.mockResolvedValue({ count: 0 })
+    await expect(svc.advanceDelivery('u1', 'd1', undefined, '000000')).rejects.toThrow('Muitas tentativas')
+  })
+})
+
+describe('CouriersService.getStats (ganho do dia)', () => {
+  it('conta só entregas de pedido PAGO', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1', rating: 4.8 })
+    prisma.delivery.findMany.mockResolvedValue([{ courierFee: 6 }, { courierFee: 4 }])
+    const r = await svc.getStats('u1')
+    expect(prisma.delivery.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: 'DELIVERED', order: { payment: { status: 'PAID' } } }) }),
+    )
+    expect(r).toEqual({ todayCount: 2, todayEarnings: 10, rating: 4.8 })
   })
 })
