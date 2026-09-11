@@ -141,10 +141,21 @@ export function Couriers() {
     setActioning(key)
     try {
       const updated = await api.updateCourierDocStatus(selected.id, doc, status)
-      setSelected(updated)
       // Update in list too
       setCouriers(cs => cs.map(c => c.id === updated.id ? updated : c))
       const docLabel = DOC_KEYS.find(d => d.key === doc)?.label ?? doc
+      // Se este doc finalizou a conta (todos aprovados → APPROVED, ou algum
+      // rejeitado → REJECTED), avisa e FECHA o modal — não faz sentido continuar
+      // revisando um cadastro já concluído.
+      if (updated.status === 'APPROVED' || updated.status === 'REJECTED') {
+        showToast(
+          updated.status === 'APPROVED' ? 'Entregador aprovado!' : 'Entregador rejeitado.',
+          updated.status === 'APPROVED' ? 'success' : 'error',
+        )
+        setSelected(null)
+        return
+      }
+      setSelected(updated)
       showToast(
         status === 'APPROVED' ? `${docLabel} aprovada!` : `${docLabel} rejeitada.`,
         status === 'APPROVED' ? 'success' : 'error',
