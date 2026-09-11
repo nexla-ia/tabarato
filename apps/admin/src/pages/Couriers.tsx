@@ -168,11 +168,25 @@ export function Couriers() {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontFamily: SANS, fontWeight: 800, fontSize: 24, color: TEXT, letterSpacing: '-0.02em', marginBottom: 4 }}>
-          Entregadores
-        </h1>
-        <p style={{ color: MUTED, fontSize: 13.5, fontFamily: SANS }}>Revise e aprove os cadastros de entregadores</p>
+      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <h1 style={{ fontFamily: SANS, fontWeight: 800, fontSize: 24, color: TEXT, letterSpacing: '-0.02em', marginBottom: 4 }}>
+            Entregadores
+          </h1>
+          <p style={{ color: MUTED, fontSize: 13.5, fontFamily: SANS }}>Revise e aprove os cadastros de entregadores</p>
+        </div>
+        <button
+          onClick={() => setRefresh((r) => r + 1)}
+          disabled={loading}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
+            padding: '8px 16px', borderRadius: 9, border: `1.5px solid ${BORDER}`,
+            background: '#fff', color: MUTED, fontSize: 13, fontWeight: 700,
+            cursor: loading ? 'default' : 'pointer', fontFamily: SANS, opacity: loading ? 0.6 : 1,
+          }}
+        >
+          <span style={{ fontSize: 15, lineHeight: 1 }}>↻</span> {loading ? 'Atualizando…' : 'Atualizar'}
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' as const }}>
