@@ -1,5 +1,4 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
-import { randomUUID } from 'crypto'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
@@ -339,7 +338,25 @@ export class CouriersService {
   async findWallet(userId: string) {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier profile not found')
-    return this.wallet.findByOwner(courier.id, 'COURIER')
+    const wallet = await this.wallet.findByOwner(courier.id, 'COURIER')
+
+    // Esconde do extrato os saques que FALHARAM: o débito (saque-<id>) e o seu
+    // estorno (estorno-saque-<id>) se anulam e só confundem. Saques concluídos
+    // (sem estorno) continuam aparecendo normalmente.
+    const txs: Array<{ referenceId?: string | null }> = (wallet as any).transactions ?? []
+    const reversed = new Set<string>()
+    for (const t of txs) {
+      const m = t.referenceId?.match(/^estorno-saque-(.+)$/)
+      if (m) reversed.add(m[1])
+    }
+    const transactions = txs.filter((t) => {
+      const ref = t.referenceId ?? ''
+      if (/^estorno-saque-/.test(ref)) return false
+      const deb = ref.match(/^saque-(.+)$/)
+      if (deb && reversed.has(deb[1])) return false
+      return true
+    })
+    return { ...wallet, transactions }
   }
 
   /** Stats da home do entregador: entregas e ganhos de hoje + avaliação. */
@@ -399,12 +416,9 @@ export class CouriersService {
     })
     if (inFlight) throw new ConflictException('Você já tem um saque em andamento. Aguarde a confirmação.')
 
-    // 1) Debita a carteira PRIMEIRO (atômico, barra saldo insuficiente). O dinheiro
-    //    fica "reservado"; se o PIX falhar, estornamos.
-    const ref = `saque-${randomUUID()}`
-    await this.wallet.debit(courier.id, 'COURIER', amount, `Saque via PIX (${courier.pixKey})`, ref)
-
-    // 2) Registra o saque como entidade com STATUS (rastreável no admin / pro entregador).
+    // 1) Cria o saque (PENDING) pra ter um id determinístico — o ref do débito e do
+    //    estorno derivam dele (saque-<id> / estorno-saque-<id>), o que permite
+    //    esconder o par no extrato quando o saque falha.
     const withdrawal = await this.prisma.withdrawal.create({
       data: {
         courierId: courier.id,
@@ -414,6 +428,17 @@ export class CouriersService {
         status: 'PENDING',
       },
     })
+    const ref = `saque-${withdrawal.id}`
+
+    // 2) Debita a carteira (atômico, barra saldo insuficiente). Se faltar saldo,
+    //    remove o saque órfão e propaga o erro. O dinheiro fica "reservado"; se o
+    //    PIX falhar depois, estornamos.
+    try {
+      await this.wallet.debit(courier.id, 'COURIER', amount, `Saque via PIX (${courier.pixKey})`, ref)
+    } catch (err) {
+      await this.prisma.withdrawal.delete({ where: { id: withdrawal.id } }).catch(() => {})
+      throw err
+    }
 
     // 3) Se o Asaas estiver ligado, envia o PIX automático; senão fica PENDING na
     //    fila manual (admin paga e marca). Falha no envio → ESTORNA a carteira.
@@ -494,7 +519,7 @@ export class CouriersService {
       })
       if (res.count > 0) {
         await this.wallet.credit(withdrawal.courierId, 'COURIER', Number(withdrawal.amount),
-          'Estorno de saque não concluído', `estorno-${withdrawal.id}`)
+          'Estorno de saque não concluído', `estorno-saque-${withdrawal.id}`)
       }
     }
   }
