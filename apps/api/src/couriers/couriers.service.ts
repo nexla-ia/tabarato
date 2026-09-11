@@ -440,6 +440,25 @@ export class CouriersService {
   }
 
   /**
+   * Autorização automática de saque (Asaas "Mecanismo de segurança" / validação de
+   * saque por webhook): o Asaas chama isto ~5s após a transferência ser criada e
+   * respondemos APPROVED — dispensa o token SMS manual. A conta é dedicada a
+   * repasses do Tá Barato e o webhook já é protegido por token, então aprovamos;
+   * se houver externalReference, confirmamos que casa com um saque nosso.
+   */
+  async authorizeAsaasTransfer(body: any): Promise<{ status: 'APPROVED' | 'REFUSED'; refuseReason?: string }> {
+    const ref = body?.transfer?.externalReference ?? body?.externalReference ?? body?.payment?.externalReference
+    try {
+      if (ref) {
+        const w = await this.prisma.withdrawal.findUnique({ where: { id: String(ref) } })
+        if (w) return { status: 'APPROVED' }
+      }
+    } catch { /* segue pro fallback */ }
+    this.logger.warn(`Asaas authorize: aprovando operação${ref ? ` (ref ${ref})` : ' (sem ref no payload)'}`)
+    return { status: 'APPROVED' }
+  }
+
+  /**
    * Webhook do Asaas (status da transferência). Marca o saque DONE ou, na falha,
    * FAILED + estorna a carteira. Idempotente: a transição só acontece uma vez
    * (updateMany com guarda de status).

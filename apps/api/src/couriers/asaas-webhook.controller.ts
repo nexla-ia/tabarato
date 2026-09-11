@@ -32,4 +32,19 @@ export class AsaasWebhookController {
     }
     return { received: true }
   }
+
+  /**
+   * Autorização automática de saque — "Mecanismo de segurança" do Asaas (Menu →
+   * Integrações → Mecanismos de segurança). O Asaas chama isto antes de concluir a
+   * transferência; respondemos { status: 'APPROVED' } pra dispensar o token SMS.
+   * Configure a mesma URL + token no painel.
+   */
+  @Post('authorize')
+  @HttpCode(200)
+  async authorize(@Headers('asaas-access-token') token: string, @Body() body: any) {
+    if (!this.asaas.isWebhookAuthorized(token)) {
+      throw new UnauthorizedException('Token inválido.')
+    }
+    return this.couriers.authorizeAsaasTransfer(body)
+  }
 }
