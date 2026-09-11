@@ -392,6 +392,13 @@ export class CouriersService {
     }
     if (!courier.pixKey) throw new BadRequestException('Cadastre sua chave PIX antes de solicitar o saque.')
 
+    // Idempotência anti duplo-envio: se já houver um saque em andamento recente,
+    // recusa (o app pode disparar 2x num toque duplo → antes virava 2 transferências).
+    const inFlight = await this.prisma.withdrawal.findFirst({
+      where: { courierId: courier.id, status: { in: ['PENDING', 'PROCESSING'] }, createdAt: { gte: new Date(Date.now() - 20_000) } },
+    })
+    if (inFlight) throw new ConflictException('Você já tem um saque em andamento. Aguarde a confirmação.')
+
     // 1) Debita a carteira PRIMEIRO (atômico, barra saldo insuficiente). O dinheiro
     //    fica "reservado"; se o PIX falhar, estornamos.
     const ref = `saque-${randomUUID()}`
