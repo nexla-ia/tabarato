@@ -95,6 +95,17 @@ export class OrdersService {
     @Optional() private matching: DeliveryMatchingService,
   ) {}
 
+  /** Cotação da taxa de entrega pro checkout — usa a config de preços atual
+   *  (loja → endereço). Mantém o valor exibido igual ao cobrado. */
+  async quoteDelivery(storeLat: number, storeLng: number, lat: number, lng: number) {
+    if (![storeLat, storeLng, lat, lng].every((v) => Number.isFinite(v))) {
+      return { distanceKm: 0, deliveryFee: await this.settings.deliveryFeeFor(0) }
+    }
+    const distanceKm = haversineKm(storeLat, storeLng, lat, lng)
+    const deliveryFee = await this.settings.deliveryFeeFor(distanceKm)
+    return { distanceKm: Math.round(distanceKm * 10) / 10, deliveryFee }
+  }
+
   async create(userId: string, dto: CreateOrderDto) {
     // Idempotência: se já existe um pedido com essa chave, devolve o mesmo
     // (evita pedido/cobrança duplicada em retry de rede ou duplo-tap no checkout).

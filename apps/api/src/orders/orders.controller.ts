@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -40,6 +40,19 @@ export class OrdersController {
   @Get('store')
   findByStore(@CurrentUser() user: any) {
     return this.ordersService.findByStore(user.sub)
+  }
+
+  // Cotação da taxa de entrega (checkout) — vem do backend pra refletir a config
+  // de preços atual (o cálculo no cliente ficaria defasado ao mudar os preços).
+  // ANTES de :id pra não ser capturado como um id.
+  @Get('delivery-quote')
+  deliveryQuote(
+    @Query('storeLat') storeLat: string,
+    @Query('storeLng') storeLng: string,
+    @Query('lat') lat: string,
+    @Query('lng') lng: string,
+  ) {
+    return this.ordersService.quoteDelivery(Number(storeLat), Number(storeLng), Number(lat), Number(lng))
   }
 
   @Get(':id')

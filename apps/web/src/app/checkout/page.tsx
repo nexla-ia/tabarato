@@ -51,17 +51,6 @@ async function tokenizeCard(data: { cardNumber: string; cvv: string; expiryMonth
   return json.id as string
 }
 
-// Espelha o cálculo de frete do backend (orders.service: BASE 10 + 2/km).
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371
-  const dLat = ((lat2 - lat1) * Math.PI) / 180
-  const dLng = ((lng2 - lng1) * Math.PI) / 180
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.asin(Math.sqrt(a))
-}
-function calcDeliveryFee(distanceKm: number): number {
-  return Math.round((10 + distanceKm * 2) * 100) / 100
-}
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -121,6 +110,8 @@ export default function CheckoutPage() {
   }, [pixResult?.pixExpiresAt])
   const [polling, setPolling] = useState(false)
   const [storeCoords, setStoreCoords] = useState<Record<string, { lat: number; lng: number }>>({})
+  // Taxa de entrega por loja vinda do BACKEND (reflete a config de preços atual).
+  const [storeFees, setStoreFees] = useState<Record<string, number>>({})
 
   const isCard = payMethod === 'CREDIT_CARD' || payMethod === 'DEBIT_CARD'
   // Teto do cliente é só uma estimativa (o back é quem valida de verdade): não
@@ -134,9 +125,10 @@ export default function CheckoutPage() {
   // Frete real por loja (10 + 2/km) — precisa das coords da loja + do endereço.
   const selAddr = addresses.find((a) => a.id === selectedAddr)
   const perStoreDelivery = stores.map((s) => {
-    const c = storeCoords[s.storeId]
-    const delivery = (c && (selAddr as any)?.lat != null && (selAddr as any)?.lng != null)
-      ? calcDeliveryFee(haversineKm(c.lat, c.lng, (selAddr as any).lat, (selAddr as any).lng))
+    // Taxa vem do backend (cotação). Enquanto não chega, delivery = null (a UI
+    // trata como "calculando" e não deixa fechar sem a entrega conhecida).
+    const delivery = (selAddr as any)?.lat != null && storeFees[s.storeId] != null
+      ? storeFees[s.storeId]
       : null
     return { delivery, freeShip: !!s.coupon?.freeShipping }
   })
@@ -179,6 +171,24 @@ export default function CheckoutPage() {
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeIdsKey])
+
+  // Cotação da taxa de entrega no BACKEND (loja → endereço) — mantém o valor
+  // exibido igual ao cobrado, mesmo quando o admin muda os preços.
+  const coordsKey = Object.entries(storeCoords).map(([k, v]) => `${k}:${v.lat},${v.lng}`).join('|')
+  useEffect(() => {
+    const addr = addresses.find((a) => a.id === selectedAddr) as any
+    if (!addr || addr.lat == null || addr.lng == null) return
+    stores.forEach((s) => {
+      const c = storeCoords[s.storeId]
+      if (!c) return
+      api.get(`/orders/delivery-quote?storeLat=${c.lat}&storeLng=${c.lng}&lat=${addr.lat}&lng=${addr.lng}`)
+        .then((r) => {
+          const fee = Number(r.data?.deliveryFee)
+          if (Number.isFinite(fee)) setStoreFees((prev) => ({ ...prev, [s.storeId]: fee }))
+        }).catch(() => {})
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAddr, storeIdsKey, coordsKey])
 
   // PIX: verifica o pagamento automaticamente (o webhook pode demorar/faltar). Se
   // o backend marcar como pago → vai pro pedido; se expirar/recusar (FAILED) → avisa.
