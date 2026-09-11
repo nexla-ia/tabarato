@@ -83,11 +83,29 @@ export class CouriersService {
 
   async register(userId: string, dto: CreateCourierDto) {
     const existing = await this.prisma.courier.findUnique({ where: { userId } })
-    if (existing) throw new ConflictException('User already registered as courier')
+    if (existing) throw new ConflictException('Você já tem um cadastro de entregador.')
 
-    return this.prisma.courier.create({
-      data: { ...dto, userId },
+    // CPF/CNH são únicos: sem checar aqui, um duplicado estourava P2002 → 500
+    // "Internal server error". Devolve mensagem clara (409).
+    const dup = await this.prisma.courier.findFirst({
+      where: { OR: [{ cpf: dto.cpf }, { cnh: dto.cnh }] },
+      select: { cpf: true, cnh: true },
     })
+    if (dup) {
+      const campo = dup.cpf === dto.cpf ? 'CPF' : 'CNH'
+      throw new ConflictException(`Este ${campo} já está cadastrado em outra conta de entregador.`)
+    }
+
+    try {
+      return await this.prisma.courier.create({ data: { ...dto, userId } })
+    } catch (err: any) {
+      // Corrida entre cadastros simultâneos com o mesmo CPF/CNH.
+      if (err?.code === 'P2002') {
+        throw new ConflictException('CPF ou CNH já cadastrado em outra conta de entregador.')
+      }
+      this.logger.error(`register courier falhou (user ${userId})`, err)
+      throw err
+    }
   }
 
   async findMe(userId: string) {
