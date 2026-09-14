@@ -87,6 +87,33 @@ describe('AsaasService', () => {
       expect(sent.installmentCount).toBeUndefined()
     })
 
+    it('createCheckout à vista → DETACHED, item com o valor, externalReference e link', async () => {
+      fetchSpy = jest.spyOn(global as any, 'fetch').mockResolvedValue(OK({ id: 'chk_1', link: 'https://sandbox.asaas.com/checkoutSession/show/chk_1', status: 'ACTIVE' }) as any)
+      const a = makeAsaas({ ASAAS_API_KEY: 'k' })
+      const r = await a.createCheckout({
+        value: 80, orderId: 'ord-7', itemName: 'Pedido Tá Barato',
+        successUrl: 'https://x/ok', cancelUrl: 'https://x/no',
+      })
+      expect(r).toEqual({ id: 'chk_1', link: 'https://sandbox.asaas.com/checkoutSession/show/chk_1', status: 'ACTIVE' })
+      const [url, init] = fetchSpy.mock.calls[0]
+      expect(String(url)).toContain('/checkouts')
+      const sent = JSON.parse((init as any).body)
+      expect(sent.billingTypes).toEqual(['CREDIT_CARD'])
+      expect(sent.chargeTypes).toEqual(['DETACHED'])
+      expect(sent.externalReference).toBe('ord-7')
+      expect(sent.items[0].value).toBe(80)
+      expect(sent.installment).toBeUndefined()
+    })
+
+    it('createCheckout parcelado → inclui INSTALLMENT + maxInstallmentCount', async () => {
+      fetchSpy = jest.spyOn(global as any, 'fetch').mockResolvedValue(OK({ id: 'chk_2', link: 'l', status: 'ACTIVE' }) as any)
+      const a = makeAsaas({ ASAAS_API_KEY: 'k' })
+      await a.createCheckout({ value: 300, orderId: 'o', itemName: 'x', installments: 6, successUrl: 's', cancelUrl: 'c' })
+      const sent = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(sent.chargeTypes).toEqual(['DETACHED', 'INSTALLMENT'])
+      expect(sent.installment).toEqual({ maxInstallmentCount: 6 })
+    })
+
     it('propaga a descrição do erro do Asaas quando !ok', async () => {
       fetchSpy = jest.spyOn(global as any, 'fetch').mockResolvedValue({
         ok: false, status: 400, json: async () => ({ errors: [{ description: 'Transação não autorizada.' }] }),

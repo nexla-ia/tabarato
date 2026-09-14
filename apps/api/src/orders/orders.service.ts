@@ -492,8 +492,24 @@ export class OrdersService {
       }
     }
 
-    // Card payment — synchronous
-    if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && dto.cardToken) {
+    // Cartão via Checkout HOSPEDADO do Asaas (assíncrono, igual PIX): os dados do
+    // cartão ficam na página do Asaas, não passam pelo nosso backend. O pedido fica
+    // PENDING e é confirmado pelo webhook CHECKOUT_PAID.
+    if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && this.payments.asaasCardCheckoutEnabled) {
+      try {
+        const { checkoutUrl } = await this.payments.createAsaasCardCheckout(payment.id, total, order.id, { installments: dto.installments ?? 1 })
+        if ((order as any).payment) Object.assign((order as any).payment, { gateway: 'ASAAS', checkoutUrl })
+      } catch (err: any) {
+        this.logger.error('Asaas checkout (cartão) falhou após o pedido ser salvo', err)
+        await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } }).catch(() => {})
+        await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } }).catch(() => {})
+        await this.restoreOrderConsumption(order.id)
+        throw new BadRequestException('Não foi possível iniciar o pagamento com cartão agora. Tente novamente ou pague com PIX.')
+      }
+    }
+
+    // Card payment (Mercado Pago) — synchronous
+    else if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && dto.cardToken) {
       try {
         // Dados ricos do pagador reduzem o "cc_rejected_high_risk" do antifraude do MP.
         const nameParts = (payer?.name ?? '').trim().split(/\s+/).filter(Boolean)
@@ -843,7 +859,19 @@ export class OrdersService {
       }
     }
 
-    if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && dto.cardToken) {
+    if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && this.payments.asaasCardCheckoutEnabled) {
+      try {
+        const { checkoutUrl } = await this.payments.createAsaasCardCheckout(payment.id, grandTotal, firstOrder.id, { installments: dto.installments ?? 1 })
+        paymentOut = { ...paymentOut, gateway: 'ASAAS', checkoutUrl }
+        orders.forEach((o) => { if (o.payment) Object.assign(o.payment, { gateway: 'ASAAS', checkoutUrl }) })
+      } catch (err: any) {
+        this.logger.error('Asaas checkout (cartão, multi) falhou', err)
+        await cancelAll()
+        throw new BadRequestException('Não foi possível iniciar o pagamento com cartão agora. Tente novamente ou pague com PIX.')
+      }
+    }
+
+    else if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && dto.cardToken) {
       try {
         const nameParts = (payer?.name ?? '').trim().split(/\s+/).filter(Boolean)
         const result = await this.payments.createCardPayment(payment.id, grandTotal, firstOrder.id, dto.cardToken, dto.installments ?? 1, safePayerEmail(payer?.email), dto.payerCpf, {

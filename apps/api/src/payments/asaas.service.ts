@@ -183,6 +183,48 @@ export class AsaasService {
   }
 
   /**
+   * Cria um Checkout HOSPEDADO (página do Asaas) pra pagamento com CARTÃO. O cliente
+   * digita o cartão na página do Asaas — os dados NÃO passam pelo nosso backend (PCI
+   * mínimo). Retorna o link pra redirecionar/abrir. O status vem pelo webhook
+   * CHECKOUT_PAID/CANCELED/EXPIRED. `externalReference` = id do pedido.
+   */
+  async createCheckout(input: {
+    value: number
+    orderId: string
+    itemName: string
+    itemDescription?: string
+    installments?: number
+    successUrl: string
+    cancelUrl: string
+    expiredUrl?: string
+    customerId?: string
+  }): Promise<{ id: string; link: string; status: string }> {
+    const value = Math.round(input.value * 100) / 100
+    const maxInst = input.installments && input.installments > 1 ? Math.min(input.installments, 21) : 1
+    const data = await this.api<any>('POST', '/checkouts', {
+      billingTypes: ['CREDIT_CARD'],
+      chargeTypes: maxInst > 1 ? ['DETACHED', 'INSTALLMENT'] : ['DETACHED'],
+      minutesToExpire: 60,
+      callback: {
+        successUrl: input.successUrl,
+        cancelUrl: input.cancelUrl,
+        ...(input.expiredUrl ? { expiredUrl: input.expiredUrl } : {}),
+      },
+      items: [{ name: input.itemName.slice(0, 30), description: input.itemDescription, quantity: 1, value }],
+      externalReference: input.orderId,
+      ...(maxInst > 1 ? { installment: { maxInstallmentCount: maxInst } } : {}),
+      ...(input.customerId ? { customer: input.customerId } : {}),
+    })
+    return { id: data.id, link: data.link, status: data.status }
+  }
+
+  /** Consulta o status de um Checkout (poll quando o webhook se perde). */
+  async getCheckout(id: string): Promise<{ id: string; status: string }> {
+    const data = await this.api<any>('GET', `/checkouts/${id}`)
+    return { id: data.id, status: data.status }
+  }
+
+  /**
    * Cria uma transferência PIX para a chave do entregador. ASSÍNCRONO: o retorno
    * só diz que foi criada; o status final (DONE/FAILED) chega pelo webhook.
    * `externalReference` = id do nosso saque (idempotência/rastreio).

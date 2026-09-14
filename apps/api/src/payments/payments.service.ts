@@ -159,8 +159,46 @@ export class PaymentsService {
   getPublicConfig() {
     return {
       pix: this.asaas.pixInEnabled ? 'ASAAS' : 'MP',
+      // Cartão no Asaas = Checkout HOSPEDADO (o app abre a página do Asaas; os dados
+      // do cartão não passam pelo nosso backend). 'checkout' sinaliza esse fluxo.
       card: this.asaas.cardInEnabled ? 'ASAAS' : 'MP',
+      cardMode: this.asaas.cardInEnabled ? 'CHECKOUT' : 'TOKEN',
     }
+  }
+
+  get asaasCardCheckoutEnabled(): boolean {
+    return this.asaas.cardInEnabled
+  }
+
+  private webUrl(): string {
+    return (this.config.get<string>('WEB_URL') || 'https://tabarato-production.up.railway.app').replace(/\/$/, '')
+  }
+
+  /**
+   * Cartão via Checkout HOSPEDADO do Asaas: cria o checkout, guarda o id do checkout
+   * em Payment.gatewayId e devolve o link pra abrir. O pedido fica PENDING (assíncrono,
+   * igual PIX) — a confirmação chega pelo webhook CHECKOUT_PAID. Sem dados de cartão
+   * no nosso backend (a página do Asaas coleta cartão + CPF do pagador).
+   */
+  async createAsaasCardCheckout(
+    paymentId: string, amount: number, orderId: string, opts?: { installments?: number },
+  ): Promise<{ checkoutUrl: string }> {
+    const orderUrl = `${this.webUrl()}/orders/${orderId}`
+    const checkout = await this.asaas.createCheckout({
+      value: amount,
+      orderId,
+      itemName: 'Pedido Tá Barato',
+      itemDescription: `Pedido #${orderId.slice(0, 8)}`,
+      installments: opts?.installments,
+      successUrl: orderUrl,
+      cancelUrl: `${orderUrl}?pagamento=cancelado`,
+      expiredUrl: `${orderUrl}?pagamento=expirado`,
+    })
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: { gatewayId: checkout.id, gateway: 'ASAAS' },
+    })
+    return { checkoutUrl: checkout.link }
   }
 
   /**
@@ -530,23 +568,44 @@ export class PaymentsService {
       return
     }
     const event: string | undefined = body?.event
-    const p = body?.payment
-    if (!event || !p || !String(event).startsWith('PAYMENT_')) return
-    const gatewayId = p.id ? String(p.id) : undefined
-    const orderId = p.externalReference as string | undefined
-    if (!orderId) return
+    if (!event) return
 
-    const PAID = ['PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED']
-    const FAILED = ['PAYMENT_OVERDUE', 'PAYMENT_DELETED', 'PAYMENT_CREDIT_CARD_CAPTURE_REFUSED', 'PAYMENT_REPROVED_BY_RISK_ANALYSIS']
+    const PAID_EV = ['PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED']
+    const FAILED_EV = ['PAYMENT_OVERDUE', 'PAYMENT_DELETED', 'PAYMENT_CREDIT_CARD_CAPTURE_REFUSED', 'PAYMENT_REPROVED_BY_RISK_ANALYSIS']
 
     try {
+      // Resolve o pedido: PAYMENT_* traz externalReference = orderId; CHECKOUT_* traz
+      // o checkout.id, que mapeamos pelo Payment.gatewayId (guardado na criação).
+      let orderId: string | undefined
+      let gatewayId: string | undefined
+      if (event.startsWith('CHECKOUT_')) {
+        const coId = body?.checkout?.id ? String(body.checkout.id) : undefined
+        if (!coId) return
+        const pay = await this.prisma.payment.findFirst({
+          where: { gatewayId: coId, gateway: 'ASAAS' },
+          select: { orders: { select: { id: true }, take: 1 } },
+        })
+        orderId = pay?.orders?.[0]?.id
+      } else if (event.startsWith('PAYMENT_')) {
+        orderId = body?.payment?.externalReference
+        gatewayId = body?.payment?.id ? String(body.payment.id) : undefined
+      } else {
+        return
+      }
+      if (!orderId) return
+
+      const paid = PAID_EV.includes(event) || event === 'CHECKOUT_PAID'
+      const failed = FAILED_EV.includes(event) || event === 'CHECKOUT_CANCELED' || event === 'CHECKOUT_EXPIRED'
+      const refunded = event === 'PAYMENT_REFUNDED'
+      if (!paid && !failed && !refunded) return
+
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
         include: { payment: true, user: { select: { id: true, pushToken: true } } },
       })
       if (!order?.payment) return
 
-      if (PAID.includes(event) && order.payment.status !== 'PAID') {
+      if (paid && order.payment.status !== 'PAID') {
         const claim = await this.prisma.payment.updateMany({
           where: { id: order.payment.id, status: { not: 'PAID' } },
           data: { status: 'PAID', paidAt: new Date(), ...(gatewayId ? { gatewayId } : {}) },
@@ -563,7 +622,7 @@ export class PaymentsService {
         return
       }
 
-      if (FAILED.includes(event) && order.payment.status === 'PENDING') {
+      if (failed && order.payment.status === 'PENDING') {
         const claim = await this.prisma.payment.updateMany({
           where: { id: order.payment.id, status: 'PENDING' }, data: { status: 'FAILED' },
         })
@@ -577,7 +636,7 @@ export class PaymentsService {
         return
       }
 
-      if (event === 'PAYMENT_REFUNDED' && order.payment.status !== 'REFUNDED') {
+      if (refunded && order.payment.status !== 'REFUNDED') {
         await this.prisma.payment.updateMany({
           where: { id: order.payment.id, status: { not: 'REFUNDED' } }, data: { status: 'REFUNDED' },
         })
@@ -604,11 +663,22 @@ export class PaymentsService {
     }
     if (!order.payment?.gatewayId || order.payment.status !== 'PENDING') return order.payment
 
-    // Asaas: consulta a cobrança direto (não usa token de lojista/split).
+    // Asaas: consulta direto (não usa token de lojista/split). PIX = cobrança;
+    // cartão = Checkout hospedado (gatewayId é o id do checkout).
     if ((order.payment as any).gateway === 'ASAAS') {
       try {
-        const p = await this.asaas.getPayment(order.payment.gatewayId)
-        if (p.status === 'CONFIRMED' || p.status === 'RECEIVED') {
+        const isCard = order.payment.method === 'CREDIT_CARD' || order.payment.method === 'DEBIT_CARD'
+        let paid = false, failed = false
+        if (isCard) {
+          const c = await this.asaas.getCheckout(order.payment.gatewayId)
+          paid = c.status === 'PAID'
+          failed = c.status === 'CANCELED' || c.status === 'EXPIRED'
+        } else {
+          const p = await this.asaas.getPayment(order.payment.gatewayId)
+          paid = p.status === 'CONFIRMED' || p.status === 'RECEIVED'
+          failed = ['OVERDUE', 'REFUNDED', 'DELETED'].includes(p.status)
+        }
+        if (paid) {
           const claim = await this.prisma.payment.updateMany({
             where: { id: order.payment.id, status: { not: 'PAID' } },
             data: { status: 'PAID', paidAt: new Date() },
@@ -618,7 +688,7 @@ export class PaymentsService {
           }
           return await this.prisma.payment.findUnique({ where: { id: order.payment.id } })
         }
-        if (['OVERDUE', 'REFUNDED', 'DELETED'].includes(p.status)) {
+        if (failed) {
           const claim = await this.prisma.payment.updateMany({
             where: { id: order.payment.id, status: 'PENDING' }, data: { status: 'FAILED' },
           })
