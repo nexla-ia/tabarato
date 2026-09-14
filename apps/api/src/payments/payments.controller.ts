@@ -31,4 +31,14 @@ export class WebhooksController {
     await this.paymentsService.handleWebhook(body, xSignature, xRequestId, req.rawBody)
     return { ok: true }
   }
+
+  // Webhook de COBRANÇA do Asaas (entrada de dinheiro). Configure no painel do Asaas
+  // (tipo "Cobranças/Payment") apontando pra POST <api>/api/webhooks/asaas com o
+  // token em ASAAS_WEBHOOK_TOKEN. (Transferências/saque usam /couriers/asaas/webhook.)
+  @Throttle({ default: { ttl: 60_000, limit: 300 } })
+  @Post('asaas')
+  async handleAsaas(@Body() body: any, @Headers('asaas-access-token') token: string) {
+    await this.paymentsService.handleAsaasWebhook(token, body)
+    return { received: true }
+  }
 }

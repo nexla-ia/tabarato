@@ -115,7 +115,7 @@ describe('CouriersService.handleAsaasTransferWebhook', () => {
 
     await svc.handleAsaasTransferWebhook('TRANSFER_FAILED', { externalReference: 'w1', failReason: 'x' })
 
-    expect(wallet.credit).toHaveBeenCalledWith('c1', 'COURIER', 50, expect.any(String), 'estorno-w1')
+    expect(wallet.credit).toHaveBeenCalledWith('c1', 'COURIER', 50, expect.any(String), 'estorno-saque-w1')
   })
 
   it('TRANSFER_FAILED idempotente (count=0) → NÃO estorna de novo', async () => {

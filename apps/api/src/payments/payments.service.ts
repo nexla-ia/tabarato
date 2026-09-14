@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { MpOauthService } from './mp-oauth.service'
+import { AsaasService } from './asaas.service'
 import { OrderConsumptionService } from '../orders/order-consumption.service'
 import { PIX_EXPIRATION_MS } from './pix.constants'
 
@@ -20,6 +21,7 @@ export class PaymentsService {
     private push: PushService,
     private notifications: NotificationsService,
     private mpOauth: MpOauthService,
+    private asaas: AsaasService,
     private orderConsumption: OrderConsumptionService,
   ) {
     const client = new MercadoPagoConfig({
@@ -61,8 +63,17 @@ export class PaymentsService {
 
   async createPixPayment(
     paymentId: string, amount: number, orderId: string, payerEmail: string,
-    opts?: { sellerToken?: string | null; applicationFee?: number },
-  ) {
+    opts?: {
+      sellerToken?: string | null; applicationFee?: number
+      // Dados do pagador (usados só no modo Asaas p/ criar o cliente)
+      userId?: string; payerName?: string; payerCpf?: string; payerPhone?: string
+    },
+  ): Promise<{ gatewayId: string; pixCode: string | null; pixQrBase64: string | null; splitFellBack: boolean }> {
+    // Modo Asaas (entrada centralizada): ignora split — todo o dinheiro entra na
+    // conta da plataforma e o repasse à loja/entregador é interno (carteira + saque PIX).
+    if (this.asaas.pixInEnabled) {
+      return this.createAsaasPixPayment(paymentId, amount, orderId, payerEmail, opts)
+    }
     const apiUrl = this.config.get<string>('API_URL') ?? ''
     const webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
       ?? `${apiUrl}/api/webhooks/mercadopago`
@@ -139,6 +150,111 @@ export class PaymentsService {
     return { gatewayId, pixCode, pixQrBase64, splitFellBack }
   }
 
+  // ── Asaas (entrada centralizada) ────────────────────────────────────────────────
+
+  /**
+   * Cliente Asaas do pagador — cacheia o id (e o CPF) no User pra reuso. cpfCnpj é
+   * exigido pelo Asaas; se não tivermos (nem cache), pede o CPF ao cliente.
+   */
+  private async getOrCreateAsaasCustomer(
+    userId: string,
+    payer: { name?: string; email?: string; cpf?: string; phone?: string },
+  ): Promise<string> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { asaasCustomerId: true, name: true, email: true, cpf: true, phone: true },
+    })
+    if (user?.asaasCustomerId) return user.asaasCustomerId
+
+    const cpf = (payer.cpf || user?.cpf || '').replace(/\D/g, '')
+    if (!cpf) throw new BadRequestException('Informe seu CPF para concluir o pagamento.')
+
+    const { id } = await this.asaas.createCustomer({
+      name: payer.name || user?.name || 'Cliente',
+      cpfCnpj: cpf,
+      email: payer.email || user?.email || undefined,
+      phone: payer.phone || user?.phone || undefined,
+      externalReference: userId,
+    })
+    await this.prisma.user
+      .update({ where: { id: userId }, data: { asaasCustomerId: id, ...(user?.cpf ? {} : { cpf }) } })
+      .catch((err) => this.logger.warn('Falha ao cachear asaasCustomerId', err as any))
+    return id
+  }
+
+  private async createAsaasPixPayment(
+    paymentId: string, amount: number, orderId: string, payerEmail: string,
+    opts?: { userId?: string; payerName?: string; payerCpf?: string; payerPhone?: string },
+  ) {
+    if (!opts?.userId) throw new BadRequestException('Não foi possível identificar o pagador.')
+    const customerId = await this.getOrCreateAsaasCustomer(opts.userId, {
+      name: opts.payerName, email: payerEmail, cpf: opts.payerCpf, phone: opts.payerPhone,
+    })
+    const charge = await this.asaas.createPixCharge({
+      customerId, value: amount, orderId, description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
+    })
+    const qr = await this.asaas.getPixQrCode(charge.id)
+    const pixCode = qr.payload
+    const pixQrBase64 = qr.encodedImage
+    if (!pixCode) {
+      this.logger.error(`Asaas PIX sem QR (pedido ${orderId.slice(0, 8)}, cobrança ${charge.id})`)
+      throw new Error('Não foi possível gerar o QR Code PIX agora.')
+    }
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        gatewayId: charge.id,
+        gateway: 'ASAAS',
+        pixCode,
+        pixQrBase64,
+        pixExpiresAt: new Date(Date.now() + PIX_EXPIRATION_MS),
+      },
+    })
+    return { gatewayId: charge.id, pixCode, pixQrBase64, splitFellBack: false }
+  }
+
+  private async createAsaasCardPayment(
+    paymentId: string, amount: number, orderId: string, payerEmail: string,
+    installments: number, payerCpf: string | undefined,
+    opts?: {
+      userId?: string; payerName?: string; payerPhone?: string; remoteIp?: string
+      card?: { holderName: string; number: string; expiryMonth: string; expiryYear: string; ccv: string }
+      payerAddress?: { zip_code?: string; street_number?: string; complement?: string }
+    },
+  ) {
+    if (!opts?.userId) throw new BadRequestException('Não foi possível identificar o pagador.')
+    if (!opts?.card) throw new BadRequestException('Dados do cartão ausentes.')
+    const cpf = (payerCpf || '').replace(/\D/g, '')
+    if (!cpf) throw new BadRequestException('Informe o CPF do titular do cartão.')
+
+    const customerId = await this.getOrCreateAsaasCustomer(opts.userId, {
+      name: opts.payerName, email: payerEmail, cpf, phone: opts.payerPhone,
+    })
+    const charge = await this.asaas.createCardCharge({
+      customerId, value: amount, orderId, description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
+      remoteIp: opts.remoteIp,
+      installmentCount: installments,
+      creditCard: opts.card,
+      creditCardHolderInfo: {
+        name: opts.payerName || opts.card.holderName,
+        email: payerEmail,
+        cpfCnpj: cpf,
+        postalCode: opts.payerAddress?.zip_code || '',
+        addressNumber: opts.payerAddress?.street_number || '0',
+        addressComplement: opts.payerAddress?.complement,
+        phone: opts.payerPhone,
+        mobilePhone: opts.payerPhone,
+      },
+    })
+    const paid = charge.status === 'CONFIRMED' || charge.status === 'RECEIVED'
+    const status: 'PAID' | 'FAILED' | 'PENDING' = paid ? 'PAID' : (charge.status === 'PENDING' || charge.status === 'AWAITING_RISK_ANALYSIS' ? 'PENDING' : 'FAILED')
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: { gatewayId: charge.id, gateway: 'ASAAS', status, paidAt: status === 'PAID' ? new Date() : undefined },
+    })
+    return { gatewayId: charge.id, status, mpStatus: charge.status, statusDetail: charge.status, splitFellBack: false }
+  }
+
   // ── Cartão de crédito/débito ──────────────────────────────────────────────────
 
   async createCardPayment(
@@ -158,9 +274,28 @@ export class PaymentsService {
       payerRegDate?: string
       items?: Array<{ id: string; title: string; quantity: number; unit_price: number }>
       deviceId?: string
-      payerAddress?: { zip_code?: string; street_name?: string; street_number?: string }
+      payerAddress?: { zip_code?: string; street_name?: string; street_number?: string; complement?: string }
+      // Asaas: dados do pagador + cartão cru (o MP usa cardToken; o Asaas usa os campos)
+      userId?: string
+      remoteIp?: string
+      card?: { holderName: string; number: string; expiryMonth: string; expiryYear: string; ccv: string }
     },
   ) {
+    // Modo Asaas (entrada centralizada) — cartão vai com os dados crus (Asaas é PCI).
+    if (this.asaas.cardInEnabled) {
+      return this.createAsaasCardPayment(paymentId, amount, orderId, payerEmail, installments, payerCpf, {
+        userId: opts?.userId,
+        payerName: [opts?.payerFirstName, opts?.payerLastName].filter(Boolean).join(' ') || undefined,
+        payerPhone: opts?.payerPhone,
+        remoteIp: opts?.remoteIp,
+        card: opts?.card,
+        payerAddress: {
+          zip_code: opts?.payerAddress?.zip_code,
+          street_number: opts?.payerAddress?.street_number,
+          complement: opts?.payerAddress?.complement,
+        },
+      })
+    }
     const webhookUrl = this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
       ?? `${this.config.get<string>('API_URL') ?? ''}/api/webhooks/mercadopago`
 
@@ -371,6 +506,76 @@ export class PaymentsService {
     }
   }
 
+  // ── Webhook Asaas (cobrança) ────────────────────────────────────────────────
+
+  /**
+   * Webhook de COBRANÇA do Asaas (entrada de dinheiro). Confirma/cancela o pedido
+   * conforme o evento. Espelha a lógica do webhook do MP (transição atômica +
+   * idempotente). O header asaas-access-token é validado aqui.
+   */
+  async handleAsaasWebhook(token: string | undefined, body: any) {
+    if (!this.asaas.isWebhookAuthorized(token)) {
+      this.logger.warn('Asaas webhook (cobrança): token inválido — ignorando')
+      return
+    }
+    const event: string | undefined = body?.event
+    const p = body?.payment
+    if (!event || !p || !String(event).startsWith('PAYMENT_')) return
+    const gatewayId = p.id ? String(p.id) : undefined
+    const orderId = p.externalReference as string | undefined
+    if (!orderId) return
+
+    const PAID = ['PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED']
+    const FAILED = ['PAYMENT_OVERDUE', 'PAYMENT_DELETED', 'PAYMENT_CREDIT_CARD_CAPTURE_REFUSED', 'PAYMENT_REPROVED_BY_RISK_ANALYSIS']
+
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: { payment: true, user: { select: { id: true, pushToken: true } } },
+      })
+      if (!order?.payment) return
+
+      if (PAID.includes(event) && order.payment.status !== 'PAID') {
+        const claim = await this.prisma.payment.updateMany({
+          where: { id: order.payment.id, status: { not: 'PAID' } },
+          data: { status: 'PAID', paidAt: new Date(), ...(gatewayId ? { gatewayId } : {}) },
+        })
+        if (claim.count === 0) return
+        await this.prisma.order.updateMany({
+          where: { paymentId: order.payment.id, status: 'PENDING' }, data: { status: 'CONFIRMED' },
+        })
+        if (order.user?.pushToken) {
+          this.push.send(order.user.pushToken, '✅ Pagamento confirmado!', 'Seu pedido foi pago e já está sendo preparado.', { orderId })
+        }
+        this.notifications.create(order.user.id, 'PAYMENT', '✅ Pagamento confirmado!', `Pedido #${orderId.slice(0, 8)} pago com sucesso.`, { orderId })
+          .catch((err) => this.logger.warn('Notification failed', err))
+        return
+      }
+
+      if (FAILED.includes(event) && order.payment.status === 'PENDING') {
+        const claim = await this.prisma.payment.updateMany({
+          where: { id: order.payment.id, status: 'PENDING' }, data: { status: 'FAILED' },
+        })
+        if (claim.count === 0) return
+        await this.orderConsumption.cancelPendingForPayment(order.payment.id)
+        if (order.user?.pushToken) {
+          this.push.send(order.user.pushToken, 'Pagamento não concluído', 'Seu pagamento não foi confirmado e o pedido foi cancelado. Você pode tentar novamente.', { orderId })
+        }
+        this.notifications.create(order.user.id, 'PAYMENT', 'Pagamento não concluído', `O pagamento do pedido #${orderId.slice(0, 8)} não foi confirmado — pedido cancelado.`, { orderId })
+          .catch((err) => this.logger.warn('Notification failed', err))
+        return
+      }
+
+      if (event === 'PAYMENT_REFUNDED' && order.payment.status !== 'REFUNDED') {
+        await this.prisma.payment.updateMany({
+          where: { id: order.payment.id, status: { not: 'REFUNDED' } }, data: { status: 'REFUNDED' },
+        })
+      }
+    } catch (err) {
+      this.logger.error('Asaas webhook (cobrança) processing failed', err as any)
+    }
+  }
+
   // ── Poll status (consumer app pulls if webhook misses) ─────────────────────
 
   async syncPaymentStatus(orderId: string, userId?: string) {
@@ -387,6 +592,36 @@ export class PaymentsService {
       throw new ForbiddenException('Acesso negado.')
     }
     if (!order.payment?.gatewayId || order.payment.status !== 'PENDING') return order.payment
+
+    // Asaas: consulta a cobrança direto (não usa token de lojista/split).
+    if ((order.payment as any).gateway === 'ASAAS') {
+      try {
+        const p = await this.asaas.getPayment(order.payment.gatewayId)
+        if (p.status === 'CONFIRMED' || p.status === 'RECEIVED') {
+          const claim = await this.prisma.payment.updateMany({
+            where: { id: order.payment.id, status: { not: 'PAID' } },
+            data: { status: 'PAID', paidAt: new Date() },
+          })
+          if (claim.count > 0) {
+            await this.prisma.order.updateMany({ where: { paymentId: order.payment.id, status: 'PENDING' }, data: { status: 'CONFIRMED' } })
+          }
+          return await this.prisma.payment.findUnique({ where: { id: order.payment.id } })
+        }
+        if (['OVERDUE', 'REFUNDED', 'DELETED'].includes(p.status)) {
+          const claim = await this.prisma.payment.updateMany({
+            where: { id: order.payment.id, status: 'PENDING' }, data: { status: 'FAILED' },
+          })
+          if (claim.count > 0) {
+            await this.orderConsumption.cancelPendingForPayment(order.payment.id)
+            this.notifications.create(order.userId, 'PAYMENT', 'Pagamento não concluído',
+              `O pagamento do pedido #${orderId.slice(0, 8)} não foi confirmado — pedido cancelado.`, { orderId })
+              .catch((err) => this.logger.warn('Notification failed', err))
+            return await this.prisma.payment.findUnique({ where: { id: order.payment.id } })
+          }
+        }
+      } catch {}
+      return order.payment
+    }
 
     try {
       const store = order.store as any
@@ -446,6 +681,18 @@ export class PaymentsService {
     if (!payment) return { refunded: false }
     if (payment.status === 'REFUNDED') return { refunded: true }
     if (payment.status !== 'PAID' || !payment.gatewayId) return { refunded: false }
+
+    // Asaas: estorno direto pela cobrança.
+    if ((payment as any).gateway === 'ASAAS') {
+      try {
+        await this.asaas.refundPayment(payment.gatewayId)
+        const updated = await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'REFUNDED' } })
+        return { refunded: updated.status === 'REFUNDED' }
+      } catch (err) {
+        this.logger.error(`Asaas refund failed for order ${orderId}`, err as any)
+        throw new BadRequestException('Não foi possível estornar o pagamento no Asaas. Tente novamente.')
+      }
+    }
 
     const store = order!.store as any
     const sellerToken = order!.paidViaSplit && store?.mpConnected

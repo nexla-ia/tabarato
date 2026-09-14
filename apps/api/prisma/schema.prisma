@@ -95,6 +95,9 @@ model User {
   avatarUrl    String?  @map("avatar_url")
   city         String?
   state        String?
+  // Pagamento (Asaas): CPF do pagador + id do cliente no Asaas (cacheado p/ reuso)
+  cpf             String? @map("cpf")
+  asaasCustomerId String? @map("asaas_customer_id")
   isActive     Boolean  @default(true) @map("is_active")
   pushToken    String?  @map("push_token")
   referralCode String?  @unique @map("referral_code")
@@ -395,6 +398,7 @@ model OrderItem {
 model Payment {
   id             String        @id @default(uuid())
   method         PaymentMethod
+  gateway        String?       @default("MP") // MP | ASAAS — provedor onde a cobrança foi criada
   gatewayId      String?       @map("gateway_id")
   idempotencyKey String?       @unique @map("idempotency_key")
   status         PaymentStatus @default(PENDING)

@@ -455,7 +455,7 @@ export class OrdersService {
       try {
         const pixResult = await this.payments.createPixPayment(
           payment.id, total, order.id, safePayerEmail(payer?.email),
-          splitOpts,
+          { ...splitOpts, userId, payerName: payer?.name, payerCpf: dto.payerCpf, payerPhone: payer?.phone ?? undefined },
         )
         // O split foi recusado pelo MP e caiu pro modo centralizado — o dinheiro
         // não está na conta da loja, então reembolso futuro não pode usar o token
@@ -830,7 +830,7 @@ export class OrdersService {
 
     if (dto.paymentMethod === 'PIX') {
       try {
-        const pixResult = await this.payments.createPixPayment(payment.id, grandTotal, firstOrder.id, safePayerEmail(payer?.email), splitOpts)
+        const pixResult = await this.payments.createPixPayment(payment.id, grandTotal, firstOrder.id, safePayerEmail(payer?.email), { ...splitOpts, userId, payerName: payer?.name, payerCpf: dto.payerCpf, payerPhone: payer?.phone ?? undefined })
         if (pixResult.splitFellBack) await this.prisma.order.updateMany({ where: { paymentId: payment.id }, data: { paidViaSplit: false } }).catch(() => {})
         paymentOut = { ...payment, gatewayId: pixResult.gatewayId, pixCode: pixResult.pixCode, pixQrBase64: pixResult.pixQrBase64, pixExpiresAt: new Date(Date.now() + PIX_EXPIRATION_MS) }
         orders.forEach((o) => { if (o.payment) Object.assign(o.payment, paymentOut) })
