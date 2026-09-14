@@ -41,6 +41,7 @@ export class UsersService {
         avatarUrl: true,
         city: true,
         state: true,
+        cpf: true,
         referralCode: true,
         isActive: true,
         createdAt: true,

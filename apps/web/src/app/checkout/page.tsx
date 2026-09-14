@@ -7,7 +7,7 @@ import { api } from '@/lib/api'
 import { useCartStore } from '@/stores/cart'
 import { promoDiscountFor } from '@/lib/promo'
 import { useAuth } from '@/hooks/useAuth'
-import { validateCardForm } from '@/lib/cardValidation'
+import { validateCardForm, validateCpf } from '@/lib/cardValidation'
 import { geocodeAddress } from '@/lib/geocoding'
 import Image from 'next/image'
 import Script from 'next/script'
@@ -88,6 +88,18 @@ export default function CheckoutPage() {
   const [cardCvv, setCardCvv] = useState('')
   const [cardCpf, setCardCpf] = useState('')
   const [installments, setInstallments] = useState(1)
+
+  // Provedor de pagamento (backend). O Asaas exige CPF no PIX; o MP não.
+  const [asaasPix, setAsaasPix] = useState(false)
+  const [pixCpf, setPixCpf] = useState('')
+  useEffect(() => {
+    api.get('/payments/config')
+      .then(({ data }) => setAsaasPix(data?.pix === 'ASAAS'))
+      .catch(() => {})
+  }, [])
+  useEffect(() => {
+    if ((user as any)?.cpf && !pixCpf) setPixCpf(fmtCpf((user as any).cpf))
+  }, [user])
 
   // New address
   const [showAddrForm, setShowAddrForm] = useState(false)
@@ -242,6 +254,11 @@ export default function CheckoutPage() {
       const firstError = cardErrors.cardNumber ?? cardErrors.expiry ?? cardErrors.cvv ?? cardErrors.cpf
       if (firstError) { setError(firstError); return }
     }
+    // PIX via Asaas exige o CPF do pagador pra emitir a cobrança.
+    if (!isCard && asaasPix && !validateCpf(pixCpf)) {
+      setError(pixCpf ? 'CPF inválido. Confira os números.' : 'Informe seu CPF para pagar com PIX.')
+      return
+    }
 
     setLoading(true); setError('')
     try {
@@ -262,7 +279,7 @@ export default function CheckoutPage() {
         paymentMethod: payMethod,
         cardToken,
         installments: isCard ? installments : undefined,
-        payerCpf: isCard ? cardCpf : undefined,
+        payerCpf: isCard ? cardCpf : (asaasPix ? pixCpf : undefined),
         idempotencyKey: idemKey.current,
         // Fingerprint do dispositivo (security.js do MP) — reduz recusa de cartão
         // por antifraude (cc_rejected_high_risk). Só existe depois do script carregar.
@@ -481,6 +498,16 @@ export default function CheckoutPage() {
               <div className={styles.pmDesc}>Crédito ou débito</div>
             </button>
           </div>
+
+          {!isCard && asaasPix && (
+            <div className={styles.cardForm}>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>CPF do pagador</label>
+                <input className={styles.input} value={pixCpf} onChange={e => setPixCpf(fmtCpf(e.target.value))} placeholder="000.000.000-00" maxLength={14} inputMode="numeric" />
+                <span style={{ color: '#9A8880', fontSize: 12, marginTop: 4, display: 'block' }}>Necessário para gerar a cobrança PIX.</span>
+              </div>
+            </div>
+          )}
 
           {isCard && (
             <div className={styles.cardForm}>

@@ -9,6 +9,12 @@ export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @UseGuards(JwtAuthGuard)
+  @Get('config')
+  getConfig() {
+    return this.paymentsService.getPublicConfig()
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('orders/:orderId/sync')
   syncStatus(@Param('orderId') orderId: string, @CurrentUser() user: any) {
     return this.paymentsService.syncPaymentStatus(orderId, user.sub)

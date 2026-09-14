@@ -153,6 +153,17 @@ export class PaymentsService {
   // ── Asaas (entrada centralizada) ────────────────────────────────────────────────
 
   /**
+   * Config pública de pagamento — o checkout usa pra saber qual provedor está ativo
+   * por método (ASAAS exige CPF no PIX; no cartão os campos vão crus em vez do token MP).
+   */
+  getPublicConfig() {
+    return {
+      pix: this.asaas.pixInEnabled ? 'ASAAS' : 'MP',
+      card: this.asaas.cardInEnabled ? 'ASAAS' : 'MP',
+    }
+  }
+
+  /**
    * Cliente Asaas do pagador — cacheia o id (e o CPF) no User pra reuso. cpfCnpj é
    * exigido pelo Asaas; se não tivermos (nem cache), pede o CPF ao cliente.
    */
