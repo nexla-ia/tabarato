@@ -2,6 +2,26 @@ import { BadRequestException, Injectable } from '@nestjs/common'
 import { WalletOwnerType } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 
+/**
+ * Esconde do extrato os pares saque/estorno que se anulam (saque que falhou): o
+ * débito `saque-<id>` e o crédito `estorno-saque-<id>` só confundem. Saques
+ * concluídos (sem estorno) continuam aparecendo. Compartilhado por loja e entregador.
+ */
+export function hideReversedWithdrawals<T extends { referenceId?: string | null }>(txs: T[]): T[] {
+  const reversed = new Set<string>()
+  for (const t of txs) {
+    const m = t.referenceId?.match(/^estorno-saque-(.+)$/)
+    if (m) reversed.add(m[1])
+  }
+  return txs.filter((t) => {
+    const ref = t.referenceId ?? ''
+    if (/^estorno-saque-/.test(ref)) return false
+    const deb = ref.match(/^saque-(.+)$/)
+    if (deb && reversed.has(deb[1])) return false
+    return true
+  })
+}
+
 @Injectable()
 export class WalletService {
   constructor(private prisma: PrismaService) {}

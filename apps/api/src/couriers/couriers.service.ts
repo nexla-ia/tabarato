@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { DeliveryStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
-import { WalletService } from '../wallet/wallet.service'
+import { WalletService, hideReversedWithdrawals } from '../wallet/wallet.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { LoyaltyService } from '../loyalty/loyalty.service'
 import { MpOauthService } from '../payments/mp-oauth.service'
@@ -339,24 +339,7 @@ export class CouriersService {
     const courier = await this.prisma.courier.findUnique({ where: { userId } })
     if (!courier) throw new NotFoundException('Courier profile not found')
     const wallet = await this.wallet.findByOwner(courier.id, 'COURIER')
-
-    // Esconde do extrato os saques que FALHARAM: o débito (saque-<id>) e o seu
-    // estorno (estorno-saque-<id>) se anulam e só confundem. Saques concluídos
-    // (sem estorno) continuam aparecendo normalmente.
-    const txs: Array<{ referenceId?: string | null }> = (wallet as any).transactions ?? []
-    const reversed = new Set<string>()
-    for (const t of txs) {
-      const m = t.referenceId?.match(/^estorno-saque-(.+)$/)
-      if (m) reversed.add(m[1])
-    }
-    const transactions = txs.filter((t) => {
-      const ref = t.referenceId ?? ''
-      if (/^estorno-saque-/.test(ref)) return false
-      const deb = ref.match(/^saque-(.+)$/)
-      if (deb && reversed.has(deb[1])) return false
-      return true
-    })
-    return { ...wallet, transactions }
+    return { ...wallet, transactions: hideReversedWithdrawals((wallet as any).transactions ?? []) }
   }
 
   /** Stats da home do entregador: entregas e ganhos de hoje + avaliação. */
@@ -421,6 +404,8 @@ export class CouriersService {
     //    esconder o par no extrato quando o saque falha.
     const withdrawal = await this.prisma.withdrawal.create({
       data: {
+        ownerType: 'COURIER',
+        ownerId: courier.id,
         courierId: courier.id,
         amount,
         pixKey: courier.pixKey,
@@ -518,8 +503,14 @@ export class CouriersService {
         data: { status: 'FAILED', failReason: (transfer.failReason ?? event).slice(0, 300) },
       })
       if (res.count > 0) {
-        await this.wallet.credit(withdrawal.courierId, 'COURIER', Number(withdrawal.amount),
-          'Estorno de saque não concluído', `estorno-saque-${withdrawal.id}`)
+        // Estorno genérico (loja ou entregador). Fallback pro courierId nos saques
+        // legados (criados antes de owner_type/owner_id existirem).
+        const ownerId = withdrawal.ownerId ?? withdrawal.courierId
+        const ownerType = (withdrawal.ownerType ?? 'COURIER') as 'STORE' | 'COURIER'
+        if (ownerId) {
+          await this.wallet.credit(ownerId, ownerType, Number(withdrawal.amount),
+            'Estorno de saque não concluído', `estorno-saque-${withdrawal.id}`)
+        }
       }
     }
   }

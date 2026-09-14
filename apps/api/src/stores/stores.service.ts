@@ -1,8 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
-import { WalletService } from '../wallet/wallet.service'
+import { WalletService, hideReversedWithdrawals } from '../wallet/wallet.service'
 import { MpOauthService } from '../payments/mp-oauth.service'
+import { AsaasService } from '../payments/asaas.service'
 import { CreateStoreDto } from './dto/create-store.dto'
 import { UpdateStoreDto } from './dto/update-store.dto'
 
@@ -90,6 +90,7 @@ export class StoresService {
     private prisma: PrismaService,
     private wallet: WalletService,
     private mpOauth: MpOauthService,
+    private asaas: AsaasService,
   ) {}
 
   // isOpen (mostrado ao cliente) = aberto pelo horário E não pausado manualmente.
@@ -295,15 +296,60 @@ export class StoresService {
     if (!store) throw new NotFoundException('Store not found')
     const wallet = await this.wallet.findByOwner(store.id, 'STORE')
     // Inclui a chave PIX de saque pra o app mostrar/editar na Carteira.
-    return { ...wallet, pixKey: store.pixKey ?? null }
+    return { ...wallet, transactions: hideReversedWithdrawals((wallet as any).transactions ?? []), pixKey: store.pixKey ?? null }
   }
 
+  /**
+   * Saque da loja — repasse automático via PIX-out do Asaas (mesmo fluxo do
+   * entregador). Enquanto o Asaas estiver desligado, fica PENDING na fila manual.
+   */
   async requestWithdrawal(userId: string, amount: number) {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
     // Precisa da chave PIX cadastrada pra saber PRA ONDE mandar o repasse.
     if (!store.pixKey) throw new BadRequestException('Cadastre sua chave PIX de recebimento antes de solicitar o saque.')
-    await this.wallet.debit(store.id, 'STORE', amount, `Saque via PIX (${store.pixKey})`, `saque-${randomUUID()}`)
+
+    // Anti duplo-envio: recusa se já houver um saque em andamento recente.
+    const inFlight = await this.prisma.withdrawal.findFirst({
+      where: { ownerType: 'STORE', ownerId: store.id, status: { in: ['PENDING', 'PROCESSING'] }, createdAt: { gte: new Date(Date.now() - 20_000) } },
+    })
+    if (inFlight) throw new ConflictException('Você já tem um saque em andamento. Aguarde a confirmação.')
+
+    // 1) Cria o saque (PENDING) — id determinístico p/ o ref do débito/estorno.
+    const withdrawal = await this.prisma.withdrawal.create({
+      data: { ownerType: 'STORE', ownerId: store.id, amount, pixKey: store.pixKey, status: 'PENDING' },
+    })
+    const ref = `saque-${withdrawal.id}`
+
+    // 2) Debita a carteira (atômico). Sem saldo → remove o saque órfão e propaga.
+    try {
+      await this.wallet.debit(store.id, 'STORE', amount, `Saque via PIX (${store.pixKey})`, ref)
+    } catch (err) {
+      await this.prisma.withdrawal.delete({ where: { id: withdrawal.id } }).catch(() => {})
+      throw err
+    }
+
+    // 3) Envia o PIX automático (se o Asaas estiver ligado). Falha → estorna.
+    //    O status final (DONE/FAILED) chega pelo mesmo webhook do entregador
+    //    (/couriers/asaas/webhook), que já trata saques genéricos por owner.
+    if (this.asaas.enabled) {
+      try {
+        const transfer = await this.asaas.createPixTransfer({
+          value: Number(amount),
+          pixAddressKey: store.pixKey,
+          externalReference: withdrawal.id,
+          description: `Repasse Tá Barato — loja ${store.id.slice(0, 8)}`,
+        })
+        await this.prisma.withdrawal.update({ where: { id: withdrawal.id }, data: { status: 'PROCESSING', asaasTransferId: transfer.id } })
+        return { message: 'Saque solicitado! O PIX está sendo processado e cai em instantes.' }
+      } catch (err: any) {
+        await this.wallet.credit(store.id, 'STORE', amount, 'Estorno de saque não concluído', `estorno-${ref}`)
+        await this.prisma.withdrawal.update({ where: { id: withdrawal.id }, data: { status: 'FAILED', failReason: String(err?.message ?? err).slice(0, 300) } })
+        this.logger.error(`Saque loja ${withdrawal.id} falhou no Asaas — carteira estornada`, err)
+        throw new BadRequestException('Não foi possível enviar o PIX agora. Seu saldo foi mantido. Tente novamente em instantes.')
+      }
+    }
+
     return { message: 'Saque solicitado com sucesso. Será processado em até 24h via PIX.' }
   }
 

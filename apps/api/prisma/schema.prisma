@@ -482,7 +482,10 @@ enum WithdrawalStatus {
 
 model Withdrawal {
   id              String           @id @default(uuid())
-  courierId       String           @map("courier_id")
+  // Saque genérico: ownerType = STORE | COURIER, ownerId = id da loja/entregador.
+  ownerType       String           @default("COURIER") @map("owner_type")
+  ownerId         String?          @map("owner_id")
+  courierId       String?          @map("courier_id") // legado (mantém a relação com Courier)
   amount          Decimal
   pixKey          String           @map("pix_key")
   pixKeyType      String?          @map("pix_key_type")
@@ -492,9 +495,10 @@ model Withdrawal {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
-  courier Courier @relation(fields: [courierId], references: [id])
+  courier Courier? @relation(fields: [courierId], references: [id])
 
   @@index([courierId])
+  @@index([ownerType, ownerId])
   @@index([status])
   @@map("withdrawals")
 }
