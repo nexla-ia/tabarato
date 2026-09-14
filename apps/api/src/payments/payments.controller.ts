@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, RawBodyRequest, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Headers, HttpCode, Param, Post, RawBodyRequest, Req, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
@@ -43,6 +43,7 @@ export class WebhooksController {
   // token em ASAAS_WEBHOOK_TOKEN. (Transferências/saque usam /couriers/asaas/webhook.)
   @Throttle({ default: { ttl: 60_000, limit: 300 } })
   @Post('asaas')
+  @HttpCode(200)
   async handleAsaas(@Body() body: any, @Headers('asaas-access-token') token: string) {
     await this.paymentsService.handleAsaasWebhook(token, body)
     return { received: true }
