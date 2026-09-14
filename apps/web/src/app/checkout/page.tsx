@@ -89,12 +89,14 @@ export default function CheckoutPage() {
   const [cardCpf, setCardCpf] = useState('')
   const [installments, setInstallments] = useState(1)
 
-  // Provedor de pagamento (backend). O Asaas exige CPF no PIX; o MP não.
+  // Provedor de pagamento (backend). Asaas: exige CPF no PIX; cartão vai pro Checkout
+  // hospedado (redireciona pra página do Asaas, sem formulário de cartão aqui).
   const [asaasPix, setAsaasPix] = useState(false)
+  const [cardCheckout, setCardCheckout] = useState(false)
   const [pixCpf, setPixCpf] = useState('')
   useEffect(() => {
     api.get('/payments/config')
-      .then(({ data }) => setAsaasPix(data?.pix === 'ASAAS'))
+      .then(({ data }) => { setAsaasPix(data?.pix === 'ASAAS'); setCardCheckout(data?.card === 'ASAAS') })
       .catch(() => {})
   }, [])
   useEffect(() => {
@@ -248,7 +250,8 @@ export default function CheckoutPage() {
     if (!selectedAddr) { setError('Selecione um endereço de entrega'); return }
     if (stores.length === 0) { setError('Carrinho vazio'); return }
 
-    if (isCard) {
+    // No modo Checkout (Asaas) o cartão é preenchido na página do Asaas — sem validação aqui.
+    if (isCard && !cardCheckout) {
       if (!cardHolder.trim()) { setError('Nome no cartão obrigatório'); return }
       const cardErrors = validateCardForm({ cardNumber, expiry: cardExpiry, cvv: cardCvv, cpf: cardCpf })
       const firstError = cardErrors.cardNumber ?? cardErrors.expiry ?? cardErrors.cvv ?? cardErrors.cpf
@@ -263,7 +266,7 @@ export default function CheckoutPage() {
     setLoading(true); setError('')
     try {
       let cardToken: string | undefined
-      if (isCard) {
+      if (isCard && !cardCheckout) {
         const [month, year] = cardExpiry.split('/')
         cardToken = await tokenizeCard({ cardNumber, cvv: cardCvv, expiryMonth: month.trim(), expiryYear: year.trim(), holderName: cardHolder, cpf: cardCpf })
       }
@@ -289,6 +292,13 @@ export default function CheckoutPage() {
 
       const orders: { id: string }[] = data.orders
       clear()
+
+      // Cartão via Checkout Asaas: redireciona pra página segura do Asaas. Ao voltar
+      // (successUrl → /orders/:id), a tela do pedido confirma pelo status.
+      if (data.payment?.checkoutUrl) {
+        window.location.href = data.payment.checkoutUrl
+        return
+      }
 
       if (payMethod === 'PIX' && data.payment?.pixCode) {
         setPixResult({
@@ -509,7 +519,19 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {isCard && (
+          {isCard && cardCheckout && (
+            <div className={styles.cardForm}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '4px 2px' }}>
+                <CreditCard size={20} color="#2563EB" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>Pagamento seguro pelo Asaas</div>
+                  <div style={{ color: '#6b7280', fontSize: 13 }}>Ao finalizar, você será levado à página segura do Asaas para informar os dados do cartão. Nenhum dado do cartão passa pelo Tá Barato.</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isCard && !cardCheckout && (
             <div className={styles.cardForm}>
               <div className={styles.cardTypeToggle}>
                 <button
