@@ -110,6 +110,7 @@ export class AsaasService {
     value: number
     orderId: string
     description?: string
+    split?: Array<{ walletId: string; fixedValue: number }> // parte de cada loja → subconta dela
   }): Promise<{ id: string; status: string }> {
     const data = await this.api<any>('POST', '/payments', {
       customer: input.customerId,
@@ -118,6 +119,7 @@ export class AsaasService {
       dueDate: this.today(),
       description: input.description,
       externalReference: input.orderId,
+      ...(input.split?.length ? { split: input.split } : {}),
     })
     return { id: data.id, status: data.status }
   }
@@ -211,6 +213,7 @@ export class AsaasService {
     cancelUrl: string
     expiredUrl?: string
     customerId?: string
+    split?: Array<{ walletId: string; fixedValue: number }>
   }): Promise<{ id: string; link: string; status: string }> {
     const value = Math.round(input.value * 100) / 100
     const maxInst = input.installments && input.installments > 1 ? Math.min(input.installments, 21) : 1
@@ -227,6 +230,7 @@ export class AsaasService {
       externalReference: input.orderId,
       ...(maxInst > 1 ? { installment: { maxInstallmentCount: maxInst } } : {}),
       ...(input.customerId ? { customer: input.customerId } : {}),
+      ...(input.split?.length ? { splits: input.split } : {}),
     })
     return { id: data.id, link: data.link, status: data.status }
   }
@@ -235,6 +239,57 @@ export class AsaasService {
   async getCheckout(id: string): Promise<{ id: string; status: string }> {
     const data = await this.api<any>('GET', `/checkouts/${id}`)
     return { id: data.id, status: data.status }
+  }
+
+  // ── SUBCONTAS (split por loja) ──────────────────────────────────────────────────
+
+  /**
+   * Cria uma SUBCONTA (conta filha) do Asaas pra uma loja. A conta-mãe (plataforma)
+   * precisa ser CNPJ. Retorna walletId (usado no split) e apiKey (usada pra sacar da
+   * subconta) — a apiKey só volta AQUI, não dá pra recuperar depois: cifrar e guardar.
+   */
+  async createAccount(input: {
+    name: string
+    email: string
+    cpfCnpj: string
+    mobilePhone: string
+    incomeValue: number
+    address: string
+    addressNumber: string
+    province: string
+    postalCode: string
+    companyType?: string
+    birthDate?: string
+    complement?: string
+  }): Promise<{ id: string; walletId: string; apiKey: string }> {
+    const data = await this.api<any>('POST', '/accounts', {
+      name: input.name,
+      email: input.email,
+      cpfCnpj: (input.cpfCnpj || '').replace(/\D/g, ''),
+      mobilePhone: (input.mobilePhone || '').replace(/\D/g, ''),
+      incomeValue: input.incomeValue,
+      address: input.address,
+      addressNumber: input.addressNumber,
+      province: input.province,
+      postalCode: (input.postalCode || '').replace(/\D/g, ''),
+      ...(input.companyType ? { companyType: input.companyType } : {}),
+      ...(input.birthDate ? { birthDate: input.birthDate } : {}),
+      ...(input.complement ? { complement: input.complement } : {}),
+    })
+    return { id: data.id, walletId: data.walletId, apiKey: data.apiKey }
+  }
+
+  /** Saldo disponível de uma conta (usa a apiKey da subconta pra a carteira da loja). */
+  async getBalance(apiKey: string): Promise<number> {
+    const res = await fetch(`${this.baseUrl}/finance/balance`, {
+      headers: { 'Content-Type': 'application/json', 'User-Agent': 'TaBarato', access_token: apiKey },
+    })
+    const data: any = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      this.logger.error(`getBalance falhou: ${data?.errors?.[0]?.description || res.status}`)
+      throw new Error('Não foi possível consultar o saldo.')
+    }
+    return Number(data.balance ?? 0)
   }
 
   /**
@@ -248,8 +303,9 @@ export class AsaasService {
     pixAddressKeyType?: string | null
     externalReference: string
     description?: string
+    apiKey?: string // sobrescreve a key (ex.: saque da SUBCONTA da loja); default = plataforma
   }): Promise<AsaasTransferResult> {
-    const apiKey = this.config.get<string>('ASAAS_API_KEY')
+    const apiKey = input.apiKey || this.config.get<string>('ASAAS_API_KEY')
     if (!apiKey) throw new Error('ASAAS_API_KEY não configurada')
 
     const res = await fetch(`${this.baseUrl}/transfers`, {

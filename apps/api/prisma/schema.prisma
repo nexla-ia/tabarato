@@ -193,6 +193,11 @@ model Store {
   mpRefreshToken    String?   @map("mp_refresh_token")
   mpTokenExpiresAt  DateTime? @map("mp_token_expires_at")
   mpConnected       Boolean   @default(false) @map("mp_connected")
+  // Asaas — split de pagamento (subconta da loja). A parte da loja cai direto aqui.
+  asaasAccountId    String?   @map("asaas_account_id")
+  asaasWalletId     String?   @map("asaas_wallet_id")  // usado no split da cobrança
+  asaasApiKey       String?   @map("asaas_api_key")    // criptografado (saque da subconta)
+  asaasOnboarded    Boolean   @default(false) @map("asaas_onboarded")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 

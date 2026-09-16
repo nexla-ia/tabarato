@@ -452,12 +452,27 @@ export class OrdersService {
       splitOpts = { sellerToken, applicationFee }
     }
 
+    // Split ASAAS (subconta): a parte da loja cai DIRETO na conta dela; a plataforma
+    // fica com comissão + frete (paga o motoboy). paidViaSplit=true → não credita a
+    // carteira na entrega (a loja já recebeu no pagamento). Mesma fórmula do crédito
+    // da loja na entrega: subtotal − cupom − promoção − comissão − (frete se grátis).
+    let asaasSplit: Array<{ walletId: string; fixedValue: number }> | undefined
+    if (this.payments.asaasMoneyInEnabled && (store as any).asaasWalletId) {
+      const commission = await this.settings.commissionFor(subtotal)
+      const absorbed = couponFreeShipping ? deliveryFee : 0
+      const storeShare = Math.max(0, Math.round((subtotal - couponDiscount - promoDiscount - commission - absorbed) * 100) / 100)
+      if (storeShare > 0) {
+        asaasSplit = [{ walletId: (store as any).asaasWalletId, fixedValue: storeShare }]
+        await this.prisma.order.update({ where: { id: order.id }, data: { paidViaSplit: true } }).catch(() => {})
+      }
+    }
+
     // PIX — await so the QR code is available when the response returns
     if (dto.paymentMethod === 'PIX') {
       try {
         const pixResult = await this.payments.createPixPayment(
           payment.id, total, order.id, safePayerEmail(payer?.email),
-          { ...splitOpts, userId, payerName: payer?.name, payerCpf: dto.payerCpf, payerPhone: payer?.phone ?? undefined },
+          { ...splitOpts, userId, payerName: payer?.name, payerCpf: dto.payerCpf, payerPhone: payer?.phone ?? undefined, asaasSplit },
         )
         // O split foi recusado pelo MP e caiu pro modo centralizado — o dinheiro
         // não está na conta da loja, então reembolso futuro não pode usar o token
@@ -499,7 +514,7 @@ export class OrdersService {
     // PENDING e é confirmado pelo webhook CHECKOUT_PAID.
     if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && this.payments.asaasCardCheckoutEnabled) {
       try {
-        const { checkoutUrl } = await this.payments.createAsaasCardCheckout(payment.id, total, order.id, { installments: dto.installments ?? 1 })
+        const { checkoutUrl } = await this.payments.createAsaasCardCheckout(payment.id, total, order.id, { installments: dto.installments ?? 1, asaasSplit })
         if ((order as any).payment) Object.assign((order as any).payment, { gateway: 'ASAAS', checkoutUrl })
       } catch (err: any) {
         this.logger.error('Asaas checkout (cartão) falhou após o pedido ser salvo', err)
@@ -838,6 +853,31 @@ export class OrdersService {
       splitOpts = { sellerToken, applicationFee }
     }
 
+    // Split ASAAS por loja — cada loja COM subconta recebe sua parte direto; lojas sem
+    // subconta caem na carteira (fallback gracioso durante a migração). paidViaSplit por
+    // pedido → só os pedidos com split não são creditados de novo na entrega.
+    let asaasSplit: Array<{ walletId: string; fixedValue: number }> | undefined
+    if (this.payments.asaasMoneyInEnabled) {
+      const splits: Array<{ walletId: string; fixedValue: number }> = []
+      const splitOrderIds: string[] = []
+      for (const g of prepared) {
+        const walletId = (g.store as any).asaasWalletId
+        if (!walletId) continue
+        const commission = await this.settings.commissionFor(g.subtotal)
+        const absorbed = g.couponFreeShipping ? g.deliveryFee : 0
+        const share = Math.max(0, Math.round((g.subtotal - g.couponDiscount - g.promoDiscount - commission - absorbed) * 100) / 100)
+        if (share > 0) {
+          splits.push({ walletId, fixedValue: share })
+          const ord = orders.find((o) => o.storeId === g.store.id)
+          if (ord) splitOrderIds.push(ord.id)
+        }
+      }
+      if (splits.length) {
+        asaasSplit = splits
+        await this.prisma.order.updateMany({ where: { id: { in: splitOrderIds } }, data: { paidViaSplit: true } }).catch(() => {})
+      }
+    }
+
     const cancelAll = async () => {
       await this.prisma.order.updateMany({ where: { paymentId: payment.id }, data: { status: 'CANCELLED' } }).catch(() => {})
       await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } }).catch(() => {})
@@ -848,7 +888,7 @@ export class OrdersService {
 
     if (dto.paymentMethod === 'PIX') {
       try {
-        const pixResult = await this.payments.createPixPayment(payment.id, grandTotal, firstOrder.id, safePayerEmail(payer?.email), { ...splitOpts, userId, payerName: payer?.name, payerCpf: dto.payerCpf, payerPhone: payer?.phone ?? undefined })
+        const pixResult = await this.payments.createPixPayment(payment.id, grandTotal, firstOrder.id, safePayerEmail(payer?.email), { ...splitOpts, userId, payerName: payer?.name, payerCpf: dto.payerCpf, payerPhone: payer?.phone ?? undefined, asaasSplit })
         if (pixResult.splitFellBack) await this.prisma.order.updateMany({ where: { paymentId: payment.id }, data: { paidViaSplit: false } }).catch(() => {})
         paymentOut = { ...payment, gatewayId: pixResult.gatewayId, pixCode: pixResult.pixCode, pixQrBase64: pixResult.pixQrBase64, pixExpiresAt: new Date(Date.now() + PIX_EXPIRATION_MS) }
         orders.forEach((o) => { if (o.payment) Object.assign(o.payment, paymentOut) })
@@ -863,7 +903,7 @@ export class OrdersService {
 
     if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && this.payments.asaasCardCheckoutEnabled) {
       try {
-        const { checkoutUrl } = await this.payments.createAsaasCardCheckout(payment.id, grandTotal, firstOrder.id, { installments: dto.installments ?? 1 })
+        const { checkoutUrl } = await this.payments.createAsaasCardCheckout(payment.id, grandTotal, firstOrder.id, { installments: dto.installments ?? 1, asaasSplit })
         paymentOut = { ...paymentOut, gateway: 'ASAAS', checkoutUrl }
         orders.forEach((o) => { if (o.payment) Object.assign(o.payment, { gateway: 'ASAAS', checkoutUrl }) })
       } catch (err: any) {

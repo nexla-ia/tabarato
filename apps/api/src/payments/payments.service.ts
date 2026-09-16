@@ -67,6 +67,8 @@ export class PaymentsService {
       sellerToken?: string | null; applicationFee?: number
       // Dados do pagador (usados só no modo Asaas p/ criar o cliente)
       userId?: string; payerName?: string; payerCpf?: string; payerPhone?: string
+      // Split Asaas (subconta): parte de cada loja → subconta dela
+      asaasSplit?: Array<{ walletId: string; fixedValue: number }>
     },
   ): Promise<{ gatewayId: string; pixCode: string | null; pixQrBase64: string | null; splitFellBack: boolean }> {
     // Modo Asaas (entrada centralizada): ignora split — todo o dinheiro entra na
@@ -188,7 +190,8 @@ export class PaymentsService {
    * no nosso backend (a página do Asaas coleta cartão + CPF do pagador).
    */
   async createAsaasCardCheckout(
-    paymentId: string, amount: number, orderId: string, opts?: { installments?: number },
+    paymentId: string, amount: number, orderId: string,
+    opts?: { installments?: number; asaasSplit?: Array<{ walletId: string; fixedValue: number }> },
   ): Promise<{ checkoutUrl: string }> {
     const orderUrl = `${this.webUrl()}/orders/${orderId}`
     const checkout = await this.asaas.createCheckout({
@@ -200,6 +203,7 @@ export class PaymentsService {
       successUrl: orderUrl,
       cancelUrl: `${orderUrl}?pagamento=cancelado`,
       expiredUrl: `${orderUrl}?pagamento=expirado`,
+      split: opts?.asaasSplit,
     })
     await this.prisma.payment.update({
       where: { id: paymentId },
@@ -240,7 +244,7 @@ export class PaymentsService {
 
   private async createAsaasPixPayment(
     paymentId: string, amount: number, orderId: string, payerEmail: string,
-    opts?: { userId?: string; payerName?: string; payerCpf?: string; payerPhone?: string },
+    opts?: { userId?: string; payerName?: string; payerCpf?: string; payerPhone?: string; asaasSplit?: Array<{ walletId: string; fixedValue: number }> },
   ) {
     if (!opts?.userId) throw new BadRequestException('Não foi possível identificar o pagador.')
     const customerId = await this.getOrCreateAsaasCustomer(opts.userId, {
@@ -248,6 +252,7 @@ export class PaymentsService {
     })
     const charge = await this.asaas.createPixCharge({
       customerId, value: amount, orderId, description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
+      split: opts.asaasSplit,
     })
     const qr = await this.asaas.getPixQrCode(charge.id)
     const pixCode = qr.payload

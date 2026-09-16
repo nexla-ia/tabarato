@@ -7,6 +7,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { StoresService } from './stores.service'
 import { CreateStoreDto } from './dto/create-store.dto'
 import { UpdateStoreDto } from './dto/update-store.dto'
+import { AsaasOnboardDto } from './dto/asaas-onboard.dto'
 
 @Controller('stores')
 export class StoresController {
@@ -92,6 +93,21 @@ export class StoresController {
   @Patch('my/pix')
   updatePixKey(@CurrentUser() user: any, @Body() body: { pixKey: string }) {
     return this.storesService.updatePixKey(user.sub, body.pixKey)
+  }
+
+  // Onboarding do split: status + criação da subconta Asaas da loja.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Get('my/asaas/status')
+  asaasStatus(@CurrentUser() user: any) {
+    return this.storesService.asaasStatus(user.sub)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Post('my/asaas/onboard')
+  asaasOnboard(@CurrentUser() user: any, @Body() dto: AsaasOnboardDto) {
+    return this.storesService.createAsaasAccount(user.sub, dto)
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

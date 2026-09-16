@@ -21,6 +21,7 @@ import { NotificationsModule } from './notifications/notifications.module'
 import { PaymentsModule } from './payments/payments.module'
 import { LoyaltyModule } from './loyalty/loyalty.module'
 import { PlatformSettingsModule } from './settings/platform-settings.module'
+import { CryptoModule } from './common/crypto.service'
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PlatformSettingsModule } from './settings/platform-settings.module'
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     ScheduleModule.forRoot(),
     PrismaModule,
+    CryptoModule,
     PlatformSettingsModule,
     AuthModule,
     UsersModule,

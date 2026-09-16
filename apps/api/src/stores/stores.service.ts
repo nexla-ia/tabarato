@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service'
 import { WalletService, hideReversedWithdrawals } from '../wallet/wallet.service'
 import { MpOauthService } from '../payments/mp-oauth.service'
 import { AsaasService } from '../payments/asaas.service'
+import { CryptoService } from '../common/crypto.service'
+import { AsaasOnboardDto } from './dto/asaas-onboard.dto'
 import { CreateStoreDto } from './dto/create-store.dto'
 import { UpdateStoreDto } from './dto/update-store.dto'
 
@@ -91,6 +93,7 @@ export class StoresService {
     private wallet: WalletService,
     private mpOauth: MpOauthService,
     private asaas: AsaasService,
+    private crypto: CryptoService,
   ) {}
 
   // isOpen (mostrado ao cliente) = aberto pelo horário E não pausado manualmente.
@@ -294,6 +297,19 @@ export class StoresService {
   async findWallet(userId: string) {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
+
+    // Split (subconta): o dinheiro da loja cai DIRETO na subconta Asaas dela — o saldo
+    // vem de lá, não da carteira interna da plataforma.
+    if (store.asaasWalletId && store.asaasApiKey) {
+      let balance = 0
+      try { balance = await this.asaas.getBalance(this.crypto.decrypt(store.asaasApiKey)!) } catch { /* mostra 0 se cair */ }
+      const withdrawals = await this.prisma.withdrawal.findMany({
+        where: { ownerType: 'STORE', ownerId: store.id },
+        orderBy: { createdAt: 'desc' }, take: 20,
+      })
+      return { balance, transactions: [], withdrawals, pixKey: store.pixKey ?? null, source: 'ASAAS' }
+    }
+
     const wallet = await this.wallet.findByOwner(store.id, 'STORE')
     // Inclui a chave PIX de saque pra o app mostrar/editar na Carteira.
     return { ...wallet, transactions: hideReversedWithdrawals((wallet as any).transactions ?? []), pixKey: store.pixKey ?? null }
@@ -314,6 +330,29 @@ export class StoresService {
       where: { ownerType: 'STORE', ownerId: store.id, status: { in: ['PENDING', 'PROCESSING'] }, createdAt: { gte: new Date(Date.now() - 20_000) } },
     })
     if (inFlight) throw new ConflictException('Você já tem um saque em andamento. Aguarde a confirmação.')
+
+    // Split (subconta): o dinheiro JÁ está na subconta da loja — o saque transfere de
+    // LÁ pro banco dela (com a apiKey da subconta). Sem carteira/estorno da plataforma:
+    // se falhar, o dinheiro simplesmente continua na subconta.
+    if (store.asaasWalletId && store.asaasApiKey) {
+      const apiKey = this.crypto.decrypt(store.asaasApiKey)
+      if (!apiKey) throw new BadRequestException('Configuração de recebimento inválida. Refaça o cadastro de recebimentos.')
+      const w = await this.prisma.withdrawal.create({
+        data: { ownerType: 'STORE', ownerId: store.id, amount, pixKey: store.pixKey, status: 'PENDING' },
+      })
+      try {
+        const transfer = await this.asaas.createPixTransfer({
+          value: Number(amount), pixAddressKey: store.pixKey, externalReference: w.id,
+          description: `Saque Tá Barato — loja ${store.id.slice(0, 8)}`, apiKey,
+        })
+        await this.prisma.withdrawal.update({ where: { id: w.id }, data: { status: 'PROCESSING', asaasTransferId: transfer.id } })
+        return { message: 'Saque solicitado! O PIX está sendo processado e cai em instantes.' }
+      } catch (err: any) {
+        await this.prisma.withdrawal.update({ where: { id: w.id }, data: { status: 'FAILED', failReason: String(err?.message ?? err).slice(0, 300) } })
+        this.logger.error(`Saque loja ${w.id} (subconta) falhou`, err)
+        throw new BadRequestException('Não foi possível enviar o PIX agora (confira o saldo disponível). Tente novamente em instantes.')
+      }
+    }
 
     // 1) Cria o saque (PENDING) — id determinístico p/ o ref do débito/estorno.
     const withdrawal = await this.prisma.withdrawal.create({
@@ -351,6 +390,67 @@ export class StoresService {
     }
 
     return { message: 'Saque solicitado com sucesso. Será processado em até 24h via PIX.' }
+  }
+
+  /** Status da subconta Asaas da loja — o app usa pra saber se precisa fazer o onboarding. */
+  async asaasStatus(userId: string) {
+    const store = await this.prisma.store.findUnique({
+      where: { userId },
+      select: { asaasOnboarded: true, asaasWalletId: true },
+    })
+    if (!store) throw new NotFoundException('Store not found')
+    return {
+      required: this.asaas.moneyInEnabled, // split ligado → a loja precisa de subconta
+      onboarded: Boolean(store.asaasOnboarded && store.asaasWalletId),
+    }
+  }
+
+  /**
+   * Onboarding do split: cria a SUBCONTA Asaas da loja. A partir daí, a parte da loja
+   * cai DIRETO na subconta (não passa pela conta da plataforma). A apiKey da subconta
+   * é guardada CRIPTOGRAFADA (usada pra sacar da subconta). Idempotente.
+   */
+  async createAsaasAccount(userId: string, dto: AsaasOnboardDto) {
+    const store = await this.prisma.store.findUnique({
+      where: { userId },
+      include: { user: { select: { email: true } } },
+    })
+    if (!store) throw new NotFoundException('Store not found')
+    if (store.asaasWalletId) return { onboarded: true } // já tem subconta
+
+    const email = store.user?.email
+    if (!email) throw new BadRequestException('E-mail da loja não encontrado.')
+    if (!store.phone) throw new BadRequestException('Cadastre o telefone da loja antes de configurar os recebimentos.')
+
+    try {
+      const acc = await this.asaas.createAccount({
+        name: store.name,
+        email,
+        cpfCnpj: store.cnpj,
+        mobilePhone: store.phone,
+        incomeValue: dto.incomeValue,
+        address: dto.address || store.address,
+        addressNumber: dto.addressNumber,
+        province: dto.province,
+        postalCode: dto.postalCode,
+        companyType: dto.companyType,
+        complement: dto.complement,
+      })
+      await this.prisma.store.update({
+        where: { id: store.id },
+        data: {
+          asaasAccountId: acc.id,
+          asaasWalletId: acc.walletId,
+          asaasApiKey: this.crypto.encrypt(acc.apiKey),
+          asaasOnboarded: true,
+        },
+      })
+      this.logger.log(`Loja ${store.id.slice(0, 8)} criou subconta Asaas ${acc.id}`)
+      return { onboarded: true }
+    } catch (err: any) {
+      this.logger.error(`Falha ao criar subconta Asaas da loja ${store.id}`, err)
+      throw new BadRequestException(`Não foi possível configurar os recebimentos: ${String(err?.message ?? '').slice(0, 160)}`)
+    }
   }
 
   /** Chave PIX da loja — usada só pra RECEBER os saques do repasse (não é pagamento do cliente). */
