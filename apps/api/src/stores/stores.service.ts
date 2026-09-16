@@ -252,11 +252,11 @@ export class StoresService {
 
     const nextPaused = !store.isPaused
 
-    // Trava: a loja só pode ABRIR (nextPaused = false) depois de conectar o
-    // Mercado Pago — sem isso ela não recebe pagamento (PIX/cartão) e o pedido
-    // seria barrado no checkout de qualquer forma. Só vale quando o marketplace
-    // está configurado (feature flag).
-    if (!nextPaused && this.mpOauth.isEnabled() && !(store as any).mpConnected) {
+    // Trava (LEGADO do marketplace MP): a loja só podia ABRIR depois de conectar o
+    // Mercado Pago. Com o Asaas centralizado ligado, a entrada de dinheiro é da
+    // plataforma e a loja recebe via carteira + saque PIX — então essa trava é
+    // desligada (só vale no modo MP marketplace).
+    if (!nextPaused && this.mpOauth.isEnabled() && !this.asaas.moneyInEnabled && !(store as any).mpConnected) {
       throw new BadRequestException(
         'Conecte sua conta Mercado Pago em Configurações antes de abrir a loja. ' +
         'Lembre de ter uma chave PIX cadastrada na conta MP para receber por PIX.',

@@ -171,6 +171,12 @@ export class PaymentsService {
     return this.asaas.cardInEnabled
   }
 
+  /** Entrada de dinheiro pelo Asaas ativa → modelo centralizado (desliga o marketplace/
+   *  split do MP; a loja não precisa conectar conta de pagamento, recebe via carteira+saque). */
+  get asaasMoneyInEnabled(): boolean {
+    return this.asaas.moneyInEnabled
+  }
+
   private webUrl(): string {
     return (this.config.get<string>('WEB_URL') || 'https://tabarato-production.up.railway.app').replace(/\/$/, '')
   }

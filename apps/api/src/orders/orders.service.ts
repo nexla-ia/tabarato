@@ -161,7 +161,9 @@ export class OrdersService {
 
     // Marketplace (split): a loja precisa ter o Mercado Pago conectado pra receber.
     // Só bloqueia quando o marketplace está configurado (feature flag).
-    const marketplaceOn = this.mpOauth.isEnabled()
+    // Com a entrada de dinheiro no Asaas (centralizado), o marketplace/split do MP é
+    // desligado: a loja NÃO precisa conectar conta de pagamento — recebe via carteira + saque.
+    const marketplaceOn = this.mpOauth.isEnabled() && !this.payments.asaasMoneyInEnabled
     if (marketplaceOn && !(store as any).mpConnected) {
       throw new BadRequestException('Esta loja está finalizando a configuração de pagamentos e ainda não pode receber pedidos.')
     }
@@ -715,7 +717,7 @@ export class OrdersService {
     const address = await this.prisma.address.findFirst({ where: { id: dto.addressId, userId } })
     if (!address) throw new NotFoundException('Address not found')
 
-    const marketplaceOn = this.mpOauth.isEnabled()
+    const marketplaceOn = this.mpOauth.isEnabled() && !this.payments.asaasMoneyInEnabled
     const multiStore = rawGroups.length > 1
 
     // Prepara todos os grupos (validação + preço) ANTES de qualquer escrita.

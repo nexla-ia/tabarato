@@ -38,6 +38,12 @@ export class AsaasService {
     return this.enabled && this.config.get<string>('ASAAS_CARD_ENABLED') === 'true'
   }
 
+  /** Entrada de dinheiro pelo Asaas ativa (PIX ou cartão). Quando true, o modelo é
+   *  CENTRALIZADO (sem split/marketplace do MP; repasse à loja via carteira + saque PIX). */
+  get moneyInEnabled(): boolean {
+    return this.pixInEnabled || this.cardInEnabled
+  }
+
   private get baseUrl(): string {
     return this.config.get<string>('ASAAS_BASE_URL') || 'https://api-sandbox.asaas.com/v3'
   }

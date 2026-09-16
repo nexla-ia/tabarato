@@ -7,6 +7,7 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { PrismaService } from '../prisma/prisma.service'
 import { MpOauthService } from './mp-oauth.service'
+import { AsaasService } from './asaas.service'
 
 @Controller('stores/mp')
 export class MpConnectController {
@@ -14,6 +15,7 @@ export class MpConnectController {
     private readonly mp: MpOauthService,
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly asaas: AsaasService,
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -24,7 +26,9 @@ export class MpConnectController {
       where: { userId: user.sub },
       select: { mpConnected: true, mpUserId: true },
     })
-    return { enabled: this.mp.isEnabled(), connected: Boolean(store?.mpConnected), mpUserId: store?.mpUserId ?? null }
+    // Com o Asaas centralizado ligado, o marketplace do MP fica OFF → o app deixa de
+    // exigir a conexão com o Mercado Pago (a loja recebe via carteira + saque PIX).
+    return { enabled: this.mp.isEnabled() && !this.asaas.moneyInEnabled, connected: Boolean(store?.mpConnected), mpUserId: store?.mpUserId ?? null }
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
