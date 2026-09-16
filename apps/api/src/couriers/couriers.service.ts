@@ -465,14 +465,22 @@ export class CouriersService {
    */
   async authorizeAsaasTransfer(body: any): Promise<{ status: 'APPROVED' | 'REFUSED'; refuseReason?: string }> {
     const ref = body?.transfer?.externalReference ?? body?.externalReference ?? body?.payment?.externalReference
+    // SEGURANÇA: só auto-aprova uma transferência que casa com um saque NOSSO ainda em
+    // andamento. Sem ref ou sem saque casado → REFUSED (nunca aprovar no escuro).
+    if (!ref) {
+      this.logger.warn('Asaas authorize: operação sem referência — REFUSED')
+      return { status: 'REFUSED', refuseReason: 'Operação sem referência.' }
+    }
     try {
-      if (ref) {
-        const w = await this.prisma.withdrawal.findUnique({ where: { id: String(ref) } })
-        if (w) return { status: 'APPROVED' }
+      const w = await this.prisma.withdrawal.findUnique({ where: { id: String(ref) } })
+      if (w && (w.status === 'PENDING' || w.status === 'PROCESSING')) {
+        return { status: 'APPROVED' }
       }
-    } catch { /* segue pro fallback */ }
-    this.logger.warn(`Asaas authorize: aprovando operação${ref ? ` (ref ${ref})` : ' (sem ref no payload)'}`)
-    return { status: 'APPROVED' }
+    } catch (err) {
+      this.logger.error('Asaas authorize: erro ao validar saque', err as any)
+    }
+    this.logger.warn(`Asaas authorize: sem saque casado p/ ref ${ref} — REFUSED`)
+    return { status: 'REFUSED', refuseReason: 'Operação não reconhecida.' }
   }
 
   /**
@@ -497,6 +505,22 @@ export class CouriersService {
     }
 
     if (event === 'TRANSFER_FAILED' || event === 'TRANSFER_CANCELLED' || event === 'TRANSFER_BLOCKED') {
+      // SEGURANÇA: re-consulta o status REAL da transferência no Asaas antes de estornar.
+      // O corpo do webhook pode ser forjado; estornar um saque que NA VERDADE saiu =
+      // dinheiro em dobro. Só estorna se o Asaas confirmar que não foi concluído.
+      if (this.asaas.enabled && withdrawal.asaasTransferId) {
+        try {
+          const t = await this.asaas.getTransfer(withdrawal.asaasTransferId)
+          const inProgressOrDone = ['DONE', 'PENDING', 'BANK_PROCESSING'].includes(t.status)
+          if (inProgressOrDone) {
+            this.logger.warn(`Transfer webhook ${event} p/ saque ${withdrawal.id}, mas status real=${t.status} — NÃO estorna`)
+            return
+          }
+        } catch (err) {
+          this.logger.warn(`Falha ao re-consultar transferência ${withdrawal.asaasTransferId} — NÃO estorna por segurança`)
+          return
+        }
+      }
       // Estorna só uma vez: a transição PROCESSING→FAILED serve de guarda de idempotência.
       const res = await this.prisma.withdrawal.updateMany({
         where: { id: withdrawal.id, status: 'PROCESSING' },

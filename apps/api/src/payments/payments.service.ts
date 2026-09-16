@@ -99,9 +99,10 @@ export class PaymentsService {
     } catch (err: any) {
       const detail = this.extractMpError(err)
       const codes = this.extractMpErrorCodes(err)
+      // Loga só detail + códigos (não o objeto de erro cru do provedor, que pode
+      // carregar PII do pagador nos logs).
       this.logger.error(
         `PIX create falhou (pedido ${orderId.slice(0, 8)}, sellerToken=${opts?.sellerToken ? 'sim' : 'não'}, fee=${opts?.applicationFee ?? 0}, codes=${codes || 'n/a'}): ${detail}`,
-        JSON.stringify(err?.cause ?? err?.message ?? err ?? ''),
       )
       // "cannot use application_fee": o MP recusou o split nessa cobrança. Causas
       // possíveis (nenhuma diagnosticável só pelo texto genérico do erro — exigem
@@ -568,16 +569,12 @@ export class PaymentsService {
       return
     }
     const event: string | undefined = body?.event
-    if (!event) return
-
-    const PAID_EV = ['PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED']
-    const FAILED_EV = ['PAYMENT_OVERDUE', 'PAYMENT_DELETED', 'PAYMENT_CREDIT_CARD_CAPTURE_REFUSED', 'PAYMENT_REPROVED_BY_RISK_ANALYSIS']
+    if (!event || (!event.startsWith('PAYMENT_') && !event.startsWith('CHECKOUT_'))) return
 
     try {
       // Resolve o pedido: PAYMENT_* traz externalReference = orderId; CHECKOUT_* traz
       // o checkout.id, que mapeamos pelo Payment.gatewayId (guardado na criação).
       let orderId: string | undefined
-      let gatewayId: string | undefined
       if (event.startsWith('CHECKOUT_')) {
         const coId = body?.checkout?.id ? String(body.checkout.id) : undefined
         if (!coId) return
@@ -586,18 +583,10 @@ export class PaymentsService {
           select: { orders: { select: { id: true }, take: 1 } },
         })
         orderId = pay?.orders?.[0]?.id
-      } else if (event.startsWith('PAYMENT_')) {
-        orderId = body?.payment?.externalReference
-        gatewayId = body?.payment?.id ? String(body.payment.id) : undefined
       } else {
-        return
+        orderId = body?.payment?.externalReference
       }
       if (!orderId) return
-
-      const paid = PAID_EV.includes(event) || event === 'CHECKOUT_PAID'
-      const failed = FAILED_EV.includes(event) || event === 'CHECKOUT_CANCELED' || event === 'CHECKOUT_EXPIRED'
-      const refunded = event === 'PAYMENT_REFUNDED'
-      if (!paid && !failed && !refunded) return
 
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -605,10 +594,36 @@ export class PaymentsService {
       })
       if (!order?.payment) return
 
+      // SEGURANÇA: nunca confia no corpo do webhook (o Asaas não assina o payload, só
+      // manda um token estático). Só age em pagamentos que são REALMENTE do Asaas e
+      // re-consulta o status REAL na API antes de confirmar/cancelar — o evento é só o
+      // gatilho. Isso impede um POST forjado de confirmar um pedido sem pagamento.
+      if (order.payment.gateway !== 'ASAAS' || !order.payment.gatewayId) return
+
+      const isCard = order.payment.method === 'CREDIT_CARD' || order.payment.method === 'DEBIT_CARD'
+      let paid = false, failed = false, refunded = false
+      try {
+        if (isCard) {
+          const c = await this.asaas.getCheckout(order.payment.gatewayId)
+          paid = c.status === 'PAID'
+          failed = c.status === 'CANCELED' || c.status === 'EXPIRED'
+        } else {
+          const p = await this.asaas.getPayment(order.payment.gatewayId)
+          // Confirma só com status pago REAL E valor batendo com o total do pedido.
+          paid = (p.status === 'CONFIRMED' || p.status === 'RECEIVED') && Math.abs(p.value - Number(order.payment.amount)) < 0.01
+          failed = ['OVERDUE', 'DELETED'].includes(p.status)
+          refunded = p.status === 'REFUNDED'
+        }
+      } catch (err) {
+        this.logger.warn(`Asaas webhook: falha ao re-consultar ${order.payment.gatewayId} — ignorando`)
+        return
+      }
+      if (!paid && !failed && !refunded) return
+
       if (paid && order.payment.status !== 'PAID') {
         const claim = await this.prisma.payment.updateMany({
           where: { id: order.payment.id, status: { not: 'PAID' } },
-          data: { status: 'PAID', paidAt: new Date(), ...(gatewayId ? { gatewayId } : {}) },
+          data: { status: 'PAID', paidAt: new Date() },
         })
         if (claim.count === 0) return
         await this.prisma.order.updateMany({
@@ -763,13 +778,20 @@ export class PaymentsService {
     if (payment.status === 'REFUNDED') return { refunded: true }
     if (payment.status !== 'PAID' || !payment.gatewayId) return { refunded: false }
 
-    // Asaas: estorno direto pela cobrança.
+    // Asaas: estorno direto pela cobrança. Claim ATÔMICO (PAID→REFUNDED) antes de
+    // chamar o gateway — só um cancelamento concorrente vence e dispara o estorno.
     if ((payment as any).gateway === 'ASAAS') {
+      const claim = await this.prisma.payment.updateMany({ where: { id: payment.id, status: 'PAID' }, data: { status: 'REFUNDED' } })
+      if (claim.count === 0) {
+        const cur = await this.prisma.payment.findUnique({ where: { id: payment.id }, select: { status: true } })
+        return { refunded: cur?.status === 'REFUNDED' } // outro já estornou (idempotente)
+      }
       try {
         await this.asaas.refundPayment(payment.gatewayId)
-        const updated = await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'REFUNDED' } })
-        return { refunded: updated.status === 'REFUNDED' }
+        return { refunded: true }
       } catch (err) {
+        // Reverte o claim pra não deixar "REFUNDED" sem o dinheiro ter voltado (permite retry).
+        await this.prisma.payment.updateMany({ where: { id: payment.id, status: 'REFUNDED' }, data: { status: 'PAID' } }).catch(() => {})
         this.logger.error(`Asaas refund failed for order ${orderId}`, err as any)
         throw new BadRequestException('Não foi possível estornar o pagamento no Asaas. Tente novamente.')
       }

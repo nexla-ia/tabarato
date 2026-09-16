@@ -17,7 +17,7 @@ function makeService(over: any = {}) {
     ...(over.prisma ?? {}),
   }
   const wallet = { debit: jest.fn(), credit: jest.fn(), ...(over.wallet ?? {}) }
-  const asaas = { enabled: false, createPixTransfer: jest.fn(), ...(over.asaas ?? {}) }
+  const asaas = { enabled: false, createPixTransfer: jest.fn(), getTransfer: jest.fn(), ...(over.asaas ?? {}) }
   const uploads = { signDocuments: jest.fn().mockResolvedValue({}), ...(over.uploads ?? {}) }
   const matching = { cancelMatching: jest.fn(), startMatching: jest.fn().mockResolvedValue(undefined), ...(over.matching ?? {}) }
   const gateway = { evictUserFromOrder: jest.fn().mockResolvedValue(undefined), ...(over.gateway ?? {}) }
@@ -133,6 +133,54 @@ describe('CouriersService.handleAsaasTransferWebhook', () => {
     prisma.withdrawal.findUnique.mockResolvedValue(null)
     await svc.handleAsaasTransferWebhook('TRANSFER_DONE', { externalReference: 'nao-existe' })
     expect(prisma.withdrawal.updateMany).not.toHaveBeenCalled()
+  })
+
+  // H1: TRANSFER_FAILED forjado NÃO pode estornar um saque que na verdade saiu.
+  it('TRANSFER_FAILED forjado mas status REAL=DONE → NÃO estorna (re-consulta o Asaas)', async () => {
+    const { svc, prisma, wallet, asaas } = makeService({
+      asaas: { enabled: true, getTransfer: jest.fn().mockResolvedValue({ id: 'tr1', status: 'DONE' }) },
+    })
+    prisma.withdrawal.findUnique.mockResolvedValue({ id: 'w1', ownerId: 'c1', ownerType: 'COURIER', amount: 50, status: 'PROCESSING', asaasTransferId: 'tr1' })
+
+    await svc.handleAsaasTransferWebhook('TRANSFER_FAILED', { externalReference: 'w1' })
+
+    expect(asaas.getTransfer).toHaveBeenCalledWith('tr1')
+    expect(prisma.withdrawal.updateMany).not.toHaveBeenCalled()
+    expect(wallet.credit).not.toHaveBeenCalled()
+  })
+
+  it('TRANSFER_FAILED com status REAL=FAILED → estorna', async () => {
+    const { svc, prisma, wallet, asaas } = makeService({
+      asaas: { enabled: true, getTransfer: jest.fn().mockResolvedValue({ id: 'tr1', status: 'FAILED' }) },
+    })
+    prisma.withdrawal.findUnique.mockResolvedValue({ id: 'w1', ownerId: 'c1', ownerType: 'COURIER', amount: 50, status: 'PROCESSING', asaasTransferId: 'tr1' })
+    prisma.withdrawal.updateMany.mockResolvedValue({ count: 1 })
+
+    await svc.handleAsaasTransferWebhook('TRANSFER_FAILED', { externalReference: 'w1' })
+
+    expect(wallet.credit).toHaveBeenCalledWith('c1', 'COURIER', 50, expect.any(String), 'estorno-saque-w1')
+  })
+})
+
+describe('CouriersService.authorizeAsaasTransfer', () => {
+  it('sem ref → REFUSED', async () => {
+    const { svc } = makeService()
+    expect(await svc.authorizeAsaasTransfer({})).toEqual(expect.objectContaining({ status: 'REFUSED' }))
+  })
+  it('ref sem saque casado → REFUSED', async () => {
+    const { svc, prisma } = makeService()
+    prisma.withdrawal.findUnique.mockResolvedValue(null)
+    expect(await svc.authorizeAsaasTransfer({ transfer: { externalReference: 'x' } })).toEqual(expect.objectContaining({ status: 'REFUSED' }))
+  })
+  it('saque casado em PROCESSING → APPROVED', async () => {
+    const { svc, prisma } = makeService()
+    prisma.withdrawal.findUnique.mockResolvedValue({ id: 'w1', status: 'PROCESSING' })
+    expect(await svc.authorizeAsaasTransfer({ transfer: { externalReference: 'w1' } })).toEqual({ status: 'APPROVED' })
+  })
+  it('saque já DONE → REFUSED (não reaprova operação antiga)', async () => {
+    const { svc, prisma } = makeService()
+    prisma.withdrawal.findUnique.mockResolvedValue({ id: 'w1', status: 'DONE' })
+    expect(await svc.authorizeAsaasTransfer({ transfer: { externalReference: 'w1' } })).toEqual(expect.objectContaining({ status: 'REFUSED' }))
   })
 })
 

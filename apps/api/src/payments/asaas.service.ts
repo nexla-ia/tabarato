@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import * as crypto from 'crypto'
 
 export interface AsaasTransferResult {
   id: string
@@ -171,9 +172,15 @@ export class AsaasService {
   }
 
   /** Consulta o status atual de uma cobrança (poll quando o webhook se perde). */
-  async getPayment(paymentId: string): Promise<{ id: string; status: string; externalReference: string | null }> {
+  async getPayment(paymentId: string): Promise<{ id: string; status: string; value: number; externalReference: string | null }> {
     const data = await this.api<any>('GET', `/payments/${paymentId}`)
-    return { id: data.id, status: data.status, externalReference: data.externalReference ?? null }
+    return { id: data.id, status: data.status, value: Number(data.value), externalReference: data.externalReference ?? null }
+  }
+
+  /** Consulta o status REAL de uma transferência (usado pra validar o webhook de saque). */
+  async getTransfer(transferId: string): Promise<{ id: string; status: string }> {
+    const data = await this.api<any>('GET', `/transfers/${transferId}`)
+    return { id: data.id, status: data.status }
   }
 
   /** Estorno TOTAL de uma cobrança paga (usado no cancelamento do pedido). */
@@ -270,10 +277,24 @@ export class AsaasService {
     return { id: data.id, status: data.status, authorized: data.authorized ?? true }
   }
 
-  /** Valida o token do webhook do Asaas (header asaas-access-token), se configurado. */
+  /**
+   * Valida o token do webhook do Asaas (header asaas-access-token). FAIL-CLOSED em
+   * produção: sem token configurado, rejeita (não deixa o webhook anônimo). Comparação
+   * timing-safe pra não vazar o token por análise de tempo.
+   */
   isWebhookAuthorized(token: string | undefined): boolean {
     const expected = this.config.get<string>('ASAAS_WEBHOOK_TOKEN')
-    if (!expected) return true // sem token configurado, não bloqueia (dev/sandbox)
-    return token === expected
+    if (!expected) {
+      // Em produção, sem segredo configurado = fecha (igual ao webhook do Mercado Pago).
+      if (this.config.get<string>('NODE_ENV') === 'production') {
+        this.logger.error('ASAAS_WEBHOOK_TOKEN ausente em produção — webhook rejeitado')
+        return false
+      }
+      return true // dev/sandbox: sem token, não bloqueia
+    }
+    if (!token) return false
+    const a = Buffer.from(token)
+    const b = Buffer.from(expected)
+    return a.length === b.length && crypto.timingSafeEqual(a, b)
   }
 }

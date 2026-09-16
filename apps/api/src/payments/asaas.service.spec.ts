@@ -132,7 +132,11 @@ describe('AsaasService', () => {
       const a = makeAsaas({ ASAAS_WEBHOOK_TOKEN: 'secret' })
       expect(a.isWebhookAuthorized('secret')).toBe(true)
       expect(a.isWebhookAuthorized('errado')).toBe(false)
+      expect(a.isWebhookAuthorized('tamanho-diferente')).toBe(false)
       expect(a.isWebhookAuthorized(undefined)).toBe(false)
+    })
+    it('FAIL-CLOSED em produção: sem token configurado → rejeita', () => {
+      expect(makeAsaas({ NODE_ENV: 'production' }).isWebhookAuthorized('qualquer')).toBe(false)
     })
   })
 })
