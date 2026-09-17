@@ -88,4 +88,12 @@ export class OrdersController {
   cancelByStore(@CurrentUser() user: any, @Param('id') id: string, @Body() body: { note?: string }) {
     return this.ordersService.cancelByStore(user.sub, id, body.note)
   }
+
+  // Reanunciar a entrega aos motoboys (quando a busca expirou sem ninguém aceitar).
+  @UseGuards(RolesGuard)
+  @Roles('STORE_OWNER')
+  @Post(':id/reannounce')
+  reannounce(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.ordersService.reannounceDelivery(user.sub, id)
+  }
 }

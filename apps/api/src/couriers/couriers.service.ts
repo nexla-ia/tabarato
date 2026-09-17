@@ -246,6 +246,7 @@ export class CouriersService {
       where: {
         courierId: null,
         status: 'SEARCHING_COURIER',
+        matchingExpired: false, // busca expirada → só volta se a loja reanunciar
         // Não mostra corridas que ESTE entregador já recusou.
         NOT: { refusedCourierIds: { has: courier.id } },
         // Não mostra corridas de pedidos já cancelados/entregues (entregas órfãs).

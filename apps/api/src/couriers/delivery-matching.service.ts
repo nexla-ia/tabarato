@@ -32,7 +32,9 @@ export class DeliveryMatchingService implements OnModuleInit {
   // Re-oferece entregas que ficaram órfãs (matching desistiu após 3km e a corrida
   // ficou "aberta" sem ninguém sendo notificado) e, se demorar demais, avisa o lojista.
   private static readonly RESWEEP_AFTER_MIN = 10
-  private static readonly ALERT_AFTER_MIN = 45
+  // Limite total da busca: passou disso sem ninguém aceitar, a corrida EXPIRA (para de
+  // ofertar) e a loja precisa reanunciar. Evita corrida "aberta pra sempre".
+  private static readonly MAX_SEARCH_MIN = 30
 
   // Quantos entregadores recebem a oferta por vez (primeiro que aceitar leva). Antes
   // ofertava só o mais próximo → se ele ignorasse, 30s perdidos.
@@ -48,7 +50,7 @@ export class DeliveryMatchingService implements OnModuleInit {
   async onModuleInit() {
     try {
       const stuck = await this.prisma.delivery.findMany({
-        where: { status: 'SEARCHING_COURIER', courierId: null, order: { status: { notIn: ['CANCELLED', 'DELIVERED'] } } },
+        where: { status: 'SEARCHING_COURIER', courierId: null, matchingExpired: false, order: { status: { notIn: ['CANCELLED', 'DELIVERED'] } } },
         include: { order: { include: { store: { select: { lat: true, lng: true } } } } },
       })
       if (stuck.length > 0) {
@@ -72,7 +74,7 @@ export class DeliveryMatchingService implements OnModuleInit {
   async resweepOrphanDeliveries() {
     try {
       const orphans = await this.prisma.delivery.findMany({
-        where: { status: 'SEARCHING_COURIER', courierId: null, order: { status: { notIn: ['CANCELLED', 'DELIVERED'] } } },
+        where: { status: 'SEARCHING_COURIER', courierId: null, matchingExpired: false, order: { status: { notIn: ['CANCELLED', 'DELIVERED'] } } },
         include: { order: { include: { store: { select: { name: true, lat: true, lng: true, user: { select: { pushToken: true } } } } } } },
       })
       const now = Date.now()
@@ -85,25 +87,30 @@ export class DeliveryMatchingService implements OnModuleInit {
         const store = d.order?.store
         if (!store || store.lat == null || store.lng == null) continue
 
-        // Re-abre o ciclo do zero (raio 1km) — dá chance a entregadores que ficaram
-        // online depois que o matching original desistiu.
-        this.logger.log(`[Match] Re-sweeping orphan delivery ${d.id.slice(0, 8)} (${Math.round(ageMin)}min aberta)`)
-        await this.startMatching(d.id, store.lat, store.lng)
-
-        // Passou do limite e ainda ninguém: avisa o lojista UMA vez para ele decidir
-        // (entrega própria / cancelar). Não cancela nem estorna automático — decisão de negócio.
-        if (ageMin >= DeliveryMatchingService.ALERT_AFTER_MIN && !this.alertedOrphans.has(d.id)) {
-          this.alertedOrphans.add(d.id)
+        // Passou do LIMITE sem ninguém aceitar → EXPIRA (para de ofertar) e avisa a loja
+        // pra reanunciar. Não fica re-ofertando pra sempre.
+        if (ageMin >= DeliveryMatchingService.MAX_SEARCH_MIN) {
+          await this.prisma.delivery.updateMany({
+            where: { id: d.id, status: 'SEARCHING_COURIER', courierId: null },
+            data: { matchingExpired: true },
+          })
+          this.cancelMatching(d.id)
+          this.logger.log(`[Match] Delivery ${d.id.slice(0, 8)} EXPIROU após ${Math.round(ageMin)}min — loja precisa reanunciar`)
           const token = store.user?.pushToken
           if (token) {
             this.push.send(
               token,
               '⚠️ Pedido sem entregador',
-              `O pedido #${d.orderId.slice(0, 8)} está há mais de ${DeliveryMatchingService.ALERT_AFTER_MIN}min sem entregador. Considere entrega própria ou cancelar.`,
+              `O pedido #${d.orderId.slice(0, 8)} ficou sem entregador. Abra "Pedidos" e toque em Reanunciar quando estiver pronto para despachar.`,
               { orderId: d.orderId, type: 'NO_COURIER' },
             ).catch(() => {})
           }
+          continue
         }
+
+        // Entre 10 e 30min: re-abre o ciclo (raio 1km) — dá chance a quem ficou online depois.
+        this.logger.log(`[Match] Re-sweeping orphan delivery ${d.id.slice(0, 8)} (${Math.round(ageMin)}min aberta)`)
+        await this.startMatching(d.id, store.lat, store.lng)
       }
       // Limpa da memória alertas de entregas que já saíram de SEARCHING_COURIER.
       if (this.alertedOrphans.size) {
@@ -140,6 +147,7 @@ export class DeliveryMatchingService implements OnModuleInit {
       include: { order: { select: { status: true } } },
     })
     if (!delivery || delivery.courierId || delivery.status !== 'SEARCHING_COURIER'
+        || (delivery as any).matchingExpired
         || ['CANCELLED', 'DELIVERED'].includes((delivery as any).order?.status)) {
       this.cancelMatching(deliveryId)
       return

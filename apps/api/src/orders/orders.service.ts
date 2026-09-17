@@ -61,6 +61,10 @@ function promoDiscountFor(quantity: number, unitPrice: number, buyQty?: number |
  * TLD reservado (.test/.local/.invalid/.example) — comum em contas de teste. Se
  * o e-mail do cliente não for válido, usa um fallback válido da plataforma.
  */
+// Valor mínimo de cobrança aceito pelo Asaas (cobrança avulsa). Abaixo disso o Asaas
+// recusa a geração do PIX/cartão — barramos antes, com mensagem clara ao cliente.
+const MIN_ASAAS_CHARGE = 5
+
 function safePayerEmail(email?: string | null): string {
   const FALLBACK = 'comprador@tabarato.com.br'
   if (!email) return FALLBACK
@@ -342,6 +346,9 @@ export class OrdersService {
     // do repasse dela na entrega). deliveryFee continua gravado (o entregador recebe).
     const deliveryWaived = couponFreeShipping ? deliveryFee : 0
     const total = Math.round((subtotal + deliveryFee - discount - deliveryWaived) * 100) / 100
+    if (this.payments.asaasMoneyInEnabled && total < MIN_ASAAS_CHARGE) {
+      throw new BadRequestException(`O valor mínimo do pedido para pagamento é R$ ${MIN_ASAAS_CHARGE},00.`)
+    }
 
     // Código de entrega (anti-fraude): 6 dígitos CRIPTOGRÁFICOS que o cliente informa
     // ao entregador. Sem ele, o entregador não finaliza a corrida (padrão iFood).
@@ -787,6 +794,9 @@ export class OrdersService {
       return { discount, total }
     })
     const grandTotal = Math.round(groupTotals.reduce((s, t) => s + t.total, 0) * 100) / 100
+    if (this.payments.asaasMoneyInEnabled && grandTotal < MIN_ASAAS_CHARGE) {
+      throw new BadRequestException(`O valor mínimo do pedido para pagamento é R$ ${MIN_ASAAS_CHARGE},00.`)
+    }
 
     // Guarda: os descontos não podem zerar o pedido — o Mercado Pago não cobra R$0
     // (e a loja não pode "pagar" o cliente). Se o total ficou <= 0, barra com mensagem.
@@ -1159,6 +1169,37 @@ export class OrdersService {
   }
 
   // Store owner can cancel even READY/PREPARING orders (before pickup)
+  /**
+   * Reanuncia a entrega aos motoboys quando a busca EXPIROU (ninguém aceitou no prazo).
+   * Reabre o ciclo do zero: limpa os que recusaram, tira o "expirado" e reinicia o
+   * matching. Só a loja dona do pedido pode.
+   */
+  async reannounceDelivery(userId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { store: { select: { userId: true, lat: true, lng: true } }, delivery: true },
+    })
+    if (!order) throw new NotFoundException('Pedido não encontrado.')
+    if (order.store?.userId !== userId) throw new ForbiddenException('Acesso negado.')
+    const delivery = order.delivery
+    if (!delivery) throw new BadRequestException('Marque o pedido como "Pronto" para procurar um entregador.')
+    if (delivery.courierId) throw new BadRequestException('Este pedido já tem um entregador.')
+    if (delivery.status === 'DELIVERED' || delivery.status === 'FAILED') {
+      throw new BadRequestException('Esta entrega já foi finalizada.')
+    }
+
+    // Reabre: limpa recusados, tira o "expirado" e zera o relógio da busca (createdAt).
+    await this.prisma.delivery.update({
+      where: { id: delivery.id },
+      data: { matchingExpired: false, refusedCourierIds: [], status: 'SEARCHING_COURIER', createdAt: new Date() },
+    })
+    if (order.store?.lat != null && order.store?.lng != null) {
+      this.matching?.startMatching(delivery.id, order.store.lat, order.store.lng)
+        .catch((err) => this.logger.warn('Reannounce match failed', err))
+    }
+    return { ok: true }
+  }
+
   async cancelByStore(userId: string, orderId: string, note?: string) {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new ForbiddenException()

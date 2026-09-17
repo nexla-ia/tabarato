@@ -63,6 +63,10 @@ export default function PedidosPage() {
     onSuccess: () => { setCancelId(null); setNote('') },
     onSettled: () => qc.invalidateQueries({ queryKey: ['store-orders'] }),
   })
+  const reannounce = useMutation({
+    mutationFn: async (id: string) => (await api.post(`/orders/${id}/reannounce`)).data,
+    onSettled: () => qc.invalidateQueries({ queryKey: ['store-orders'] }),
+  })
 
   const orders = ordersQ.data ?? []
   const lateCount = orders.filter(isOrderLate).length
@@ -166,11 +170,13 @@ export default function PedidosPage() {
         </div>
 
         {(o.status === 'READY' || o.status === 'PICKED_UP') && (
-          <div className={styles.waitRow}>
-            {o.status === 'READY'
-              ? <><ShoppingBag size={13} /> Aguardando o entregador retirar</>
-              : <><Bike size={13} /> Saiu para entrega</>}
-          </div>
+          o.delivery?.matchingExpired
+            ? <div className={styles.expiredRow}><TriangleAlert size={14} /> Sem entregador — reanuncie para procurar de novo</div>
+            : <div className={styles.waitRow}>
+                {o.status === 'READY'
+                  ? (o.delivery?.courierId ? <><Bike size={13} /> Entregador a caminho</> : <><ShoppingBag size={13} /> Aguardando o entregador retirar</>)
+                  : <><Bike size={13} /> Saiu para entrega</>}
+              </div>
         )}
 
         <div className={styles.cardFoot}>
@@ -182,6 +188,11 @@ export default function PedidosPage() {
           {next && (
             <button className={styles.advanceBtn} onClick={() => advance.mutate({ id: o.id, status: next })} disabled={advance.isPending}>
               {NEXT_STATUS_LABEL[o.status]} <ArrowRight size={15} />
+            </button>
+          )}
+          {o.status === 'READY' && o.delivery?.matchingExpired && (
+            <button className={styles.advanceBtn} onClick={() => reannounce.mutate(o.id)} disabled={reannounce.isPending}>
+              Reanunciar <Bike size={15} />
             </button>
           )}
         </div>

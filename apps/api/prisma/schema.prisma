@@ -517,6 +517,9 @@ model Delivery {
   status      DeliveryStatus @default(SEARCHING_COURIER)
   // Entregadores que RECUSARAM esta corrida — não recebem a oferta de novo.
   refusedCourierIds String[]  @default([]) @map("refused_courier_ids")
+  // Busca por entregador EXPIROU (passou do limite sem ninguém aceitar) — para de
+  // ofertar e a loja precisa "reanunciar" pra reabrir. Reset limpa os recusados.
+  matchingExpired   Boolean   @default(false) @map("matching_expired")
   photoUrl    String?        @map("photo_url")
   pickedUpAt  DateTime?      @map("picked_up_at")
   deliveredAt DateTime?      @map("delivered_at")

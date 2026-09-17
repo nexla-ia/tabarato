@@ -140,6 +140,7 @@ export interface Order {
   address?: { street?: string; number?: string; district?: string; city?: string; complement?: string | null } | null
   items?: OrderItem[]
   payment?: { method: string; status: string } | null
+  delivery?: { id: string; status: string; courierId?: string | null; matchingExpired?: boolean } | null
 }
 
 export const STATUS_LABEL: Record<string, string> = {
