@@ -96,7 +96,11 @@ export class CouriersService {
     }
 
     try {
-      return await this.prisma.courier.create({ data: { ...dto, userId } })
+      // acceptedTerms não é coluna — separa e grava o timestamp do aceite.
+      const { acceptedTerms, ...data } = dto
+      return await this.prisma.courier.create({
+        data: { ...data, userId, termsAcceptedAt: acceptedTerms ? new Date() : null },
+      })
     } catch (err: any) {
       // Corrida entre cadastros simultâneos com o mesmo CPF/CNH.
       if (err?.code === 'P2002') {

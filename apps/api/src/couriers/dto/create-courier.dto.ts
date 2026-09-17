@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator'
+import { Equals, IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator'
 import { IsCPF } from '../../common/validators/is-cpf.validator'
 
 export class CreateCourierDto {
@@ -50,4 +50,10 @@ export class CreateCourierDto {
   @IsString()
   @MaxLength(500)
   vehicleDocPhotoUrl: string
+
+  // Aceite OBRIGATÓRIO do Termo de Responsabilidade do entregador (extravio/roubo,
+  // conduta, etc.). Sem o aceite, não cadastra.
+  @IsBoolean()
+  @Equals(true, { message: 'É necessário aceitar o Termo de Responsabilidade do entregador.' })
+  acceptedTerms: boolean
 }

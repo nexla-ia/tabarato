@@ -451,6 +451,8 @@ model Courier {
   currentLat         Float?        @map("current_lat")
   currentLng         Float?        @map("current_lng")
   rating             Float         @default(5.0)
+  // Quando o entregador aceitou o Termo de Responsabilidade (no cadastro).
+  termsAcceptedAt    DateTime?     @map("terms_accepted_at")
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
 

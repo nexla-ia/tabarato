@@ -1141,7 +1141,7 @@ export class OrdersService {
     })
     if (!order) throw new NotFoundException('Order not found')
     if (!['PENDING', 'CONFIRMED'].includes(order.status)) {
-      throw new BadRequestException('Order cannot be cancelled at this stage')
+      throw new BadRequestException('A loja já começou a preparar seu pedido. Fale com a loja pelo chat para resolver.')
     }
 
     // Estorna o pagamento se já foi pago (idempotente; lança se o MP recusar,
