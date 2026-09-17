@@ -167,6 +167,10 @@ export class OrdersService {
     if (marketplaceOn && !(store as any).mpConnected) {
       throw new BadRequestException('Esta loja está finalizando a configuração de pagamentos e ainda não pode receber pedidos.')
     }
+    // Split Asaas: a loja PRECISA ter a subconta configurada (recebimentos) pra receber.
+    if (this.payments.asaasMoneyInEnabled && !(store as any).asaasWalletId) {
+      throw new BadRequestException('Esta loja está finalizando a configuração de recebimentos e ainda não pode receber pedidos.')
+    }
 
     // Validate the scheduled time (if any) — must be a valid future date
     let scheduledDate: Date | undefined
@@ -628,6 +632,9 @@ export class OrdersService {
     if ((store as any).status !== 'APPROVED') throw new BadRequestException(`A loja "${store.name}" não está disponível para pedidos.`)
     if (marketplaceOn && !(store as any).mpConnected) {
       throw new BadRequestException(`A loja "${store.name}" está finalizando a configuração de pagamentos e ainda não pode receber pedidos.`)
+    }
+    if (this.payments.asaasMoneyInEnabled && !(store as any).asaasWalletId) {
+      throw new BadRequestException(`A loja "${store.name}" está finalizando a configuração de recebimentos e ainda não pode receber pedidos.`)
     }
     if (!scheduledDate) {
       const openNow = isStoreOpenNow(store.openingHours, (store as any).scheduleExceptions)

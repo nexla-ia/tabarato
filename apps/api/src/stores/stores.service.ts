@@ -265,6 +265,10 @@ export class StoresService {
         'Lembre de ter uma chave PIX cadastrada na conta MP para receber por PIX.',
       )
     }
+    // Split Asaas: a loja só ABRE depois de configurar os recebimentos (subconta).
+    if (!nextPaused && this.asaas.moneyInEnabled && !(store as any).asaasWalletId) {
+      throw new BadRequestException('Configure seus recebimentos (aba "Recebimentos") antes de abrir a loja.')
+    }
 
     const scheduleOpen = computeIsOpen(store.openingHours, (store as any).scheduleExceptions)
     const effectiveOpen = scheduleOpen === null ? !nextPaused : (scheduleOpen && !nextPaused)
