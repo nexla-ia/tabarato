@@ -127,7 +127,7 @@ describe('StoresService — split (subconta Asaas)', () => {
 
     await svc.createAsaasAccount('u1', { postalCode: '76980000', addressNumber: '10', province: 'Centro', incomeValue: 5000 } as any)
 
-    expect(asaas.createAccount).toHaveBeenCalledWith(expect.objectContaining({ cpfCnpj: '11222333000144', email: 'a@b.c', name: 'Loja' }))
+    expect(asaas.createAccount).toHaveBeenCalledWith(expect.objectContaining({ cpfCnpj: '11222333000144', email: expect.stringContaining('+loja'), name: 'Loja' }))
     expect(crypto.encrypt).toHaveBeenCalledWith('RAWKEY')
     expect(prisma.store.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ asaasWalletId: 'wal1', asaasApiKey: 'enc:RAWKEY', asaasOnboarded: true }) }),

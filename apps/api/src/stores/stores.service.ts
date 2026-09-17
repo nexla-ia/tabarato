@@ -422,9 +422,15 @@ export class StoresService {
     if (!store) throw new NotFoundException('Store not found')
     if (store.asaasWalletId) return { onboarded: true } // já tem subconta
 
-    const email = store.user?.email
-    if (!email) throw new BadRequestException('E-mail da loja não encontrado.')
+    const baseEmail = store.user?.email
+    if (!baseEmail) throw new BadRequestException('E-mail da loja não encontrado.')
     if (!store.phone) throw new BadRequestException('Cadastre o telefone da loja antes de configurar os recebimentos.')
+
+    // O Asaas exige e-mail ÚNICO por subconta. Como o e-mail do lojista pode já estar
+    // em uso (conta-mãe, outra loja, tentativa anterior), usa um alias +loja<id> —
+    // continua caindo na caixa dele, mas é distinto no Asaas.
+    const [local, domain] = baseEmail.split('@')
+    const email = domain ? `${local}+loja${store.id.slice(0, 8)}@${domain}` : baseEmail
 
     try {
       const acc = await this.asaas.createAccount({
