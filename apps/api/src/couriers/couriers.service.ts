@@ -242,6 +242,13 @@ export class CouriersService {
     if (courier.status !== 'APPROVED' || !courier.isOnline) return []
     if (courier.currentLat == null || courier.currentLng == null) return []
 
+    // Já tem uma entrega ATIVA? Não oferta novas — só pode 1 por vez, e o aceite daria
+    // 409. Isto mata o loop de "outro entregador pegou" que voltava a aparecer.
+    const activeCount = await this.prisma.delivery.count({
+      where: { courierId: courier.id, status: { notIn: ['SEARCHING_COURIER', 'DELIVERED', 'FAILED'] } },
+    })
+    if (activeCount > 0) return []
+
     const deliveries = await this.prisma.delivery.findMany({
       where: {
         courierId: null,
