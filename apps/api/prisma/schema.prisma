@@ -515,6 +515,8 @@ model Delivery {
   distanceKm  Decimal        @map("distance_km")
   courierFee  Decimal        @map("courier_fee")
   status      DeliveryStatus @default(SEARCHING_COURIER)
+  // Entregadores que RECUSARAM esta corrida — não recebem a oferta de novo.
+  refusedCourierIds String[]  @default([]) @map("refused_courier_ids")
   photoUrl    String?        @map("photo_url")
   pickedUpAt  DateTime?      @map("picked_up_at")
   deliveredAt DateTime?      @map("delivered_at")

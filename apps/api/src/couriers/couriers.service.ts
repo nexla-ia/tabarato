@@ -243,7 +243,14 @@ export class CouriersService {
     if (courier.currentLat == null || courier.currentLng == null) return []
 
     const deliveries = await this.prisma.delivery.findMany({
-      where: { courierId: null, status: 'SEARCHING_COURIER' },
+      where: {
+        courierId: null,
+        status: 'SEARCHING_COURIER',
+        // Não mostra corridas que ESTE entregador já recusou.
+        NOT: { refusedCourierIds: { has: courier.id } },
+        // Não mostra corridas de pedidos já cancelados/entregues (entregas órfãs).
+        order: { status: { notIn: ['CANCELLED', 'DELIVERED'] } },
+      },
       include: {
         order: {
           // SELECT explícito: antes do aceite só expõe o mínimo. Com `include` sem
@@ -332,7 +339,40 @@ export class CouriersService {
     // Cancel auto-match timer — delivery is taken
     this.matching?.cancelMatching(deliveryId)
 
+    // Avisa CLIENTE e LOJA que um entregador assumiu a corrida (push + sino). A tela do
+    // pedido também reflete pelo poll, mas o aviso na hora melhora muito a experiência.
+    try {
+      const ord = await this.prisma.order.findUnique({
+        where: { id: target.orderId },
+        select: {
+          id: true, userId: true,
+          user: { select: { pushToken: true } },
+          store: { select: { userId: true, user: { select: { pushToken: true } } } },
+        },
+      })
+      if (ord) {
+        const short = ord.id.slice(0, 8)
+        if (ord.user?.pushToken) this.push.send(ord.user.pushToken, '🛵 Entregador a caminho!', 'Um entregador aceitou seu pedido e está indo até a loja.', { orderId: ord.id })
+        this.notifications.create(ord.userId, 'ORDER_UPDATE', '🛵 Entregador a caminho!', `Pedido #${short}: um entregador aceitou sua entrega.`, { orderId: ord.id }).catch(() => {})
+        if (ord.store?.user?.pushToken) this.push.send(ord.store.user.pushToken, '🛵 Entregador a caminho', 'Um entregador vai retirar este pedido.', { orderId: ord.id })
+        if (ord.store?.userId) this.notifications.create(ord.store.userId, 'ORDER_UPDATE', '🛵 Entregador a caminho', `Pedido #${short}: entregador a caminho da loja.`, { orderId: ord.id }).catch(() => {})
+      }
+    } catch (err) {
+      this.logger.warn('Falha ao notificar aceite de entrega', err as any)
+    }
+
     return this.prisma.delivery.findUnique({ where: { id: deliveryId } })
+  }
+
+  /** O entregador RECUSA a corrida — fica registrado pra ele NÃO receber a oferta de novo. */
+  async refuseDelivery(userId: string, deliveryId: string) {
+    const courier = await this.prisma.courier.findUnique({ where: { userId }, select: { id: true } })
+    if (!courier) throw new NotFoundException('Courier not found')
+    await this.prisma.delivery.updateMany({
+      where: { id: deliveryId, status: 'SEARCHING_COURIER', NOT: { refusedCourierIds: { has: courier.id } } },
+      data: { refusedCourierIds: { push: courier.id } },
+    })
+    return { refused: true }
   }
 
   async findWallet(userId: string) {

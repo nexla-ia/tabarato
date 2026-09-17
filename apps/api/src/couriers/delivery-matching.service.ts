@@ -48,7 +48,7 @@ export class DeliveryMatchingService implements OnModuleInit {
   async onModuleInit() {
     try {
       const stuck = await this.prisma.delivery.findMany({
-        where: { status: 'SEARCHING_COURIER', courierId: null },
+        where: { status: 'SEARCHING_COURIER', courierId: null, order: { status: { notIn: ['CANCELLED', 'DELIVERED'] } } },
         include: { order: { include: { store: { select: { lat: true, lng: true } } } } },
       })
       if (stuck.length > 0) {
@@ -72,7 +72,7 @@ export class DeliveryMatchingService implements OnModuleInit {
   async resweepOrphanDeliveries() {
     try {
       const orphans = await this.prisma.delivery.findMany({
-        where: { status: 'SEARCHING_COURIER', courierId: null },
+        where: { status: 'SEARCHING_COURIER', courierId: null, order: { status: { notIn: ['CANCELLED', 'DELIVERED'] } } },
         include: { order: { include: { store: { select: { name: true, lat: true, lng: true, user: { select: { pushToken: true } } } } } } },
       })
       const now = Date.now()
@@ -133,9 +133,14 @@ export class DeliveryMatchingService implements OnModuleInit {
   }
 
   private async tryRadius(deliveryId: string, storeLat: number, storeLng: number, radiusKm: number) {
-    // Confirm delivery is still unassigned
-    const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } })
-    if (!delivery || delivery.courierId || delivery.status !== 'SEARCHING_COURIER') {
+    // Confirm delivery is still unassigned E que o pedido não foi cancelado/entregue
+    // (entrega órfã de pedido morto não deve ser ofertada).
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id: deliveryId },
+      include: { order: { select: { status: true } } },
+    })
+    if (!delivery || delivery.courierId || delivery.status !== 'SEARCHING_COURIER'
+        || ['CANCELLED', 'DELIVERED'].includes((delivery as any).order?.status)) {
       this.cancelMatching(deliveryId)
       return
     }
@@ -151,7 +156,10 @@ export class DeliveryMatchingService implements OnModuleInit {
         isOnline: true,
         currentLat: { not: null },
         currentLng: { not: null },
-        id: entry.offeredTo.size ? { notIn: [...entry.offeredTo] } : undefined,
+        // Exclui quem já recebeu a oferta neste ciclo E quem RECUSOU a corrida.
+        id: (entry.offeredTo.size || delivery.refusedCourierIds.length)
+          ? { notIn: [...entry.offeredTo, ...delivery.refusedCourierIds] }
+          : undefined,
         // Não ofertar a quem já tem entrega ativa (o aceite recusaria de qualquer
         // forma por causa do limite de 1 ativa) — evita push-spam e "queimar" o
         // slot de 30s do raio com um motoboy que não pode pegar a corrida.
