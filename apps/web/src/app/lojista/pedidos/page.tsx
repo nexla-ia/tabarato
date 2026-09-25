@@ -29,6 +29,10 @@ export default function PedidosPage() {
   const [histFilter, setHistFilter] = useState<'ALL' | 'DELIVERED' | 'CANCELLED'>('ALL')
   const [cancelId, setCancelId] = useState<string | null>(null)
   const [note, setNote] = useState('')
+  // Retirada na loja: modal pra digitar o código que o cliente mostra.
+  const [pickupId, setPickupId] = useState<string | null>(null)
+  const [pickupCode, setPickupCode] = useState('')
+  const [pickupErr, setPickupErr] = useState('')
 
   const ordersQ = useQuery<Order[]>({
     queryKey: ['store-orders'],
@@ -65,6 +69,13 @@ export default function PedidosPage() {
   })
   const reannounce = useMutation({
     mutationFn: async (id: string) => (await api.post(`/orders/${id}/reannounce`)).data,
+    onSettled: () => qc.invalidateQueries({ queryKey: ['store-orders'] }),
+  })
+  const confirmPickup = useMutation({
+    mutationFn: async ({ id, code }: { id: string; code: string }) =>
+      (await api.post(`/orders/${id}/confirm-pickup`, { code })).data,
+    onSuccess: () => { setPickupId(null); setPickupCode(''); setPickupErr('') },
+    onError: (err: any) => { setPickupErr(err?.response?.data?.message ?? 'Código inválido. Confira com o cliente.') },
     onSettled: () => qc.invalidateQueries({ queryKey: ['store-orders'] }),
   })
 
@@ -119,6 +130,7 @@ export default function PedidosPage() {
 
   function Card({ o }: { o: Order }) {
     const next = NEXT_STATUS[o.status]
+    const isPickup = o.fulfillmentType === 'PICKUP'
     const canCancel = ['PENDING', 'CONFIRMED', 'PREPARING'].includes(o.status)
     const late = isOrderLate(o)
     const itemCount = (o.items ?? []).reduce((s, i) => s + i.quantity, 0)
@@ -128,6 +140,7 @@ export default function PedidosPage() {
         <div className={styles.cardHead}>
           <div className={styles.headLeft}>
             <span className={styles.orderId}>#{o.id.slice(-6).toUpperCase()}</span>
+            {isPickup && <span className={styles.pickupTag}><ShoppingBag size={11} /> Retirada</span>}
             {late
               ? <span className={styles.lateBadge}><TriangleAlert size={11} /> Atrasado</span>
               : <span className={styles.badge} style={{ background: `${STATUS_COLOR[o.status]}18`, color: STATUS_COLOR[o.status] }}>{STATUS_LABEL[o.status]}</span>}
@@ -140,10 +153,16 @@ export default function PedidosPage() {
           {o.user?.phone ? <span className={styles.phone}> · {o.user.phone}</span> : null}
         </div>
 
-        {o.address && (
+        {!isPickup && o.address && (
           <div className={styles.addr}>
             <MapPin size={13} />
             <span>{[o.address.street, o.address.number, o.address.district].filter(Boolean).join(', ')}{o.address.complement ? ` (${o.address.complement})` : ''}</span>
+          </div>
+        )}
+        {isPickup && (
+          <div className={styles.addr}>
+            <ShoppingBag size={13} />
+            <span>Cliente retira na loja</span>
           </div>
         )}
 
@@ -169,7 +188,10 @@ export default function PedidosPage() {
           </div>
         </div>
 
-        {(o.status === 'READY' || o.status === 'PICKED_UP') && (
+        {isPickup && o.status === 'READY' && (
+          <div className={styles.waitRow}><ShoppingBag size={13} /> Aguardando o cliente retirar</div>
+        )}
+        {!isPickup && (o.status === 'READY' || o.status === 'PICKED_UP') && (
           o.delivery?.matchingExpired
             ? <div className={styles.expiredRow}><TriangleAlert size={14} /> Sem entregador — reanuncie para procurar de novo</div>
             : <div className={styles.waitRow}>
@@ -190,7 +212,12 @@ export default function PedidosPage() {
               {NEXT_STATUS_LABEL[o.status]} <ArrowRight size={15} />
             </button>
           )}
-          {o.status === 'READY' && o.delivery?.matchingExpired && (
+          {isPickup && o.status === 'READY' && (
+            <button className={styles.advanceBtn} onClick={() => { setPickupId(o.id); setPickupCode(''); setPickupErr('') }} disabled={confirmPickup.isPending}>
+              Confirmar retirada <CheckCircle2 size={15} />
+            </button>
+          )}
+          {!isPickup && o.status === 'READY' && o.delivery?.matchingExpired && (
             <button className={styles.advanceBtn} onClick={() => reannounce.mutate(o.id)} disabled={reannounce.isPending}>
               Reanunciar <Bike size={15} />
             </button>
@@ -300,6 +327,39 @@ export default function PedidosPage() {
               <button className={styles.modalCancel} onClick={() => setCancelId(null)}>Voltar</button>
               <button className={styles.modalConfirm} onClick={() => cancel.mutate({ id: cancelId, note })} disabled={cancel.isPending}>
                 {cancel.isPending ? 'Recusando…' : 'Recusar pedido'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pickupId && (
+        <div className={styles.overlay} onClick={() => setPickupId(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHead}>
+              <h3>Confirmar retirada</h3>
+              <button onClick={() => setPickupId(null)}><X size={18} /></button>
+            </div>
+            <p className={styles.modalSub}>Peça ao cliente o <b>código de retirada</b> (aparece no app dele) e digite abaixo.</p>
+            <input
+              className={styles.pickupInput}
+              placeholder="Ex.: 482913"
+              value={pickupCode}
+              onChange={e => { setPickupCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setPickupErr('') }}
+              inputMode="numeric"
+              maxLength={6}
+              autoFocus
+            />
+            {pickupErr && <p className={styles.pickupErr}><TriangleAlert size={13} /> {pickupErr}</p>}
+            <div className={styles.modalActions}>
+              <button className={styles.modalCancel} onClick={() => setPickupId(null)}>Voltar</button>
+              <button
+                className={styles.modalConfirm}
+                style={{ background: '#059669' }}
+                onClick={() => confirmPickup.mutate({ id: pickupId, code: pickupCode })}
+                disabled={confirmPickup.isPending || pickupCode.length < 4}
+              >
+                {confirmPickup.isPending ? 'Confirmando…' : 'Confirmar retirada'}
               </button>
             </div>
           </div>

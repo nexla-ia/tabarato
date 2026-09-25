@@ -256,9 +256,10 @@ export class OrdersService {
         throw new BadRequestException(`Produto "${product.name}" tem apenas ${product.stock} unidade(s) disponível(is).`)
       }
 
-      // Validate delivery distance limit per product (uses pre-calculated distance)
+      // Validate delivery distance limit per product (uses pre-calculated distance).
+      // Retirada na loja não tem limite de distância (o cliente vem buscar).
       const productMaxKm = (product as any).maxDeliveryKm
-      if (productMaxKm != null && productMaxKm > 0 && distToAddress > productMaxKm) {
+      if (dto.fulfillmentType !== 'PICKUP' && productMaxKm != null && productMaxKm > 0 && distToAddress > productMaxKm) {
         throw new BadRequestException(
           `"${product.name}" não pode ser entregue a ${distToAddress.toFixed(1)} km — limite deste produto é ${productMaxKm} km.`
         )
@@ -642,6 +643,7 @@ export class OrdersService {
     address: { lat: number; lng: number },
     scheduledDate: Date | undefined,
     marketplaceOn: boolean,
+    isPickup = false,
   ) {
     const store = await this.prisma.store.findUnique({
       where: { id: group.storeId },
@@ -683,8 +685,10 @@ export class OrdersService {
       if (!product || !product.isActive) throw new BadRequestException(`Um item da loja "${store.name}" não está disponível.`)
       if (product.storeId !== store.id) throw new BadRequestException('Um item não pertence à loja informada.')
       if (product.stock !== null && product.stock < item.quantity) throw new BadRequestException(`Produto "${product.name}" tem apenas ${product.stock} unidade(s) disponível(is).`)
+      // Retirada na loja: o cliente vem até a loja, então o limite de distância do
+      // produto não se aplica (só vale pra entrega por motoboy).
       const productMaxKm = (product as any).maxDeliveryKm
-      if (productMaxKm != null && productMaxKm > 0 && distToAddress > productMaxKm) {
+      if (!isPickup && productMaxKm != null && productMaxKm > 0 && distToAddress > productMaxKm) {
         throw new BadRequestException(`"${product.name}" não pode ser entregue a ${distToAddress.toFixed(1)} km — limite deste produto é ${productMaxKm} km.`)
       }
       let unitPrice = Number(product.basePrice ?? 0)
@@ -760,14 +764,14 @@ export class OrdersService {
 
     const marketplaceOn = this.mpOauth.isEnabled() && !this.payments.asaasMoneyInEnabled
     const multiStore = rawGroups.length > 1
+    const isPickup = dto.fulfillmentType === 'PICKUP'
 
     // Prepara todos os grupos (validação + preço) ANTES de qualquer escrita.
     const prepared: Awaited<ReturnType<typeof this.prepareStoreGroup>>[] = []
-    for (const g of rawGroups) prepared.push(await this.prepareStoreGroup(userId, g, address, scheduledDate, marketplaceOn))
+    for (const g of rawGroups) prepared.push(await this.prepareStoreGroup(userId, g, address, scheduledDate, marketplaceOn, isPickup))
 
     // Retirada na loja: sem taxa de entrega em nenhum grupo. Entrega: aplica o teto de
     // segurança (acima de maxDeliveryValue, só retirada) por loja.
-    const isPickup = dto.fulfillmentType === 'PICKUP'
     if (isPickup) {
       for (const g of prepared) { (g as any).deliveryFee = 0; (g as any).couponFreeShipping = false }
     } else {

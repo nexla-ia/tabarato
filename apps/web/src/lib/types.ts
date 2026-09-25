@@ -129,6 +129,7 @@ export interface OrderItem {
 export interface Order {
   id: string
   status: OrderStatus
+  fulfillmentType?: 'DELIVERY' | 'PICKUP'
   subtotal: number | string
   deliveryFee: number | string
   discount: number | string

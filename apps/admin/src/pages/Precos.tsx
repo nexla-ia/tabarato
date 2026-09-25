@@ -105,6 +105,16 @@ export function Precos() {
             <Field label="Comissão sobre os produtos" value={p.platformCommissionPct} onChange={set('platformCommissionPct')} suffix="%" />
           </Section>
 
+          <Section title="Segurança da entrega">
+            <Field
+              label="Teto para entrega por motoboy"
+              hint="Acima deste valor de produtos, o cliente só pode retirar na loja (0 = sem limite)."
+              value={p.maxDeliveryValue}
+              onChange={set('maxDeliveryValue')}
+              suffix="R$"
+            />
+          </Section>
+
           <button
             onClick={save} disabled={saving}
             style={{ background: O, color: '#fff', border: 'none', borderRadius: 11, padding: '12px 24px', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: SANS, opacity: saving ? 0.7 : 1 }}

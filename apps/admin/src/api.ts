@@ -81,6 +81,8 @@ export interface Pricing {
   courierBaseFee: number
   courierPerKm: number
   platformCommissionPct: number
+  // Acima deste valor de produtos, só retirada na loja (0 = sem limite).
+  maxDeliveryValue: number
 }
 
 export interface OpWaiting {

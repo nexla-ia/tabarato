@@ -20,4 +20,9 @@ export class UpdatePricingDto {
   // Comissão em % (0 a 100).
   @IsOptional() @IsNumber() @Min(0) @Max(100)
   platformCommissionPct?: number
+
+  // Teto de valor (produtos) para entrega por motoboy. Acima disso, só retirada
+  // na loja. 0 = sem limite. Até R$ 1 milhão.
+  @IsOptional() @IsNumber() @Min(0) @Max(1_000_000)
+  maxDeliveryValue?: number
 }
