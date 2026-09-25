@@ -96,4 +96,12 @@ export class OrdersController {
   reannounce(@CurrentUser() user: any, @Param('id') id: string) {
     return this.ordersService.reannounceDelivery(user.sub, id)
   }
+
+  // Confirmar retirada na loja: a loja digita o código que o cliente mostra.
+  @UseGuards(RolesGuard)
+  @Roles('STORE_OWNER')
+  @Post(':id/confirm-pickup')
+  confirmPickup(@CurrentUser() user: any, @Param('id') id: string, @Body() body: { code: string }) {
+    return this.ordersService.confirmPickup(user.sub, id, body?.code)
+  }
 }

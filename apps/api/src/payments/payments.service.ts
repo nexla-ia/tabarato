@@ -8,6 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { MpOauthService } from './mp-oauth.service'
 import { AsaasService } from './asaas.service'
 import { OrderConsumptionService } from '../orders/order-consumption.service'
+import { PlatformSettingsService } from '../settings/platform-settings.service'
 import { PIX_EXPIRATION_MS } from './pix.constants'
 
 @Injectable()
@@ -23,6 +24,7 @@ export class PaymentsService {
     private mpOauth: MpOauthService,
     private asaas: AsaasService,
     private orderConsumption: OrderConsumptionService,
+    private settings: PlatformSettingsService,
   ) {
     const client = new MercadoPagoConfig({
       accessToken: this.config.get<string>('MERCADO_PAGO_ACCESS_TOKEN') ?? '',
@@ -159,13 +161,16 @@ export class PaymentsService {
    * Config pública de pagamento — o checkout usa pra saber qual provedor está ativo
    * por método (ASAAS exige CPF no PIX; no cartão os campos vão crus em vez do token MP).
    */
-  getPublicConfig() {
+  async getPublicConfig() {
+    const pricing = await this.settings.get().catch(() => null)
     return {
       pix: this.asaas.pixInEnabled ? 'ASAAS' : 'MP',
       // Cartão no Asaas = Checkout HOSPEDADO (o app abre a página do Asaas; os dados
       // do cartão não passam pelo nosso backend). 'checkout' sinaliza esse fluxo.
       card: this.asaas.cardInEnabled ? 'ASAAS' : 'MP',
       cardMode: this.asaas.cardInEnabled ? 'CHECKOUT' : 'TOKEN',
+      // Acima deste valor de produtos, só retirada na loja (0 = sem limite).
+      maxDeliveryValue: pricing?.maxDeliveryValue ?? 0,
     }
   }
 

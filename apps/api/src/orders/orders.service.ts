@@ -11,6 +11,8 @@ import { PIX_EXPIRATION_MS } from '../payments/pix.constants'
 import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
 import { OrderConsumptionService } from './order-consumption.service'
 import { PlatformSettingsService } from '../settings/platform-settings.service'
+import { WalletService } from '../wallet/wallet.service'
+import { LoyaltyService } from '../loyalty/loyalty.service'
 import { CreateOrderDto } from './dto/create-order.dto'
 
 function isStoreOpenNow(openingHours: any, scheduleExceptions?: any, atMs: number = Date.now()): boolean | null {
@@ -96,6 +98,8 @@ export class OrdersService {
     private mpOauth: MpOauthService,
     private orderConsumption: OrderConsumptionService,
     private settings: PlatformSettingsService,
+    private wallet: WalletService,
+    private loyalty: LoyaltyService,
     @Optional() private matching: DeliveryMatchingService,
   ) {}
 
@@ -292,7 +296,14 @@ export class OrdersService {
     promoDiscount = Math.round(promoDiscount * 100) / 100
 
     const distanceKm = distToAddress // already calculated above
-    const deliveryFee = await this.settings.deliveryFeeFor(distanceKm)
+    const isPickup = dto.fulfillmentType === 'PICKUP'
+    // Teto de segurança: acima de maxDeliveryValue (valor dos produtos) a ENTREGA por
+    // motoboy é bloqueada — o cliente precisa RETIRAR na loja. 0 = sem limite.
+    const pricing = await this.settings.get()
+    if (!isPickup && pricing.maxDeliveryValue > 0 && subtotal > pricing.maxDeliveryValue) {
+      throw new BadRequestException(`Pedidos acima de R$ ${pricing.maxDeliveryValue.toFixed(0)} só com retirada na loja (por segurança, o motoboy não leva itens acima desse valor).`)
+    }
+    const deliveryFee = isPickup ? 0 : await this.settings.deliveryFeeFor(distanceKm)
 
     // Descontos separados por QUEM os custeia:
     //  • cupom  → absorvido pela LOJA (promoção dela)
@@ -384,6 +395,7 @@ export class OrdersService {
           notes: dto.notes,
           scheduledFor: scheduledDate,
           deliveryCode,
+          fulfillmentType: isPickup ? 'PICKUP' : 'DELIVERY',
           // Marca se o pagamento será cobrado via split (dinheiro cai direto na loja).
           // Lido no repasse (evita creditar a loja 2x) e no estorno (qual token usar).
           paidViaSplit: marketplaceOn && ['PIX', 'CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod),
@@ -753,6 +765,21 @@ export class OrdersService {
     const prepared: Awaited<ReturnType<typeof this.prepareStoreGroup>>[] = []
     for (const g of rawGroups) prepared.push(await this.prepareStoreGroup(userId, g, address, scheduledDate, marketplaceOn))
 
+    // Retirada na loja: sem taxa de entrega em nenhum grupo. Entrega: aplica o teto de
+    // segurança (acima de maxDeliveryValue, só retirada) por loja.
+    const isPickup = dto.fulfillmentType === 'PICKUP'
+    if (isPickup) {
+      for (const g of prepared) { (g as any).deliveryFee = 0; (g as any).couponFreeShipping = false }
+    } else {
+      const pricing = await this.settings.get()
+      if (pricing.maxDeliveryValue > 0) {
+        const over = prepared.find((g) => g.subtotal > pricing.maxDeliveryValue)
+        if (over) {
+          throw new BadRequestException(`A loja "${over.store.name}" tem itens acima de R$ ${pricing.maxDeliveryValue.toFixed(0)} — esse valor só com retirada na loja.`)
+        }
+      }
+    }
+
     // Fidelidade (global): distribui o desconto entre os grupos, proporcional ao (subtotal − cupom).
     let loyaltyRedeem = 0, loyaltyAccountId: string | undefined
     if (dto.pointsToRedeem && dto.pointsToRedeem > 0) {
@@ -824,6 +851,7 @@ export class OrdersService {
             promoDiscount: g.promoDiscount,
             freeShipping: g.couponFreeShipping, total: gt.total,
             notes: dto.notes, scheduledFor: scheduledDate, deliveryCode: deliveryCodes[i],
+            fulfillmentType: isPickup ? 'PICKUP' : 'DELIVERY',
             paidViaSplit,
             items: { create: g.orderItems },
           },
@@ -1097,7 +1125,9 @@ export class OrdersService {
       data: { orderId, status, changedBy: userId, note: refusalNote },
     }).catch((err) => this.logger.warn('Audit log failed', err))
 
-    if (status === 'READY') {
+    // Retirada na loja: NÃO cria entrega nem procura motoboy — o pedido fica READY
+    // aguardando o cliente buscar (a loja confirma a retirada com o código depois).
+    if (status === 'READY' && (order as any).fulfillmentType !== 'PICKUP') {
       const existing = await this.prisma.delivery.findUnique({ where: { orderId } })
       if (!existing) {
         const distanceKm = haversineKm(store.lat, store.lng, order.address.lat, order.address.lng)
@@ -1197,6 +1227,55 @@ export class OrdersService {
       this.matching?.startMatching(delivery.id, order.store.lat, order.store.lng)
         .catch((err) => this.logger.warn('Reannounce match failed', err))
     }
+    return { ok: true }
+  }
+
+  /**
+   * Retirada na loja: a LOJA confirma que o cliente retirou, digitando o código de
+   * retirada (o mesmo deliveryCode que o cliente mostra). Marca DELIVERED, credita a
+   * loja (só no modo carteira; no split já caiu na subconta) e gera pontos de
+   * fidelidade. Anti-fraude por tentativas (trava em 5), igual ao código de entrega.
+   */
+  async confirmPickup(userId: string, orderId: string, code: string) {
+    const store = await this.prisma.store.findUnique({ where: { userId } })
+    if (!store) throw new ForbiddenException()
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, storeId: store.id },
+      include: { user: { select: { id: true, pushToken: true } } },
+    })
+    if (!order) throw new NotFoundException('Pedido não encontrado.')
+    if ((order as any).fulfillmentType !== 'PICKUP') throw new BadRequestException('Este pedido é para entrega, não retirada.')
+    if (order.status !== 'READY') throw new BadRequestException('O pedido precisa estar "Pronto" para confirmar a retirada.')
+
+    const clean = String(code ?? '').replace(/\D/g, '')
+    // Transição atômica só se o código bate E ainda há tentativas — evita brute-force.
+    const claim = await this.prisma.order.updateMany({
+      where: { id: orderId, status: 'READY', deliveryCode: clean, deliveryCodeAttempts: { lt: 5 } },
+      data: { status: 'DELIVERED' },
+    })
+    if (claim.count === 0) {
+      await this.prisma.order.updateMany({
+        where: { id: orderId, status: 'READY', deliveryCodeAttempts: { lt: 5 } },
+        data: { deliveryCodeAttempts: { increment: 1 } },
+      })
+      throw new BadRequestException('Código de retirada inválido. Confira os 6 dígitos com o cliente.')
+    }
+
+    // Repasse à loja (só no modo carteira; no split o dinheiro já caiu na subconta da loja).
+    if (!(order as any).paidViaSplit) {
+      const commission = await this.settings.commissionFor(Number(order.subtotal))
+      const storeAmount = Math.max(0, Math.round((Number(order.subtotal) - Number(order.couponDiscount) - Number((order as any).promoDiscount ?? 0) - commission) * 100) / 100)
+      if (storeAmount > 0) {
+        await this.wallet.credit(store.id, 'STORE', storeAmount, `Pedido #${orderId.slice(0, 8)} (retirada)`, orderId)
+          .catch((e) => this.logger.warn('Store credit (pickup) failed', e))
+      }
+    }
+    this.loyalty.earnPoints(order.userId, orderId, Number(order.subtotal)).catch(() => {})
+
+    if (order.user?.pushToken) this.push.send(order.user.pushToken, '✅ Pedido retirado!', 'Obrigado! Seu pedido foi retirado na loja.', { orderId })
+    this.notifications.create(order.userId, 'ORDER_UPDATE', '✅ Pedido retirado!', `Pedido #${orderId.slice(0, 8)} retirado com sucesso.`, { orderId }).catch(() => {})
+
+    this.prisma.orderStatusHistory.create({ data: { orderId, status: 'DELIVERED', changedBy: userId } }).catch(() => {})
     return { ok: true }
   }
 

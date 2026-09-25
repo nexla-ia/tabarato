@@ -9,9 +9,11 @@ import { PushService } from '../common/push.service'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { PaymentsModule } from '../payments/payments.module'
 import { CouriersModule } from '../couriers/couriers.module'
+import { WalletModule } from '../wallet/wallet.module'
+import { LoyaltyModule } from '../loyalty/loyalty.module'
 
 @Module({
-  imports: [CouponsModule, NotificationsModule, PaymentsModule, CouriersModule],
+  imports: [CouponsModule, NotificationsModule, PaymentsModule, CouriersModule, WalletModule, LoyaltyModule],
   controllers: [OrdersController],
   providers: [OrdersService, OrderConsumptionService, ScheduledOrdersService, PixExpirationService, PushService],
 })

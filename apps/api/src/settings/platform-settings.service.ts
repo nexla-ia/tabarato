@@ -8,6 +8,7 @@ export interface Pricing {
   courierBaseFee: number
   courierPerKm: number
   platformCommissionPct: number // em % (10 = 10%)
+  maxDeliveryValue: number // acima disso (subtotal), só retirada. 0 = sem limite.
 }
 
 // Padrões = comportamento atual (nada muda até o admin editar).
@@ -18,6 +19,7 @@ export const DEFAULT_PRICING: Pricing = {
   courierBaseFee: 10,
   courierPerKm: 2,
   platformCommissionPct: 10,
+  maxDeliveryValue: 1000,
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100
@@ -42,6 +44,7 @@ export class PlatformSettingsService {
           courierBaseFee: Number(row.courierBaseFee),
           courierPerKm: Number(row.courierPerKm),
           platformCommissionPct: Number(row.platformCommissionPct),
+          maxDeliveryValue: Number((row as any).maxDeliveryValue ?? DEFAULT_PRICING.maxDeliveryValue),
         }
       : { ...DEFAULT_PRICING }
     this.cache = { data, at: Date.now() }

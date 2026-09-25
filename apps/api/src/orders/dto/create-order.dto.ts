@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsEnum, IsInt, IsNumber, IsOptional, IsPositive, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsPositive, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { PaymentMethod } from '@prisma/client'
 
@@ -61,6 +61,11 @@ export class CreateOrderDto {
 
   @IsString()
   addressId: string
+
+  // DELIVERY (padrão) ou PICKUP (retirar na loja — sem taxa/entrega/motoboy).
+  @IsIn(['DELIVERY', 'PICKUP'])
+  @IsOptional()
+  fulfillmentType?: 'DELIVERY' | 'PICKUP'
 
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod

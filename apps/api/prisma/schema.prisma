@@ -344,6 +344,9 @@ model Order {
   deliveryCode String?    @map("delivery_code")
   deliveryCodeAttempts Int @default(0) @map("delivery_code_attempts")
   paidViaSplit Boolean    @default(false) @map("paid_via_split")
+  // DELIVERY (entrega por motoboy) ou PICKUP (cliente retira na loja). Retirada não
+  // tem taxa de entrega nem motoboy; o cliente confirma com o deliveryCode na loja.
+  fulfillmentType String  @default("DELIVERY") @map("fulfillment_type")
   notes        String?
   refusalNote  String?    @map("refusal_note")
   createdAt   DateTime    @default(now()) @map("created_at")
@@ -475,6 +478,9 @@ model PlatformSettings {
   courierBaseFee        Decimal  @default(10) @map("courier_base_fee")         // base que o motoboy recebe
   courierPerKm          Decimal  @default(2) @map("courier_per_km")            // por km ao motoboy
   platformCommissionPct Decimal  @default(10) @map("platform_commission_pct")  // % sobre o subtotal (10 = 10%)
+  // Acima deste valor de produtos (subtotal), a ENTREGA por motoboy é bloqueada e o
+  // cliente precisa RETIRAR na loja (segurança — motoboy não carrega item caro). 0 = sem limite.
+  maxDeliveryValue      Decimal  @default(1000) @map("max_delivery_value")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("platform_settings")

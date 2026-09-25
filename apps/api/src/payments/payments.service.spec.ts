@@ -18,8 +18,9 @@ function makeService(over: any = {}) {
     ...(over.asaas ?? {}),
   }
   const config = { get: jest.fn() }
+  const settings = { get: jest.fn().mockResolvedValue({ maxDeliveryValue: 1000 }) }
   const svc = new PaymentsService(
-    config as any, prisma as any, push as any, notifications as any, {} as any, asaas as any, orderConsumption as any,
+    config as any, prisma as any, push as any, notifications as any, {} as any, asaas as any, orderConsumption as any, settings as any,
   )
   return { svc, prisma, push, notifications, asaas }
 }
