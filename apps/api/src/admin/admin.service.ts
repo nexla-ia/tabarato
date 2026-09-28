@@ -1,8 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { UploadsService } from '../uploads/uploads.service'
 import { DeliveryMatchingService } from '../couriers/delivery-matching.service'
 import { PlatformSettingsService, Pricing } from '../settings/platform-settings.service'
+import { NotificationsService } from '../notifications/notifications.service'
+import { PushService } from '../common/push.service'
 import { UpdateCourierStatusDto } from './dto/update-courier-status.dto'
 import { UpdateCourierDocStatusDto } from './dto/update-courier-doc-status.dto'
 import { UpdateStoreStatusDto } from './dto/update-store-status.dto'
@@ -12,12 +14,34 @@ const ACTIVE_DELIVERY_STATUS = ['COURIER_ASSIGNED', 'COURIER_HEADING_TO_STORE', 
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name)
   constructor(
     private prisma: PrismaService,
     private uploads: UploadsService,
     private settings: PlatformSettingsService,
+    private notifications: NotificationsService,
+    private push: PushService,
     @Optional() private matching: DeliveryMatchingService,
   ) {}
+
+  /** Avisa o entregador quando o cadastro é aprovado/reprovado/suspenso (push + notificação). */
+  private async notifyCourierDecision(
+    user: { id?: string; pushToken?: string | null } | undefined | null,
+    status: string,
+  ) {
+    if (!user?.id) return
+    const map: Record<string, { title: string; body: string }> = {
+      APPROVED:  { title: '✅ Cadastro aprovado!', body: 'Tudo certo! Fique online e comece a receber corridas.' },
+      REJECTED:  { title: 'Cadastro não aprovado', body: 'Revise seus documentos no app e reenvie para nova análise.' },
+      SUSPENDED: { title: 'Conta suspensa', body: 'Sua conta de entregador foi suspensa. Fale com o suporte.' },
+    }
+    const msg = map[status]
+    if (!msg) return
+    if (user.pushToken) this.push.send(user.pushToken, msg.title, msg.body, { screen: 'courier' }).catch(() => {})
+    this.notifications.create(user.id, 'SYSTEM', msg.title, msg.body, { kind: 'courier_status', status }).catch((e) => {
+      this.logger.warn('Falha ao notificar decisão de cadastro do entregador', e)
+    })
+  }
 
   /** Configuração de preços (taxa de entrega, repasse do motoboy, comissão). */
   getSettings() {
@@ -87,8 +111,9 @@ export class AdminService {
     const updated = await this.prisma.courier.update({
       where: { id },
       data: { status: dto.status },
-      include: { user: { select: { name: true, email: true, phone: true, avatarUrl: true } } },
+      include: { user: { select: { id: true, name: true, email: true, phone: true, avatarUrl: true, pushToken: true } } },
     })
+    if (courier.status !== dto.status) this.notifyCourierDecision(updated.user, dto.status)
     return this.withSignedDocs(updated)
   }
 
@@ -105,7 +130,7 @@ export class AdminService {
     const updated = await this.prisma.courier.update({
       where: { id },
       data: { [fieldMap[dto.document]]: dto.status },
-      include: { user: { select: { name: true, email: true, phone: true, avatarUrl: true } } },
+      include: { user: { select: { id: true, name: true, email: true, phone: true, avatarUrl: true, pushToken: true } } },
     })
 
     const allApproved = updated.cnhStatus === 'APPROVED' &&
@@ -116,11 +141,13 @@ export class AdminService {
                         updated.vehicleDocStatus === 'REJECTED'
 
     if (allApproved || anyRejected) {
+      const nextStatus = allApproved ? 'APPROVED' : 'REJECTED'
       const finalized = await this.prisma.courier.update({
         where: { id },
-        data: { status: allApproved ? 'APPROVED' : 'REJECTED' },
-        include: { user: { select: { name: true, email: true, phone: true, avatarUrl: true } } },
+        data: { status: nextStatus },
+        include: { user: { select: { id: true, name: true, email: true, phone: true, avatarUrl: true, pushToken: true } } },
       })
+      if (courier.status !== nextStatus) this.notifyCourierDecision(finalized.user, nextStatus)
       return this.withSignedDocs(finalized)
     }
 
@@ -254,6 +281,21 @@ export class AdminService {
     if (claim.count === 0) throw new ConflictException('Este pedido não está mais aguardando entregador.')
 
     this.matching?.cancelMatching(deliveryId)
-    return this.prisma.delivery.findUnique({ where: { id: deliveryId } })
+    const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } })
+
+    // Avisa o entregador da corrida atribuída (push + notificação) — antes só via poll.
+    const cu = await this.prisma.courier.findUnique({
+      where: { id: courierId },
+      select: { userId: true, user: { select: { pushToken: true } } },
+    })
+    const title = '🛵 Corrida atribuída a você'
+    const body = 'Você recebeu uma entrega. Abra o app para começar.'
+    if (cu?.user?.pushToken) {
+      this.push.send(cu.user.pushToken, title, body, { orderId: delivery?.orderId, type: 'NEW_DELIVERY' }).catch(() => {})
+    }
+    if (cu?.userId) {
+      this.notifications.create(cu.userId, 'DELIVERY_UPDATE', title, body, { orderId: delivery?.orderId }).catch(() => {})
+    }
+    return delivery
   }
 }

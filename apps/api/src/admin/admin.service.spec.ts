@@ -10,8 +10,10 @@ function makeAdmin(over: any = {}) {
   const uploads = { signDocuments: jest.fn().mockResolvedValue({}) }
   const matching = { cancelMatching: jest.fn() }
   const settings = { get: jest.fn(), update: jest.fn() }
-  const svc = new AdminService(prisma as any, uploads as any, settings as any, matching as any)
-  return { svc, prisma, uploads, matching, settings }
+  const notifications = { create: jest.fn().mockResolvedValue(undefined) }
+  const push = { send: jest.fn().mockResolvedValue(undefined) }
+  const svc = new AdminService(prisma as any, uploads as any, settings as any, notifications as any, push as any, matching as any)
+  return { svc, prisma, uploads, matching, settings, notifications, push }
 }
 
 describe('AdminService.assignDelivery', () => {

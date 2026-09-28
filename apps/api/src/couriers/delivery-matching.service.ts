@@ -192,7 +192,9 @@ export class DeliveryMatchingService implements OnModuleInit {
         entry.offeredTo.add(c.id)
         // Push (chega com o app fechado) + socket (re-busca na hora, app aberto).
         if (c.user?.pushToken) {
-          this.push.send(c.user.pushToken, '🛵 Nova entrega disponível!', body, { deliveryId, type: 'NEW_DELIVERY' })
+          // orderId no payload: sem ele, tocar na notificação (app fechado) não
+          // roteava pra lugar nenhum. type NEW_DELIVERY leva pra aba do entregador.
+          this.push.send(c.user.pushToken, '🛵 Nova entrega disponível!', body, { deliveryId, orderId: delivery.orderId, type: 'NEW_DELIVERY' })
         }
         this.gateway?.notifyCourierNewDelivery(c.userId, deliveryId)
       }

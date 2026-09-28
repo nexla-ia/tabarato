@@ -318,9 +318,11 @@ describe('CouriersService.returnDelivery', () => {
 })
 
 describe('CouriersService.advanceDelivery (código de entrega anti-fraude)', () => {
-  function pickedUp(deliveryCode: string | null) {
+  // Estado que transiciona para DELIVERED (onde o código é exigido) agora é
+  // HEADING_TO_CLIENT — PICKED_UP passou a ir para HEADING_TO_CLIENT ("saí para entrega").
+  function headingToClient(deliveryCode: string | null) {
     return {
-      id: 'd1', courierId: 'c1', status: 'PICKED_UP',
+      id: 'd1', courierId: 'c1', status: 'HEADING_TO_CLIENT',
       orderId: 'o1', order: { deliveryCode, address: { lat: null, lng: null } },
     }
   }
@@ -333,14 +335,14 @@ describe('CouriersService.advanceDelivery (código de entrega anti-fraude)', () 
   it('finalizar sem código → pede o código', async () => {
     const { svc, prisma } = makeService()
     prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
-    prisma.delivery.findFirst.mockResolvedValue(pickedUp('123456'))
+    prisma.delivery.findFirst.mockResolvedValue(headingToClient('123456'))
     await expect(svc.advanceDelivery('u1', 'd1', undefined, undefined)).rejects.toThrow('Informe o código')
     expect(prisma.order.updateMany).not.toHaveBeenCalled()
   })
   it('código errado → incrementa tentativa ATOMICAMENTE (lt:5) e recusa', async () => {
     const { svc, prisma } = makeService()
     prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
-    prisma.delivery.findFirst.mockResolvedValue(pickedUp('123456'))
+    prisma.delivery.findFirst.mockResolvedValue(headingToClient('123456'))
     prisma.order.updateMany.mockResolvedValue({ count: 1 })
     prisma.order.findUnique.mockResolvedValue({ deliveryCodeAttempts: 1 })
     await expect(svc.advanceDelivery('u1', 'd1', undefined, '000000')).rejects.toThrow('incorreto')
@@ -351,7 +353,7 @@ describe('CouriersService.advanceDelivery (código de entrega anti-fraude)', () 
   it('lockout: já estourou 5 tentativas (updateMany count=0) → bloqueia', async () => {
     const { svc, prisma } = makeService()
     prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
-    prisma.delivery.findFirst.mockResolvedValue(pickedUp('123456'))
+    prisma.delivery.findFirst.mockResolvedValue(headingToClient('123456'))
     prisma.order.updateMany.mockResolvedValue({ count: 0 })
     await expect(svc.advanceDelivery('u1', 'd1', undefined, '000000')).rejects.toThrow('Muitas tentativas')
   })

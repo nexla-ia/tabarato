@@ -118,14 +118,17 @@ export function Couriers() {
     setRefresh(r => r + 1)
   }
 
-  const handleOverallAction = async (status: 'APPROVED' | 'REJECTED') => {
+  const handleOverallAction = async (status: 'APPROVED' | 'REJECTED' | 'SUSPENDED') => {
     if (!selected) return
-    // Confirma ação destrutiva (rejeitar bloqueia o entregador de aceitar corridas).
+    // Confirma ações que bloqueiam o entregador de aceitar corridas.
     if (status === 'REJECTED' && !window.confirm('Rejeitar este entregador? Ele não poderá aceitar entregas.')) return
+    if (status === 'SUSPENDED' && !window.confirm('Suspender este entregador? Ele fica bloqueado até ser reativado.')) return
     setActioning(status)
     try {
       const updated = await api.updateCourierStatus(selected.id, status)
-      showToast(status === 'APPROVED' ? 'Entregador aprovado!' : 'Entregador rejeitado.', status === 'APPROVED' ? 'success' : 'error')
+      const msg = status === 'APPROVED' ? (selected.status === 'SUSPENDED' ? 'Entregador reativado!' : 'Entregador aprovado!')
+        : status === 'SUSPENDED' ? 'Entregador suspenso.' : 'Entregador rejeitado.'
+      showToast(msg, status === 'APPROVED' ? 'success' : 'error')
       setSelected(updated)
       setRefresh(r => r + 1)
     } catch (err: unknown) {
@@ -423,7 +426,22 @@ export function Couriers() {
                       fontFamily: SANS, opacity: actioning ? 0.6 : 1,
                     }}
                   >
-                    {actioning === 'APPROVED' ? 'Aprovando...' : 'Aprovar entregador'}
+                    {actioning === 'APPROVED' ? (selected.status === 'SUSPENDED' ? 'Reativando...' : 'Aprovando...') : (selected.status === 'SUSPENDED' ? 'Reativar entregador' : 'Aprovar entregador')}
+                  </button>
+                )}
+                {selected.status === 'APPROVED' && (
+                  <button
+                    disabled={actioning !== null}
+                    onClick={() => handleOverallAction('SUSPENDED')}
+                    style={{
+                      padding: '8px 16px', borderRadius: 8, border: 'none',
+                      background: actioning === 'SUSPENDED' ? '#D97706' : '#FEF3C7',
+                      color: actioning === 'SUSPENDED' ? '#fff' : '#B45309',
+                      fontSize: 12.5, fontWeight: 700, cursor: actioning ? 'not-allowed' : 'pointer',
+                      fontFamily: SANS, opacity: actioning ? 0.6 : 1,
+                    }}
+                  >
+                    {actioning === 'SUSPENDED' ? 'Suspendendo...' : 'Suspender'}
                   </button>
                 )}
                 {selected.status !== 'REJECTED' && (

@@ -671,7 +671,7 @@ export class CouriersService {
       COURIER_ASSIGNED: 'COURIER_HEADING_TO_STORE', // atribuição manual pela loja
       COURIER_HEADING_TO_STORE: 'COURIER_AT_STORE',
       COURIER_AT_STORE: 'PICKED_UP',
-      PICKED_UP: 'DELIVERED',
+      PICKED_UP: 'HEADING_TO_CLIENT', // "Saí para entrega" — passo explícito antes de entregar
       HEADING_TO_CLIENT: 'DELIVERED',
     }
 
@@ -838,9 +838,10 @@ export class CouriersService {
     }
 
     const pushMessages: Partial<Record<DeliveryStatus, { title: string; body: string }>> = {
-      COURIER_AT_STORE: { title: '📍 Entregador na loja', body: 'O entregador chegou à loja e está coletando seu pedido.' },
-      PICKED_UP:        { title: '🚴 Pedido a caminho!',  body: 'O entregador está vindo para você. Fique de olho!' },
-      DELIVERED:        { title: '🎉 Pedido entregue!',   body: 'Aproveite! Avalie sua compra — dá pra anexar foto — e o entregador.' },
+      COURIER_AT_STORE:  { title: '📍 Entregador na loja', body: 'O entregador chegou à loja e está coletando seu pedido.' },
+      PICKED_UP:         { title: '📦 Pedido coletado',    body: 'O entregador pegou seu pedido e já vai sair para entrega.' },
+      HEADING_TO_CLIENT: { title: '🚴 Pedido a caminho!',  body: 'O entregador saiu para entrega e está vindo até você. Fique de olho!' },
+      DELIVERED:         { title: '🎉 Pedido entregue!',   body: 'Aproveite! Avalie sua compra — dá pra anexar foto — e o entregador.' },
     }
     const msg = pushMessages[nextStatus]
     const pushToken = delivery.order.user?.pushToken

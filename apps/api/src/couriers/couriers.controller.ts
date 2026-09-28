@@ -71,6 +71,8 @@ export class CouriersController {
     return this.couriersService.acceptDelivery(user.sub, id)
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('COURIER')
   @Patch('me/deliveries/:id/refuse')
   refuseDelivery(@CurrentUser() user: any, @Param('id') id: string) {
     return this.couriersService.refuseDelivery(user.sub, id)

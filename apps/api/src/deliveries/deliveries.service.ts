@@ -1,6 +1,8 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { PlatformSettingsService } from '../settings/platform-settings.service'
+import { NotificationsService } from '../notifications/notifications.service'
+import { PushService } from '../common/push.service'
 
 const COURIER_INCLUDE = {
   courier: { include: { user: { select: { name: true, phone: true } } } },
@@ -19,6 +21,8 @@ export class DeliveriesService {
   constructor(
     private prisma: PrismaService,
     private settings: PlatformSettingsService,
+    private notifications: NotificationsService,
+    private push: PushService,
   ) {}
 
   async assign(userId: string, orderId: string, courierId: string) {
@@ -31,7 +35,10 @@ export class DeliveriesService {
     })
     if (!order) throw new NotFoundException('Pedido não encontrado ou não está pronto')
 
-    const courier = await this.prisma.courier.findUnique({ where: { id: courierId } })
+    const courier = await this.prisma.courier.findUnique({
+      where: { id: courierId },
+      select: { id: true, status: true, userId: true, user: { select: { pushToken: true } } },
+    })
     if (!courier) throw new NotFoundException('Entregador não encontrado')
     // Não permite atribuir a entregador não-aprovado (pendente/suspenso).
     if (courier.status !== 'APPROVED') {
@@ -46,7 +53,7 @@ export class DeliveriesService {
     const courierFee = await this.settings.courierFeeFor(distanceKm)
 
     try {
-      return await this.prisma.delivery.create({
+      const created = await this.prisma.delivery.create({
         data: {
           orderId, courierId,
           distanceKm: Math.round(distanceKm * 10) / 10,
@@ -55,6 +62,14 @@ export class DeliveriesService {
         },
         include: COURIER_INCLUDE,
       })
+      // Avisa o entregador (push + notificação) — antes ele só via pelo poll.
+      const title = '🛵 Corrida atribuída a você'
+      const body = `A loja ${store.name} te atribuiu uma entrega. Abra o app para começar.`
+      if (courier.user?.pushToken) {
+        this.push.send(courier.user.pushToken, title, body, { orderId, type: 'NEW_DELIVERY' }).catch(() => {})
+      }
+      this.notifications.create(courier.userId, 'DELIVERY_UPDATE', title, body, { orderId }).catch(() => {})
+      return created
     } catch (err: any) {
       // Corrida entre a checagem acima e o create (ou com o auto-match): a constraint
       // única de orderId barra a duplicata — devolve 409 no lugar de um 500 cru.
