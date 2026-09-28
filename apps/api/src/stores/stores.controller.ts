@@ -91,8 +91,8 @@ export class StoresController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('STORE_OWNER')
   @Patch('my/pix')
-  updatePixKey(@CurrentUser() user: any, @Body() body: { pixKey: string }) {
-    return this.storesService.updatePixKey(user.sub, body.pixKey)
+  updatePixKey(@CurrentUser() user: any, @Body() body: { pixKey: string; pixKeyType?: string }) {
+    return this.storesService.updatePixKey(user.sub, body.pixKey, body.pixKeyType)
   }
 
   // Onboarding do split: status + criação da subconta Asaas da loja.

@@ -175,6 +175,7 @@ model Store {
   lng              Float
   address          String
   pixKey           String?     @map("pix_key")
+  pixKeyType       String?     @map("pix_key_type") // CPF | CNPJ | EMAIL | PHONE | EVP (p/ transferência via Asaas)
   photos           String[]    @default([])
   // Documento da empresa (Cartão CNPJ ou CCMEI do MEI) — enviado pelo lojista
   // e conferido pelo admin antes de aprovar a loja.

@@ -311,12 +311,12 @@ export class StoresService {
         where: { ownerType: 'STORE', ownerId: store.id },
         orderBy: { createdAt: 'desc' }, take: 20,
       })
-      return { balance, transactions: [], withdrawals, pixKey: store.pixKey ?? null, source: 'ASAAS' }
+      return { balance, transactions: [], withdrawals, pixKey: store.pixKey ?? null, pixKeyType: store.pixKeyType ?? null, source: 'ASAAS' }
     }
 
     const wallet = await this.wallet.findByOwner(store.id, 'STORE')
     // Inclui a chave PIX de saque pra o app mostrar/editar na Carteira.
-    return { ...wallet, transactions: hideReversedWithdrawals((wallet as any).transactions ?? []), pixKey: store.pixKey ?? null }
+    return { ...wallet, transactions: hideReversedWithdrawals((wallet as any).transactions ?? []), pixKey: store.pixKey ?? null, pixKeyType: store.pixKeyType ?? null }
   }
 
   /**
@@ -346,7 +346,7 @@ export class StoresService {
       })
       try {
         const transfer = await this.asaas.createPixTransfer({
-          value: Number(amount), pixAddressKey: store.pixKey, externalReference: w.id,
+          value: Number(amount), pixAddressKey: store.pixKey, pixAddressKeyType: store.pixKeyType, externalReference: w.id,
           description: `Saque Tá Barato — loja ${store.id.slice(0, 8)}`, apiKey,
         })
         await this.prisma.withdrawal.update({ where: { id: w.id }, data: { status: 'PROCESSING', asaasTransferId: transfer.id } })
@@ -380,6 +380,7 @@ export class StoresService {
         const transfer = await this.asaas.createPixTransfer({
           value: Number(amount),
           pixAddressKey: store.pixKey,
+          pixAddressKeyType: store.pixKeyType,
           externalReference: withdrawal.id,
           description: `Repasse Tá Barato — loja ${store.id.slice(0, 8)}`,
         })
@@ -464,14 +465,22 @@ export class StoresService {
   }
 
   /** Chave PIX da loja — usada só pra RECEBER os saques do repasse (não é pagamento do cliente). */
-  async updatePixKey(userId: string, pixKey: string) {
+  async updatePixKey(userId: string, pixKey: string, pixKeyType?: string) {
     const store = await this.prisma.store.findUnique({ where: { userId } })
     if (!store) throw new NotFoundException('Store not found')
     const key = (pixKey ?? '').trim()
     if (!key) throw new BadRequestException('Informe uma chave PIX válida.')
     if (key.length > 140) throw new BadRequestException('Chave PIX muito longa.')
-    await this.prisma.store.update({ where: { id: store.id }, data: { pixKey: key } })
-    return { pixKey: key }
+    // O Asaas infere bem CPF/CNPJ/email/telefone, mas NÃO infere chave aleatória (EVP):
+    // por isso o tipo é obrigatório informar (o app manda). Aceita só os tipos válidos.
+    const VALID_TYPES = ['CPF', 'CNPJ', 'EMAIL', 'PHONE', 'EVP']
+    const type = pixKeyType ? pixKeyType.toUpperCase().trim() : undefined
+    if (type && !VALID_TYPES.includes(type)) throw new BadRequestException('Tipo de chave PIX inválido.')
+    await this.prisma.store.update({
+      where: { id: store.id },
+      data: { pixKey: key, ...(type ? { pixKeyType: type } : {}) },
+    })
+    return { pixKey: key, pixKeyType: type ?? store.pixKeyType }
   }
 
   async findMyReviews(userId: string, page = 1) {
