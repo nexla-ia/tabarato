@@ -33,6 +33,9 @@ function Tile({ label, value, color }: { label: string; value: number; color: st
   )
 }
 
+// Centro de Vilhena-RO (fallback quando ainda não há pinos).
+const VILHENA: [number, number] = [-12.7406, -60.1457]
+
 export function Operacoes() {
   const { showToast } = useToast()
   const [data, setData] = useState<Operations | null>(null)
@@ -40,6 +43,57 @@ export function Operacoes() {
   const [assigning, setAssigning] = useState<OpWaiting | null>(null)
   const [assignBusy, setAssignBusy] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Mapa ao vivo (Leaflet via CDN — window.L)
+  const mapEl = useRef<HTMLDivElement | null>(null)
+  const mapObj = useRef<any>(null)
+  const layerRef = useRef<any>(null)
+  const fitted = useRef(false)
+
+  // Inicializa o mapa uma vez.
+  useEffect(() => {
+    const L = (window as any).L
+    if (!L || !mapEl.current || mapObj.current) return
+    const map = L.map(mapEl.current, { attributionControl: false }).setView(VILHENA, 13)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map)
+    layerRef.current = L.layerGroup().addTo(map)
+    mapObj.current = map
+    // O contêiner pode ter tamanho 0 no 1º paint — recalcula após montar.
+    setTimeout(() => map.invalidateSize(), 200)
+    return () => { map.remove(); mapObj.current = null; layerRef.current = null }
+  }, [])
+
+  // Redesenha os pinos sempre que os dados atualizam (a cada 10s).
+  useEffect(() => {
+    const L = (window as any).L
+    if (!L || !mapObj.current || !layerRef.current || !data) return
+    const layer = layerRef.current
+    layer.clearLayers()
+    const pts: [number, number][] = []
+    const dot = (lat: number, lng: number, fill: string, popup: string, radius = 8) => {
+      L.circleMarker([lat, lng], { radius, color: '#fff', weight: 2, fillColor: fill, fillOpacity: 1 })
+        .bindPopup(popup).addTo(layer)
+      pts.push([lat, lng])
+    }
+    // Lojas de pedidos aguardando (âmbar; vermelho se atrasado ≥15min)
+    for (const w of data.waiting) {
+      if (w.store?.lat != null && w.store?.lng != null) {
+        dot(w.store.lat, w.store.lng, w.waitingMin >= 15 ? '#DC2626' : '#D97706',
+          `<b>${w.store.name ?? 'Loja'}</b><br/>Aguardando ${w.waitingMin} min → ${w.district ?? ''}`)
+      }
+    }
+    // Entregadores online (verde = livre, azul = em entrega)
+    for (const c of data.onlineCouriers) {
+      if (c.lat != null && c.lng != null) {
+        dot(c.lat, c.lng, c.busy ? '#2563EB' : '#16A34A',
+          `<b>${c.name ?? 'Entregador'}</b><br/>${c.busy ? 'Em entrega' : 'Livre'}`, 7)
+      }
+    }
+    // Enquadra nos pinos só na 1ª carga — depois respeita o zoom/pan do usuário.
+    if (!fitted.current && pts.length) {
+      try { mapObj.current.fitBounds(pts, { padding: [40, 40], maxZoom: 15 }) } catch { /* ignore */ }
+      fitted.current = true
+    }
+  }, [data])
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -99,6 +153,23 @@ export function Operacoes() {
             <Tile label="Aguardando entregador" value={data.waiting.length} color={data.waiting.length > 0 ? AMBER : TEXT} />
             <Tile label="Em andamento" value={data.active.length} color={TEXT} />
             <Tile label="Entregadores online" value={data.onlineCouriers.length} color={data.onlineCouriers.length > 0 ? GREEN : RED} />
+          </div>
+
+          {/* Mapa ao vivo */}
+          <div style={{ marginBottom: 26 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+              <h2 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Mapa ao vivo</h2>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                <Legend color={GREEN} label="Entregador livre" />
+                <Legend color="#2563EB" label="Em entrega" />
+                <Legend color={AMBER} label="Loja aguardando" />
+                <Legend color={RED} label="Aguardando ≥15 min" />
+              </div>
+            </div>
+            <div
+              ref={mapEl}
+              style={{ height: 380, width: '100%', borderRadius: 14, border: `1px solid ${BORDER}`, overflow: 'hidden', background: '#EAE6E1' }}
+            />
           </div>
 
           {/* Aguardando */}
@@ -240,4 +311,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Empty({ text }: { text: string }) {
   return <div style={{ fontSize: 13.5, color: MUTED, padding: '14px 4px' }}>{text}</div>
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED, fontWeight: 600 }}>
+      <span style={{ width: 12, height: 12, borderRadius: 6, background: color, border: '2px solid #fff', boxShadow: '0 0 0 1px #ddd' }} />
+      {label}
+    </span>
+  )
 }
