@@ -3,9 +3,18 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Wallet as WalletIcon, Receipt, X, Loader2, Check } from 'lucide-react'
 import { api } from '@/lib/api'
-import { Wallet, Transaction, money, timeAgo } from '@/lib/types'
+import { Wallet, Transaction, PixKeyType, money, timeAgo } from '@/lib/types'
 import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
+
+// O Asaas não infere chave aleatória (EVP): o tipo é obrigatório, senão o saque falha.
+const PIX_TYPES: { value: PixKeyType; label: string }[] = [
+  { value: 'CPF', label: 'CPF' },
+  { value: 'CNPJ', label: 'CNPJ' },
+  { value: 'EMAIL', label: 'E-mail' },
+  { value: 'PHONE', label: 'Telefone' },
+  { value: 'EVP', label: 'Aleatória' },
+]
 
 export default function CarteiraPage() {
   const qc = useQueryClient()
@@ -14,14 +23,16 @@ export default function CarteiraPage() {
   const [receiptText, setReceiptText] = useState<string | null>(null)
   const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null)
   const [pixKey, setPixKey] = useState('')
+  const [pixType, setPixType] = useState<PixKeyType>('CPF')
   const [pixSaved, setPixSaved] = useState(false)
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [msg, setMsg] = useState('')
 
   useEffect(() => { if (walletQ.data?.pixKey != null) setPixKey(walletQ.data.pixKey) }, [walletQ.data?.pixKey])
+  useEffect(() => { if (walletQ.data?.pixKeyType) setPixType(walletQ.data.pixKeyType) }, [walletQ.data?.pixKeyType])
 
   const savePix = useMutation({
-    mutationFn: async () => (await api.patch('/stores/my/pix', { pixKey: pixKey.trim() })).data,
+    mutationFn: async () => (await api.patch('/stores/my/pix', { pixKey: pixKey.trim(), pixKeyType: pixType })).data,
     onSuccess: () => { setPixSaved(true); setTimeout(() => setPixSaved(false), 2500); qc.invalidateQueries({ queryKey: ['wallet'] }) },
     onError: (e: any) => setMsg(e?.response?.data?.message ?? 'Não foi possível salvar a chave PIX.'),
   })
@@ -64,11 +75,26 @@ export default function CarteiraPage() {
       {/* Chave PIX + Saque */}
       <div className={styles.card}>
         <div className={styles.cardTitle}>Chave PIX para saque</div>
+        {/* Tipo da chave — obrigatório (o Asaas não adivinha chave aleatória) */}
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+          {PIX_TYPES.map((t) => (
+            <button
+              key={t.value}
+              onClick={() => setPixType(t.value)}
+              style={{
+                padding: '7px 14px', borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                border: `1.5px solid ${pixType === t.value ? 'var(--primary, #FF6600)' : 'var(--border, #e5e5e5)'}`,
+                background: pixType === t.value ? '#FFF0EB' : 'transparent',
+                color: pixType === t.value ? 'var(--primary, #FF6600)' : 'var(--muted, #7A5C4A)',
+              }}
+            >{t.label}</button>
+          ))}
+        </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
           <input
             value={pixKey}
             onChange={(e) => setPixKey(e.target.value)}
-            placeholder="CPF/CNPJ, e-mail, telefone ou chave aleatória"
+            placeholder={pixType === 'EVP' ? 'chave aleatória (32 caracteres)' : pixType === 'EMAIL' ? 'voce@email.com' : pixType === 'PHONE' ? '+55 69 90000-0000' : pixType === 'CNPJ' ? '00.000.000/0000-00' : '000.000.000-00'}
             style={{ flex: 1, minWidth: 200, padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--border, #e5e5e5)', fontSize: 14 }}
           />
           <button

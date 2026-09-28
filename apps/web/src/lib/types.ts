@@ -90,10 +90,13 @@ export interface Transaction {
   createdAt: string
 }
 
+export type PixKeyType = 'CPF' | 'CNPJ' | 'EMAIL' | 'PHONE' | 'EVP'
+
 export interface Wallet {
   balance: number
   transactions: Transaction[]
   pixKey?: string | null
+  pixKeyType?: PixKeyType | null
 }
 
 export interface Review {
