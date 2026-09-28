@@ -9,6 +9,7 @@ import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 
 interface MpStatus { enabled: boolean; connected: boolean; mpUserId: string | null }
+interface AsaasStatus { required: boolean; onboarded: boolean }
 
 const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 const DEFAULT_HOURS: DaySchedule[] = Array.from({ length: 7 }, () => ({ open: false, from: '08:00', to: '18:00' }))
@@ -25,6 +26,8 @@ export default function ConfigPage() {
   const qc = useQueryClient()
   const storeQ = useQuery<Store>({ queryKey: ['store-my'], queryFn: async () => (await api.get('/stores/my')).data })
   const mpQ = useQuery<MpStatus>({ queryKey: ['mp-status'], queryFn: async () => (await api.get('/stores/mp/status')).data })
+  // Recebimentos via Asaas (split por subconta) — quando ligado, a loja precisa fazer o onboarding.
+  const asaasQ = useQuery<AsaasStatus>({ queryKey: ['asaas-status'], queryFn: async () => (await api.get('/stores/my/asaas/status')).data })
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -52,6 +55,11 @@ export default function ConfigPage() {
   const docInputRef = useRef<HTMLInputElement>(null)
 
   const [maxConcurrentOrders, setMaxConcurrentOrders] = useState('')
+
+  // Onboarding Asaas (recebimentos por subconta/split)
+  const [asaasForm, setAsaasForm] = useState({ postalCode: '', addressNumber: '', province: '', incomeValue: '', companyType: 'MEI', address: '' })
+  const [cepLoading, setCepLoading] = useState(false)
+  const [asaasMsg, setAsaasMsg] = useState<'ok' | 'erro' | null>(null)
 
   const [tab, setTab] = useState<Tab>('loja')
 
@@ -95,6 +103,36 @@ export default function ConfigPage() {
   const disconnectMp = useMutation({
     mutationFn: async () => (await api.get('/stores/mp/disconnect')).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['mp-status'] }),
+  })
+
+  // Autofill do endereço pelo CEP (ViaCEP) — preenche bairro e logradouro.
+  async function lookupCep(cep: string) {
+    const digits = cep.replace(/\D/g, '')
+    if (digits.length !== 8) return
+    setCepLoading(true)
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`)
+      const via = await res.json()
+      if (!via?.erro) {
+        setAsaasForm((f) => ({ ...f, province: via.bairro || f.province, address: via.logradouro || f.address }))
+      }
+    } catch { /* deixa preencher na mão */ } finally { setCepLoading(false) }
+  }
+
+  const onboardAsaas = useMutation({
+    mutationFn: async () => {
+      const income = Math.round(Number(String(asaasForm.incomeValue).replace(/[^\d]/g, '')))
+      return (await api.post('/stores/my/asaas/onboard', {
+        postalCode: asaasForm.postalCode,
+        addressNumber: asaasForm.addressNumber,
+        province: asaasForm.province,
+        incomeValue: income,
+        companyType: asaasForm.companyType,
+        address: asaasForm.address || undefined,
+      })).data
+    },
+    onSuccess: () => { setAsaasMsg('ok'); qc.invalidateQueries({ queryKey: ['asaas-status'] }) },
+    onError: () => setAsaasMsg('erro'),
   })
 
   useEffect(() => {
@@ -204,14 +242,16 @@ export default function ConfigPage() {
   if (storeQ.isLoading) return <Spinner />
 
   const mpNeedsAttention = !!mpQ.data?.enabled && !mpQ.data?.connected
+  const asaasNeedsAttention = !!asaasQ.data?.required && !asaasQ.data?.onboarded
   const lojaNeedsAttention = !logoUrl || !phone
   const horarioNeedsAttention = hours.every((d) => !d.open)
   const fotosNeedsAttention = !documentUrl
+  const pagamentosVisible = !!mpQ.data?.enabled || !!asaasQ.data?.required
   const TAB_NEEDS_ATTENTION: Record<Tab, boolean> = {
     loja: lojaNeedsAttention,
     horario: horarioNeedsAttention,
     fotos: fotosNeedsAttention,
-    pagamentos: mpNeedsAttention,
+    pagamentos: mpNeedsAttention || asaasNeedsAttention,
   }
 
   return (
@@ -229,7 +269,7 @@ export default function ConfigPage() {
       </div>
 
       <div className={styles.tabs}>
-        {TABS.filter((t) => t.key !== 'pagamentos' || mpQ.data?.enabled).map(({ key, label, Icon }) => (
+        {TABS.filter((t) => t.key !== 'pagamentos' || pagamentosVisible).map(({ key, label, Icon }) => (
           <button
             key={key}
             type="button"
@@ -415,6 +455,81 @@ export default function ConfigPage() {
           {saved ? <><Check size={17} /> Salvo!</> : save.isPending ? 'Salvando…' : 'Salvar alterações'}
         </button>
       </div>
+      )}
+
+      {/* Pagamentos — Asaas (split por subconta): a parte da loja cai direto na conta dela */}
+      {tab === 'pagamentos' && asaasQ.data?.required && (
+        <div className={styles.card}>
+          <div className={styles.mpHead}>
+            <span className={styles.mpIcon}><CreditCard size={20} /></span>
+            <div>
+              <div className={styles.mpTitle}>Recebimentos (PIX + cartão)</div>
+              <div className={styles.mpSub}>Configure para receber sua parte de cada venda direto na sua conta, automático. Depois cadastre sua chave PIX de saque na Carteira.</div>
+            </div>
+          </div>
+
+          {asaasQ.data.onboarded ? (
+            <div className={styles.mpConnected}>
+              <span className={styles.mpBadgeOk}><Check size={14} /> Recebimentos configurados</span>
+            </div>
+          ) : (
+            <>
+              {asaasMsg === 'ok' && <div className={styles.mpOkMsg}><Check size={15} /> Recebimentos configurados! Sua parte cai direto na sua conta.</div>}
+              {asaasMsg === 'erro' && <div className={styles.mpErrMsg}><AlertTriangle size={15} /> {(onboardAsaas.error as any)?.response?.data?.message ?? 'Não foi possível configurar. Confira os dados.'}</div>}
+              <div className={styles.mpWarn}><AlertTriangle size={15} /> Enquanto não configurar, sua loja pode não conseguir receber pedidos.</div>
+
+              <label className={styles.label}>CEP</label>
+              <input
+                className={styles.input}
+                inputMode="numeric"
+                placeholder={cepLoading ? 'Buscando endereço…' : '00000-000'}
+                value={asaasForm.postalCode}
+                onChange={(e) => {
+                  const d = e.target.value.replace(/\D/g, '').slice(0, 8)
+                  setAsaasForm((f) => ({ ...f, postalCode: d }))
+                  if (d.length === 8) lookupCep(d)
+                }}
+              />
+
+              <label className={styles.label}>Bairro</label>
+              <input className={styles.input} value={asaasForm.province} onChange={(e) => setAsaasForm((f) => ({ ...f, province: e.target.value }))} placeholder="Bairro" />
+
+              <label className={styles.label}>Número do endereço</label>
+              <input className={styles.input} inputMode="numeric" value={asaasForm.addressNumber} onChange={(e) => setAsaasForm((f) => ({ ...f, addressNumber: e.target.value.slice(0, 10) }))} placeholder="Nº" />
+
+              <label className={styles.label}>Faturamento mensal estimado (R$)</label>
+              <input className={styles.input} inputMode="numeric" value={asaasForm.incomeValue} onChange={(e) => setAsaasForm((f) => ({ ...f, incomeValue: e.target.value.replace(/\D/g, '') }))} placeholder="Ex.: 5000" />
+
+              <label className={styles.label}>Tipo de empresa</label>
+              <div className={styles.asaasChips}>
+                {[{ v: 'MEI', l: 'MEI' }, { v: 'LIMITED', l: 'LTDA / EIRELI' }, { v: 'INDIVIDUAL', l: 'Autônomo' }].map((t) => (
+                  <button
+                    type="button"
+                    key={t.v}
+                    className={`${styles.asaasChip} ${asaasForm.companyType === t.v ? styles.asaasChipActive : ''}`}
+                    onClick={() => setAsaasForm((f) => ({ ...f, companyType: t.v }))}
+                  >
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                className={styles.saveBtn}
+                onClick={() => {
+                  const income = Number(String(asaasForm.incomeValue).replace(/[^\d]/g, ''))
+                  if (!asaasForm.postalCode || !asaasForm.addressNumber || !asaasForm.province || !income) {
+                    setAsaasMsg('erro'); return
+                  }
+                  setAsaasMsg(null); onboardAsaas.mutate()
+                }}
+                disabled={onboardAsaas.isPending}
+              >
+                {onboardAsaas.isPending ? <><Loader2 size={17} className={styles.spin} /> Salvando…</> : <><Check size={17} /> Salvar recebimentos</>}
+              </button>
+            </>
+          )}
+        </div>
       )}
 
       {/* Pagamentos — Mercado Pago (só aparece quando o marketplace está ativo) */}

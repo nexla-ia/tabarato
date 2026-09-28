@@ -13,6 +13,7 @@ import { NotificationBell } from '@/components/NotificationBell'
 import styles from './layout.module.css'
 
 interface MpStatus { enabled: boolean; connected: boolean }
+interface AsaasStatus { required: boolean; onboarded: boolean }
 
 const NAV = [
   { href: '/lojista',          label: 'Painel',         Icon: LayoutDashboard, exact: true },
@@ -91,11 +92,17 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
     queryFn: async () => (await api.get('/stores/mp/status')).data,
     enabled: !!user && user.role === 'STORE_OWNER' && !locked,
   })
+  const asaasQ = useQuery<AsaasStatus>({
+    queryKey: ['asaas-status'],
+    queryFn: async () => (await api.get('/stores/my/asaas/status')).data,
+    enabled: !!user && user.role === 'STORE_OWNER' && !locked,
+  })
   const configNeedsAttention = !!store && (
     !store.logoUrl || !store.phone ||
     !(store.openingHours ?? []).some((d) => d.open) ||
     !store.documentUrl ||
-    (!!mpQ.data?.enabled && !mpQ.data?.connected)
+    (!!mpQ.data?.enabled && !mpQ.data?.connected) ||
+    (!!asaasQ.data?.required && !asaasQ.data?.onboarded)
   )
 
   useEffect(() => {

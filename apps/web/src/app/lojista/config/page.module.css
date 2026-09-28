@@ -102,6 +102,17 @@
 .mpDisconnect { color: #DC2626; font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 8px; }
 .mpDisconnect:hover { background: #FEF2F2; }
 
+/* Onboarding Asaas — tipo de empresa */
+.asaasChips { display: flex; flex-wrap: wrap; gap: 8px; }
+.asaasChip {
+  padding: 9px 16px; border-radius: 999px;
+  border: 1.5px solid var(--border); background: var(--card);
+  font-size: 13px; font-weight: 700; color: var(--muted);
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.asaasChip:hover { border-color: var(--orange); }
+.asaasChipActive { border-color: var(--orange); background: #FFF0EB; color: var(--orange-dark); }
+
 /* Foto da loja */
 .logoRow { display: flex; align-items: center; gap: 16px; }
 .logoPreview {
