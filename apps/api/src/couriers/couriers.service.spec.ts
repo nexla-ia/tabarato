@@ -1,8 +1,16 @@
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common'
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { CouriersService } from './couriers.service'
 
 // Constrói o service com todas as dependências mockadas (teste unitário puro, sem DB).
 function makeService(over: any = {}) {
+  // "tx" usado dentro de prisma.$transaction (crédito de entregador/loja na entrega).
+  const tx = {
+    delivery: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    order: { update: jest.fn().mockResolvedValue({}) },
+    wallet: { upsert: jest.fn().mockResolvedValue({ id: 'w-owner' }), update: jest.fn().mockResolvedValue({}) },
+    transaction: { create: jest.fn().mockResolvedValue({}) },
+    ...(over.tx ?? {}),
+  }
   const prisma = {
     courier: { findUnique: jest.fn(), update: jest.fn() },
     withdrawal: {
@@ -13,7 +21,9 @@ function makeService(over: any = {}) {
       findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(),
       count: jest.fn(), updateMany: jest.fn(),
     },
-    order: { updateMany: jest.fn(), findUnique: jest.fn() },
+    order: { updateMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    // $transaction executa o callback com um "tx" mockado (mesma forma do client).
+    $transaction: jest.fn(async (cb: any) => cb(tx)),
     ...(over.prisma ?? {}),
   }
   const wallet = { debit: jest.fn(), credit: jest.fn(), ...(over.wallet ?? {}) }
@@ -22,13 +32,18 @@ function makeService(over: any = {}) {
   const matching = { cancelMatching: jest.fn(), startMatching: jest.fn().mockResolvedValue(undefined), ...(over.matching ?? {}) }
   const gateway = { evictUserFromOrder: jest.fn().mockResolvedValue(undefined), ...(over.gateway ?? {}) }
   const settings = { commissionFor: jest.fn().mockResolvedValue(0), courierFeeFor: jest.fn().mockResolvedValue(0), get: jest.fn(), ...(over.settings ?? {}) }
-  const config = { get: jest.fn() }
+  const config = { get: jest.fn(), ...(over.config ?? {}) }
+  const push = { send: jest.fn().mockResolvedValue(undefined), ...(over.push ?? {}) }
+  const notifications = { create: jest.fn().mockResolvedValue(undefined), ...(over.notifications ?? {}) }
+  const loyalty = { earnPoints: jest.fn().mockResolvedValue(undefined), grantReferralBonus: jest.fn().mockResolvedValue(undefined), ...(over.loyalty ?? {}) }
+  // payoutCourier: por padrão NÃO paga via MP → cai na carteira (modelo atual).
+  const mpOauth = { payoutCourier: jest.fn().mockResolvedValue({ done: false }), ...(over.mpOauth ?? {}) }
 
   const svc = new CouriersService(
-    prisma as any, {} as any, wallet as any, {} as any, {} as any,
-    config as any, {} as any, asaas as any, uploads as any, settings as any, matching as any, gateway as any,
+    prisma as any, push as any, wallet as any, notifications as any, loyalty as any,
+    config as any, mpOauth as any, asaas as any, uploads as any, settings as any, matching as any, gateway as any,
   )
-  return { svc, prisma, wallet, asaas, uploads, matching, gateway, settings }
+  return { svc, prisma, tx, wallet, asaas, uploads, matching, gateway, settings, config, push, notifications, loyalty, mpOauth }
 }
 
 describe('CouriersService.requestWithdrawal', () => {
@@ -369,5 +384,197 @@ describe('CouriersService.getStats (ganho do dia)', () => {
       expect.objectContaining({ where: expect.objectContaining({ status: 'DELIVERED', order: { payment: { status: 'PAID' } } }) }),
     )
     expect(r).toEqual({ todayCount: 2, todayEarnings: 10, rating: 4.8 })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bateria do fluxo de corrida: máquina de estados, cerca geográfica, créditos
+// e recusa. Cobre o passo "Saí para entrega" (PICKED_UP → HEADING_TO_CLIENT).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Entrega mockada num dado status, com tudo que advanceDelivery acessa. */
+function deliveryAt(status: string, over: any = {}) {
+  // `order` sai do spread geral pra não sobrescrever a mesclagem abaixo.
+  const { order: orderOver, ...rest } = over
+  return {
+    id: 'd1', courierId: 'c1', orderId: 'o1', status, courierFee: 8,
+    ...rest,
+    order: {
+      deliveryCode: '123456',
+      address: { lat: null, lng: null },
+      user: { id: 'u-cli', pushToken: 'tok-cli' },
+      store: { user: { id: 'u-loja', pushToken: 'tok-loja' } },
+      ...(orderOver ?? {}),
+    },
+  }
+}
+
+/** Mock do pedido que serve aos 3 pontos que leem order.findUnique no advance. */
+const FULL_ORDER = {
+  deliveryCodeAttempts: 0,
+  subtotal: 100, couponDiscount: 0, promoDiscount: 0, storeId: 's1',
+  paidViaSplit: false, freeShipping: false, deliveryFee: 10,
+  payment: { status: 'PAID' },
+  userId: 'u-cli',
+}
+
+describe('CouriersService.advanceDelivery (máquina de estados)', () => {
+  function setup(status: string, over: any = {}) {
+    const ctx = makeService(over)
+    ctx.prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    ctx.prisma.delivery.findFirst.mockResolvedValue(deliveryAt(status, over.delivery ?? {}))
+    ctx.prisma.delivery.updateMany.mockResolvedValue({ count: 1 })
+    ctx.prisma.order.findUnique.mockResolvedValue(FULL_ORDER)
+    return ctx
+  }
+
+  it('"Saí para entrega": PICKED_UP → HEADING_TO_CLIENT SEM exigir código', async () => {
+    const { svc, prisma } = setup('PICKED_UP')
+    prisma.delivery.findUnique.mockResolvedValue({ id: 'd1', status: 'HEADING_TO_CLIENT' })
+    const r = await svc.advanceDelivery('u1', 'd1') // sem código de propósito
+    expect(prisma.delivery.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'HEADING_TO_CLIENT' }) }),
+    )
+    expect(r).toEqual({ id: 'd1', status: 'HEADING_TO_CLIENT' })
+  })
+
+  it('atribuição manual: COURIER_ASSIGNED → COURIER_HEADING_TO_STORE', async () => {
+    const { svc, prisma } = setup('COURIER_ASSIGNED')
+    prisma.delivery.findUnique.mockResolvedValue({ id: 'd1', status: 'COURIER_HEADING_TO_STORE' })
+    await svc.advanceDelivery('u1', 'd1')
+    expect(prisma.delivery.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'COURIER_HEADING_TO_STORE' }) }),
+    )
+  })
+
+  it('COURIER_AT_STORE → PICKED_UP grava pickedUpAt e avisa a loja', async () => {
+    const { svc, prisma, push } = setup('COURIER_AT_STORE')
+    prisma.delivery.findUnique.mockResolvedValue({ id: 'd1', status: 'PICKED_UP' })
+    await svc.advanceDelivery('u1', 'd1')
+    expect(prisma.delivery.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'PICKED_UP', pickedUpAt: expect.any(Date) }) }),
+    )
+    // cliente + loja recebem push nesta etapa
+    expect(push.send).toHaveBeenCalledWith('tok-loja', expect.stringContaining('coletado'), expect.any(String), expect.any(Object))
+  })
+
+  it('avanço concorrente perdido (claim=0) → Conflict', async () => {
+    const { svc, prisma } = setup('PICKED_UP')
+    prisma.delivery.updateMany.mockResolvedValue({ count: 0 })
+    await expect(svc.advanceDelivery('u1', 'd1')).rejects.toBeInstanceOf(ConflictException)
+  })
+})
+
+describe('CouriersService.advanceDelivery (cerca geográfica)', () => {
+  // Endereço do cliente em Vilhena; cerca padrão = 300m.
+  const ADDR = { lat: -12.7406, lng: -60.1457 }
+  function setupGeo(over: any = {}) {
+    const ctx = makeService(over)
+    ctx.prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    ctx.prisma.delivery.findFirst.mockResolvedValue(deliveryAt('HEADING_TO_CLIENT', { order: { address: ADDR } }))
+    ctx.prisma.delivery.updateMany.mockResolvedValue({ count: 1 })
+    ctx.prisma.order.findUnique.mockResolvedValue(FULL_ORDER)
+    ctx.prisma.delivery.findUnique.mockResolvedValue({ id: 'd1', status: 'DELIVERED' })
+    return ctx
+  }
+
+  it('sem GPS → exige localização (não finaliza)', async () => {
+    const { svc } = setupGeo()
+    await expect(svc.advanceDelivery('u1', 'd1', undefined, '123456')).rejects.toThrow('Ative a localização')
+  })
+
+  it('longe do endereço → recusa e manda se aproximar', async () => {
+    const { svc } = setupGeo()
+    // ~2km ao norte do endereço
+    await expect(svc.advanceDelivery('u1', 'd1', undefined, '123456', -12.7226, -60.1457))
+      .rejects.toThrow('Aproxime-se')
+  })
+
+  it('dentro da cerca → finaliza a entrega', async () => {
+    const { svc, prisma } = setupGeo()
+    await svc.advanceDelivery('u1', 'd1', undefined, '123456', ADDR.lat, ADDR.lng)
+    expect(prisma.$transaction).toHaveBeenCalled()
+  })
+
+  it('cerca desativada (0) → finaliza mesmo sem GPS', async () => {
+    const { svc, prisma } = setupGeo({ config: { get: jest.fn().mockReturnValue('0') } })
+    await svc.advanceDelivery('u1', 'd1', undefined, '123456')
+    expect(prisma.$transaction).toHaveBeenCalled()
+  })
+})
+
+describe('CouriersService.advanceDelivery (dinheiro na entrega)', () => {
+  function setupPaid(paymentStatus: string, over: any = {}) {
+    const ctx = makeService(over)
+    ctx.prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    // Sem coords no endereço → cerca não se aplica; foco é o dinheiro.
+    ctx.prisma.delivery.findFirst.mockResolvedValue(deliveryAt('HEADING_TO_CLIENT'))
+    ctx.prisma.delivery.updateMany.mockResolvedValue({ count: 1 })
+    ctx.prisma.order.findUnique.mockResolvedValue({ ...FULL_ORDER, payment: { status: paymentStatus } })
+    ctx.prisma.delivery.findUnique.mockResolvedValue({ id: 'd1', status: 'DELIVERED' })
+    return ctx
+  }
+
+  it('pedido PAGO → credita entregador E loja, e marca o pedido ENTREGUE', async () => {
+    const { svc, tx } = setupPaid('PAID')
+    await svc.advanceDelivery('u1', 'd1', undefined, '123456')
+    expect(tx.order.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'DELIVERED' } }),
+    )
+    // carteira do entregador (taxa 8) e da loja (subtotal 100, comissão 0)
+    expect(tx.wallet.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ownerId_ownerType: { ownerId: 'c1', ownerType: 'COURIER' } } }),
+    )
+    expect(tx.wallet.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ownerId_ownerType: { ownerId: 's1', ownerType: 'STORE' } } }),
+    )
+    expect(tx.wallet.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { balance: { increment: 8 } } }),
+    )
+    expect(tx.wallet.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { balance: { increment: 100 } } }),
+    )
+  })
+
+  it('pedido NÃO pago → entrega é registrada mas NINGUÉM é creditado', async () => {
+    const { svc, tx } = setupPaid('PENDING')
+    await svc.advanceDelivery('u1', 'd1', undefined, '123456')
+    expect(tx.order.update).toHaveBeenCalled()
+    expect(tx.wallet.upsert).not.toHaveBeenCalled()
+    expect(tx.transaction.create).not.toHaveBeenCalled()
+  })
+
+  it('loja paga via split → credita SÓ o entregador (não paga a loja 2x)', async () => {
+    const ctx = makeService()
+    ctx.prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    ctx.prisma.delivery.findFirst.mockResolvedValue(deliveryAt('HEADING_TO_CLIENT'))
+    ctx.prisma.delivery.updateMany.mockResolvedValue({ count: 1 })
+    ctx.prisma.order.findUnique.mockResolvedValue({ ...FULL_ORDER, paidViaSplit: true })
+    ctx.prisma.delivery.findUnique.mockResolvedValue({ id: 'd1', status: 'DELIVERED' })
+    await ctx.svc.advanceDelivery('u1', 'd1', undefined, '123456')
+    expect(ctx.tx.wallet.upsert).toHaveBeenCalledTimes(1)
+    expect(ctx.tx.wallet.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ownerId_ownerType: { ownerId: 'c1', ownerType: 'COURIER' } } }),
+    )
+  })
+})
+
+describe('CouriersService.refuseDelivery', () => {
+  it('registra a recusa só se a corrida ainda procura entregador e ele não recusou antes', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1' })
+    prisma.delivery.updateMany.mockResolvedValue({ count: 1 })
+    const r = await svc.refuseDelivery('u1', 'd1')
+    expect(prisma.delivery.updateMany).toHaveBeenCalledWith({
+      where: { id: 'd1', status: 'SEARCHING_COURIER', NOT: { refusedCourierIds: { has: 'c1' } } },
+      data: { refusedCourierIds: { push: 'c1' } },
+    })
+    expect(r).toEqual({ refused: true })
+  })
+
+  it('entregador inexistente → NotFound', async () => {
+    const { svc, prisma } = makeService()
+    prisma.courier.findUnique.mockResolvedValue(null)
+    await expect(svc.refuseDelivery('u1', 'd1')).rejects.toBeInstanceOf(NotFoundException)
   })
 })

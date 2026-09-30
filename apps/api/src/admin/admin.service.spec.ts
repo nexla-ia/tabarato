@@ -93,4 +93,76 @@ describe('AdminService.updateCourierDocStatus (auto-aprovação)', () => {
     await svc.updateCourierDocStatus('c1', dto('cnh', 'APPROVED'))
     expect(prisma.courier.update).toHaveBeenCalledTimes(1)
   })
+
+  it('todos aprovados → AVISA o entregador que o cadastro foi aprovado', async () => {
+    const { svc, prisma, push, notifications } = makeAdmin()
+    prisma.courier.findUnique.mockResolvedValue({ id: 'c1', status: 'PENDING' })
+    prisma.courier.update
+      .mockResolvedValueOnce({ id: 'c1', cnhStatus: 'APPROVED', identityStatus: 'APPROVED', vehicleDocStatus: 'APPROVED' })
+      .mockResolvedValueOnce({ id: 'c1', status: 'APPROVED', user: { id: 'u1', pushToken: 'tok' } })
+    await svc.updateCourierDocStatus('c1', dto('vehicle', 'APPROVED'))
+    expect(push.send).toHaveBeenCalledWith('tok', expect.stringContaining('aprovado'), expect.any(String), { screen: 'courier' })
+    expect(notifications.create).toHaveBeenCalledWith('u1', 'SYSTEM', expect.any(String), expect.any(String), expect.objectContaining({ status: 'APPROVED' }))
+  })
+})
+
+describe('AdminService.updateCourierStatus (avisos de cadastro)', () => {
+  function setup(currentStatus: string) {
+    const ctx = makeAdmin()
+    ctx.prisma.courier.findUnique.mockResolvedValue({ id: 'c1', status: currentStatus })
+    ctx.prisma.courier.update.mockImplementation(async ({ data }: any) =>
+      ({ id: 'c1', status: data.status, user: { id: 'u1', pushToken: 'tok' } }))
+    return ctx
+  }
+
+  it('aprovar → push + notificação pro entregador', async () => {
+    const { svc, push, notifications } = setup('PENDING')
+    await svc.updateCourierStatus('c1', { status: 'APPROVED' } as any)
+    expect(push.send).toHaveBeenCalledWith('tok', expect.stringContaining('aprovado'), expect.any(String), { screen: 'courier' })
+    expect(notifications.create).toHaveBeenCalled()
+  })
+
+  it('suspender → avisa que a conta foi suspensa', async () => {
+    const { svc, push } = setup('APPROVED')
+    await svc.updateCourierStatus('c1', { status: 'SUSPENDED' } as any)
+    expect(push.send).toHaveBeenCalledWith('tok', expect.stringContaining('suspensa'), expect.any(String), { screen: 'courier' })
+  })
+
+  it('status inalterado → NÃO reenvia aviso', async () => {
+    const { svc, push, notifications } = setup('APPROVED')
+    await svc.updateCourierStatus('c1', { status: 'APPROVED' } as any)
+    expect(push.send).not.toHaveBeenCalled()
+    expect(notifications.create).not.toHaveBeenCalled()
+  })
+
+  it('entregador sem pushToken → não quebra, só grava a notificação', async () => {
+    const ctx = makeAdmin()
+    ctx.prisma.courier.findUnique.mockResolvedValue({ id: 'c1', status: 'PENDING' })
+    ctx.prisma.courier.update.mockResolvedValue({ id: 'c1', status: 'APPROVED', user: { id: 'u1', pushToken: null } })
+    await ctx.svc.updateCourierStatus('c1', { status: 'APPROVED' } as any)
+    expect(ctx.push.send).not.toHaveBeenCalled()
+    expect(ctx.notifications.create).toHaveBeenCalledWith('u1', 'SYSTEM', expect.any(String), expect.any(String), expect.any(Object))
+  })
+})
+
+describe('AdminService.assignDelivery (aviso da atribuição manual)', () => {
+  it('atribuiu → avisa o entregador com orderId + type (push navegável)', async () => {
+    const { svc, prisma, push, notifications } = makeAdmin()
+    prisma.courier.findUnique
+      .mockResolvedValueOnce({ id: 'c1', status: 'APPROVED' })          // validação
+      .mockResolvedValueOnce({ userId: 'u1', user: { pushToken: 'tok' } }) // p/ notificar
+    prisma.delivery.count.mockResolvedValue(0)
+    prisma.delivery.updateMany.mockResolvedValue({ count: 1 })
+    prisma.delivery.findUnique.mockResolvedValue({ id: 'd1', orderId: 'o1', status: 'COURIER_HEADING_TO_STORE' })
+
+    await svc.assignDelivery('d1', 'c1')
+
+    expect(push.send).toHaveBeenCalledWith(
+      'tok', expect.stringContaining('atribuída'), expect.any(String),
+      { orderId: 'o1', type: 'NEW_DELIVERY' },
+    )
+    expect(notifications.create).toHaveBeenCalledWith(
+      'u1', 'DELIVERY_UPDATE', expect.any(String), expect.any(String), { orderId: 'o1' },
+    )
+  })
 })
