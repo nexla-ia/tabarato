@@ -292,6 +292,10 @@ model Product {
   promoBuyQty   Int?     @map("promo_buy_qty")
   promoPayQty   Int?     @map("promo_pay_qty")
   isActive      Boolean  @default(true) @map("is_active")
+  // Moderação do admin: bloqueia o produto (some pro cliente e não pode ser pedido).
+  // Diferente de isActive (que é o liga/desliga do próprio lojista).
+  blockedByAdmin Boolean @default(false) @map("blocked_by_admin")
+  blockReason    String? @map("block_reason")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

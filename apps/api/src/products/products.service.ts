@@ -45,6 +45,7 @@ export class ProductsService {
       where: {
         id: { in: productIds },
         isActive: true,
+        blockedByAdmin: false,
         store: { status: 'APPROVED' },
       },
       include: {
@@ -97,6 +98,7 @@ export class ProductsService {
     const products = await this.prisma.product.findMany({
       where: {
         isActive: true,
+        blockedByAdmin: false,
         ...(excludeId ? { id: { not: excludeId } } : {}),
         ...(productCategoryId ? { categoryId: productCategoryId } : {}),
         store: {
@@ -127,7 +129,7 @@ export class ProductsService {
     if (!store || store.status !== 'APPROVED') return []
 
     return this.prisma.product.findMany({
-      where: { storeId, isActive: true },
+      where: { storeId, isActive: true, blockedByAdmin: false },
       include: {
         category: true,
         variations: { where: { isActive: true } },

@@ -191,6 +191,36 @@ export class AdminService {
     })
   }
 
+  /** Moderação: lista produtos de todas as lojas (busca por nome, filtro bloqueados). */
+  async getProducts(search?: string, blocked?: string) {
+    const where: any = {}
+    if (search?.trim()) where.name = { contains: search.trim(), mode: 'insensitive' }
+    if (blocked === 'true') where.blockedByAdmin = true
+    else if (blocked === 'false') where.blockedByAdmin = false
+    return this.prisma.product.findMany({
+      where,
+      select: {
+        id: true, name: true, imageUrl: true, basePrice: true, isActive: true,
+        blockedByAdmin: true, blockReason: true, createdAt: true,
+        store: { select: { id: true, name: true } },
+        category: { select: { name: true } },
+      },
+      orderBy: [{ blockedByAdmin: 'desc' }, { createdAt: 'desc' }],
+      take: 300,
+    })
+  }
+
+  /** Bloqueia/desbloqueia um produto (some pro cliente e não pode ser pedido). */
+  async setProductBlock(id: string, blocked: boolean, reason?: string) {
+    const product = await this.prisma.product.findUnique({ where: { id } })
+    if (!product) throw new NotFoundException('Produto não encontrado')
+    return this.prisma.product.update({
+      where: { id },
+      data: { blockedByAdmin: blocked, blockReason: blocked ? (reason?.trim() || null) : null },
+      select: { id: true, blockedByAdmin: true, blockReason: true },
+    })
+  }
+
   async getOrders(status?: string) {
     return this.prisma.order.findMany({
       where: status ? { status: status as any } : undefined,

@@ -11,6 +11,7 @@ import { Couriers } from './pages/Couriers'
 import { Stores } from './pages/Stores'
 import { Users } from './pages/Users'
 import { Orders } from './pages/Orders'
+import { Produtos } from './pages/Produtos'
 
 function Layout() {
   return (
@@ -57,6 +58,7 @@ export default function App() {
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/couriers" element={<Couriers />} />
                 <Route path="/stores" element={<Stores />} />
+                <Route path="/produtos" element={<Produtos />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/precos" element={<Precos />} />
               </Route>

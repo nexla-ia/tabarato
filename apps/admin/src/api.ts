@@ -58,6 +58,19 @@ export const api = {
 
   users: () => request<User[]>('/admin/users'),
 
+  products: (search?: string, blocked?: 'true' | 'false') => {
+    const q = new URLSearchParams()
+    if (search) q.set('search', search)
+    if (blocked) q.set('blocked', blocked)
+    const qs = q.toString()
+    return request<AdminProduct[]>(`/admin/products${qs ? `?${qs}` : ''}`)
+  },
+  setProductBlock: (id: string, blocked: boolean, reason?: string) =>
+    request<{ id: string; blockedByAdmin: boolean; blockReason: string | null }>(`/admin/products/${id}/block`, {
+      method: 'PATCH',
+      body: JSON.stringify({ blocked, ...(reason ? { reason } : {}) }),
+    }),
+
   orders: (status?: string) =>
     request<any[]>(`/admin/orders${status ? `?status=${status}` : ''}`),
 
@@ -72,6 +85,19 @@ export const api = {
   getSettings: () => request<Pricing>('/admin/settings'),
   updateSettings: (patch: Partial<Pricing>) =>
     request<Pricing>('/admin/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
+}
+
+export interface AdminProduct {
+  id: string
+  name: string
+  imageUrl: string | null
+  basePrice: number | string | null
+  isActive: boolean
+  blockedByAdmin: boolean
+  blockReason: string | null
+  createdAt: string
+  store: { id: string; name: string } | null
+  category: { name: string } | null
 }
 
 export interface Pricing {

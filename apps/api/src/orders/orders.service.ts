@@ -242,7 +242,7 @@ export class OrdersService {
         where: { id: item.productId },
         include: { variations: true },
       })
-      if (!product || !product.isActive) {
+      if (!product || !product.isActive || (product as any).blockedByAdmin) {
         throw new BadRequestException(`Product ${item.productId} not available`)
       }
       // O produto TEM que ser da loja informada (igual ao prepareStoreGroup). Sem isso
@@ -682,7 +682,7 @@ export class OrdersService {
 
     for (const item of group.items) {
       const product = await this.prisma.product.findUnique({ where: { id: item.productId }, include: { variations: true } })
-      if (!product || !product.isActive) throw new BadRequestException(`Um item da loja "${store.name}" não está disponível.`)
+      if (!product || !product.isActive || (product as any).blockedByAdmin) throw new BadRequestException(`Um item da loja "${store.name}" não está disponível.`)
       if (product.storeId !== store.id) throw new BadRequestException('Um item não pertence à loja informada.')
       if (product.stock !== null && product.stock < item.quantity) throw new BadRequestException(`Produto "${product.name}" tem apenas ${product.stock} unidade(s) disponível(is).`)
       // Retirada na loja: o cliente vem até a loja, então o limite de distância do

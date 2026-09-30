@@ -80,12 +80,22 @@ function TagIcon() {
   )
 }
 
+function BoxIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 8V16a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8Z"/>
+      <path d="m3.3 7 8.7 5 8.7-5M12 22V12"/>
+    </svg>
+  )
+}
+
 const NAV = [
   { to: '/dashboard', label: 'Dashboard',    Icon: LayoutIcon },
   { to: '/operacoes', label: 'Operação',     Icon: PulseIcon },
   { to: '/orders',    label: 'Pedidos',      Icon: ReceiptIcon },
   { to: '/couriers',  label: 'Entregadores', Icon: BikeIcon },
   { to: '/stores',    label: 'Lojas',        Icon: ShopIcon },
+  { to: '/produtos',  label: 'Produtos',     Icon: BoxIcon },
   { to: '/users',     label: 'Usuários',     Icon: PeopleIcon },
   { to: '/precos',    label: 'Preços',       Icon: TagIcon },
 ]

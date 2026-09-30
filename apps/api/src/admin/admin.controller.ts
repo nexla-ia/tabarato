@@ -49,6 +49,17 @@ export class AdminController {
     return this.adminService.getUsers()
   }
 
+  // Moderação de produtos: lista todos (filtro busca/bloqueados) e bloqueia/desbloqueia.
+  @Get('products')
+  getProducts(@Query('search') search?: string, @Query('blocked') blocked?: string) {
+    return this.adminService.getProducts(search, blocked)
+  }
+
+  @Patch('products/:id/block')
+  setProductBlock(@Param('id') id: string, @Body() body: { blocked: boolean; reason?: string }) {
+    return this.adminService.setProductBlock(id, !!body?.blocked, body?.reason)
+  }
+
   @Get('orders')
   getOrders(@Query('status') status?: string) {
     return this.adminService.getOrders(status)
