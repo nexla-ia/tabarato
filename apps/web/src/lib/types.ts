@@ -58,6 +58,8 @@ export interface Product {
   images?: string[] | null
   stock?: number | null
   isActive: boolean
+  blockedByAdmin?: boolean
+  blockReason?: string | null
   categoryId?: string | null
   variations?: ProductVariation[]
   promoBuyQty?: number | null

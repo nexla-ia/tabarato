@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus, TriangleAlert, Layers } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus, TriangleAlert, Layers, Ban } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Product, ProductVariation, Store, Category, money } from '@/lib/types'
 import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
@@ -177,10 +177,12 @@ export default function ProdutosPage() {
           {products.map(p => {
             const outOfStock = p.stock != null && p.stock <= 0
             return (
-            <div key={p.id} className={`${styles.card} ${!p.isActive ? styles.inactive : ''}`}>
+            <div key={p.id} className={`${styles.card} ${(!p.isActive || p.blockedByAdmin) ? styles.inactive : ''}`}>
               <div className={styles.thumb}>
                 {p.imageUrl ? <img src={p.imageUrl} alt={p.name} /> : <Package size={30} strokeWidth={1.5} />}
-                {outOfStock ? (
+                {p.blockedByAdmin ? (
+                  <span className={styles.blockedBadge}><Ban size={11} /> Bloqueado</span>
+                ) : outOfStock ? (
                   <span className={styles.outBadge}><TriangleAlert size={11} /> Esgotado</span>
                 ) : !p.isActive ? (
                   <span className={styles.inactiveBadge}>Inativo</span>
@@ -188,6 +190,12 @@ export default function ProdutosPage() {
               </div>
               <div className={styles.body}>
                 <div className={styles.pName}>{p.name}</div>
+                {p.blockedByAdmin && (
+                  <div className={styles.blockNote}>
+                    <Ban size={12} /> Bloqueado pela administração — não aparece no app.
+                    {p.blockReason ? <> Motivo: {p.blockReason}</> : null}
+                  </div>
+                )}
                 {p.description && <div className={styles.pDesc}>{p.description}</div>}
                 <div className={styles.pPrice}>{money(p.basePrice)}</div>
 
