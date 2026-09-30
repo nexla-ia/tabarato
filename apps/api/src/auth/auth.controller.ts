@@ -4,6 +4,7 @@ import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
 import { GoogleAuthDto } from './dto/google-auth.dto'
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto'
 
 @Controller('auth')
 export class AuthController {
@@ -27,5 +28,19 @@ export class AuthController {
   @Post('google')
   google(@Body() dto: GoogleAuthDto) {
     return this.auth.authGoogle(dto.idToken, dto.referralCode)
+  }
+
+  // Recuperação de senha. Limites apertados: pedir código é caro (manda e-mail) e
+  // tentar código é adivinhação — os dois precisam de rédea curta por IP.
+  @Throttle({ default: { ttl: 60_000, limit: 4 } })
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.auth.forgotPassword(dto.email)
+  }
+
+  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.auth.resetPassword(dto.email, dto.code, dto.newPassword)
   }
 }

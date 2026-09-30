@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common'
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
+import { MailService } from '../common/mail.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
 import * as bcrypt from 'bcryptjs'
@@ -17,6 +18,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
     private config: ConfigService,
+    private mail: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -140,6 +142,97 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } })
     if (!user || !user.isActive) throw new UnauthorizedException()
     return this.generateTokens(user.id, user.email, user.role)
+  }
+
+  // ── Recuperação de senha (código de 6 dígitos por e-mail) ──────────────────
+  private static readonly RESET_TTL_MIN = 15
+  private static readonly RESET_MAX_ATTEMPTS = 5
+
+  /**
+   * Pede o código. A resposta é SEMPRE a mesma, exista o e-mail ou não — senão o
+   * endpoint viraria um consultor de "quem tem conta aqui". O código só existe em
+   * hash no banco; o claro vai só no e-mail.
+   */
+  async forgotPassword(email: string) {
+    const generic = { message: 'Se houver uma conta com esse e-mail, enviamos um código.' }
+    const normalized = (email ?? '').trim().toLowerCase()
+    if (!normalized) return generic
+
+    const user = await this.prisma.user.findUnique({ where: { email: normalized } })
+    if (!user || !user.isActive) return generic
+
+    // Pedir um código novo invalida os anteriores que ainda estavam de pé.
+    await this.prisma.passwordReset.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    })
+
+    const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0')
+    await this.prisma.passwordReset.create({
+      data: {
+        userId: user.id,
+        codeHash: await bcrypt.hash(code, 10),
+        expiresAt: new Date(Date.now() + AuthService.RESET_TTL_MIN * 60_000),
+      },
+    })
+
+    await this.mail.sendPasswordResetCode(user.email, user.name, code, AuthService.RESET_TTL_MIN)
+    return generic
+  }
+
+  /**
+   * Troca a senha usando o código. Erros são genéricos de propósito (não dizemos se
+   * foi o e-mail, o código ou a validade). Cada palpite errado consome uma tentativa.
+   */
+  async resetPassword(email: string, code: string, newPassword: string) {
+    const invalid = new BadRequestException('Código inválido ou expirado. Peça um novo.')
+    const normalized = (email ?? '').trim().toLowerCase()
+    const digits = (code ?? '').replace(/\D/g, '')
+    if (!normalized || digits.length !== 6) throw invalid
+
+    const user = await this.prisma.user.findUnique({ where: { email: normalized } })
+    if (!user || !user.isActive) throw invalid
+
+    const reset = await this.prisma.passwordReset.findFirst({
+      where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (!reset) throw invalid
+
+    if (reset.attempts >= AuthService.RESET_MAX_ATTEMPTS) {
+      await this.prisma.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } })
+      throw new BadRequestException('Muitas tentativas. Peça um novo código.')
+    }
+
+    const ok = await bcrypt.compare(digits, reset.codeHash)
+    if (!ok) {
+      // Consome a tentativa ATOMICAMENTE (só enquanto ainda houver saldo), pra
+      // palpites em paralelo não furarem o limite.
+      const bumped = await this.prisma.passwordReset.updateMany({
+        where: { id: reset.id, usedAt: null, attempts: { lt: AuthService.RESET_MAX_ATTEMPTS } },
+        data: { attempts: { increment: 1 } },
+      })
+      if (bumped.count === 0) throw new BadRequestException('Muitas tentativas. Peça um novo código.')
+      throw invalid
+    }
+
+    // Claim atômico do código: só UMA chamada concorrente consegue usá-lo.
+    const claim = await this.prisma.passwordReset.updateMany({
+      where: { id: reset.id, usedAt: null },
+      data: { usedAt: new Date() },
+    })
+    if (claim.count === 0) throw invalid
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await bcrypt.hash(newPassword, 10),
+        // Derruba as sessões antigas: quem recuperou a conta expulsa quem estava dentro.
+        passwordChangedAt: new Date(),
+      },
+    })
+
+    return { message: 'Senha alterada. Entre com a nova senha.' }
   }
 
   private sanitizeUser(user: any) {
