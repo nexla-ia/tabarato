@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Heart } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
+import { LoadError } from '@/components/LoadError'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { StoreCardsGrid } from '../StoreCardsGrid'
@@ -16,14 +17,21 @@ export default function FavoritesPage() {
   const { user, ready } = useAuth()
   const [stores, setStores] = useState<Store[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+
+  // Rede caindo mostrava "você ainda não favoritou nenhuma loja" — parecia perda de dados.
+  const load = () => {
+    setLoading(true); setLoadError(false)
+    api.get<FavoriteRow[]>('/users/me/favorites')
+      .then((r) => setStores(r.data.map((f) => f.store)))
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false))
+  }
 
   useEffect(() => {
     if (!ready) return
     if (!user) { router.push('/login?redirect=/favorites'); return }
-    api.get<FavoriteRow[]>('/users/me/favorites')
-      .then((r) => setStores(r.data.map((f) => f.store)))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    load()
   }, [ready, user, router])
 
   if (!ready || !user || loading) {
@@ -41,7 +49,9 @@ export default function FavoritesPage() {
     <>
       <Navbar />
       <div className="container" style={{ padding: '32px 20px 60px' }}>
-        {stores.length === 0 ? (
+        {loadError ? (
+          <LoadError onRetry={load} sub="Não conseguimos buscar seus favoritos. Verifique a conexão." />
+        ) : stores.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
             background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)',

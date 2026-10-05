@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Navbar } from '@/components/Navbar'
+import { LoadError } from '@/components/LoadError'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import styles from './page.module.css'
@@ -32,11 +33,21 @@ export default function OrdersPage() {
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+
+  // Rede caindo mostrava "você ainda não fez nenhum pedido" — parecia perda de dados.
+  const load = () => {
+    setLoading(true); setLoadError(false)
+    api.get<Order[]>('/orders')
+      .then(r => setOrders(r.data))
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false))
+  }
 
   useEffect(() => {
     if (!ready) return
     if (!user) { router.push('/login'); return }
-    api.get<Order[]>('/orders').then(r => setOrders(r.data)).catch(() => {}).finally(() => setLoading(false))
+    load()
   }, [user, ready])
 
   return (
@@ -46,6 +57,8 @@ export default function OrdersPage() {
         <h1 className={styles.title}>Meus pedidos</h1>
         {loading ? (
           <div className={styles.loading}>Carregando...</div>
+        ) : loadError ? (
+          <LoadError onRetry={load} sub="Não conseguimos buscar seus pedidos. Verifique a conexão." />
         ) : orders.length === 0 ? (
           <div className={styles.empty}>
             <p>Você ainda não fez nenhum pedido.</p>
