@@ -138,10 +138,35 @@ export class AuthService {
     return { user: this.sanitizeUser(user), ...tokens }
   }
 
-  async refreshToken(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (!user || !user.isActive) throw new UnauthorizedException()
-    return this.generateTokens(user.id, user.email, user.role)
+  /**
+   * Renova a sessão a partir do refresh token.
+   *
+   * Valida assinatura/expiração com o segredo de REFRESH (não o de acesso) e repete
+   * as checagens do guard: conta ativa e token anterior à troca de senha não vale —
+   * senão a recuperação de senha não expulsaria de verdade quem estava dentro.
+   */
+  async refreshSession(refreshToken: string) {
+    const expired = new UnauthorizedException('Sessão expirada. Entre novamente.')
+    if (!refreshToken) throw expired
+
+    let payload: { sub: string; iat?: number }
+    try {
+      payload = await this.jwt.verifyAsync(refreshToken, {
+        secret: this.config.get('JWT_REFRESH_SECRET'),
+      })
+    } catch {
+      throw expired
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } })
+    if (!user || !user.isActive) throw new UnauthorizedException('Conta indisponível.')
+
+    if (user.passwordChangedAt && payload.iat != null
+        && payload.iat * 1000 < user.passwordChangedAt.getTime() - 1000) {
+      throw new UnauthorizedException('Sua senha mudou. Entre novamente.')
+    }
+
+    return { user: this.sanitizeUser(user), ...this.generateTokens(user.id, user.email, user.role) }
   }
 
   // ── Recuperação de senha (código de 6 dígitos por e-mail) ──────────────────

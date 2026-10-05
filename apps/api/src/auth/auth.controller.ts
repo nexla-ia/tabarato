@@ -5,6 +5,7 @@ import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
 import { GoogleAuthDto } from './dto/google-auth.dto'
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto'
+import { RefreshTokenDto } from './dto/refresh-token.dto'
 
 @Controller('auth')
 export class AuthController {
@@ -28,6 +29,15 @@ export class AuthController {
   @Post('google')
   google(@Body() dto: GoogleAuthDto) {
     return this.auth.authGoogle(dto.idToken, dto.referralCode)
+  }
+
+  // Renovação de sessão. O app chama isto sozinho quando o token de acesso expira —
+  // sem esta rota o 401 virava logout silencioso. Limite mais folgado porque é
+  // automático e vários usuários podem sair do mesmo IP.
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  @Post('refresh')
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.auth.refreshSession(dto.refreshToken)
   }
 
   // Recuperação de senha. Limites apertados: pedir código é caro (manda e-mail) e

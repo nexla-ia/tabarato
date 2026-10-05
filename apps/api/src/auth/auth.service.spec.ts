@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common'
+import { BadRequestException, UnauthorizedException } from '@nestjs/common'
 import * as bcrypt from 'bcryptjs'
 import { AuthService } from './auth.service'
 
@@ -16,7 +16,11 @@ function makeAuth(over: any = {}) {
     },
     ...(over.prisma ?? {}),
   }
-  const jwt = { sign: jest.fn().mockReturnValue('tok') }
+  const jwt = {
+    sign: jest.fn().mockReturnValue('tok'),
+    verifyAsync: jest.fn(),
+    ...(over.jwt ?? {}),
+  }
   const config = { get: jest.fn() }
   const mail = { sendPasswordResetCode: jest.fn().mockResolvedValue(true), send: jest.fn() }
   const svc = new AuthService(prisma as any, jwt as any, config as any, mail as any)
@@ -143,4 +147,45 @@ describe('AuthService.resetPassword', () => {
         .rejects.toBeInstanceOf(BadRequestException)
       expect(prisma.passwordReset.findFirst).not.toHaveBeenCalled()
     })
+})
+
+describe('AuthService.refreshSession', () => {
+  const NOW = Math.floor(Date.now() / 1000)
+
+  it('refresh token valido -> devolve tokens novos', async () => {
+    const { svc, prisma } = makeAuth({ jwt: { verifyAsync: jest.fn().mockResolvedValue({ sub: 'u1', iat: NOW }) } })
+    prisma.user.findUnique.mockResolvedValue({ ...ACTIVE_USER, role: 'CONSUMER', passwordChangedAt: null })
+    const r = await svc.refreshSession('rt')
+    expect(r.accessToken).toBeDefined()
+    expect(r.refreshToken).toBeDefined()
+  })
+
+  it('token invalido/expirado -> 401 generico', async () => {
+    const { svc } = makeAuth({ jwt: { verifyAsync: jest.fn().mockRejectedValue(new Error('bad')) } })
+    await expect(svc.refreshSession('lixo')).rejects.toThrow('Sessao expirada'.replace('Sessao', 'Sessão'))
+  })
+
+  it('sem token -> 401', async () => {
+    const { svc } = makeAuth()
+    await expect(svc.refreshSession('')).rejects.toBeInstanceOf(UnauthorizedException)
+  })
+
+  it('conta desativada -> 401', async () => {
+    const { svc, prisma } = makeAuth({ jwt: { verifyAsync: jest.fn().mockResolvedValue({ sub: 'u1', iat: NOW }) } })
+    prisma.user.findUnique.mockResolvedValue({ ...ACTIVE_USER, isActive: false })
+    await expect(svc.refreshSession('rt')).rejects.toThrow('indisponivel'.replace('indisponivel', 'indisponível'))
+  })
+
+  it('token emitido ANTES da troca de senha -> recusa (reset expulsa o invasor)', async () => {
+    const { svc, prisma } = makeAuth({ jwt: { verifyAsync: jest.fn().mockResolvedValue({ sub: 'u1', iat: NOW - 3600 }) } })
+    prisma.user.findUnique.mockResolvedValue({ ...ACTIVE_USER, passwordChangedAt: new Date() })
+    await expect(svc.refreshSession('rt')).rejects.toThrow('senha mudou')
+  })
+
+  it('token emitido DEPOIS da troca de senha -> aceita', async () => {
+    const { svc, prisma } = makeAuth({ jwt: { verifyAsync: jest.fn().mockResolvedValue({ sub: 'u1', iat: NOW }) } })
+    prisma.user.findUnique.mockResolvedValue({ ...ACTIVE_USER, passwordChangedAt: new Date(Date.now() - 3600_000) })
+    const r = await svc.refreshSession('rt')
+    expect(r.accessToken).toBeDefined()
+  })
 })
