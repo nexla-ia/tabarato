@@ -155,11 +155,16 @@ function AlertRow({ emoji, title, count, accent, accentBg, accentText, onClick }
 export function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    api.stats().then(setStats).catch(console.error).finally(() => setLoading(false))
-  }, [])
+  // Sem este estado de erro a página ficava EM BRANCO quando a API caía — o
+  // admin via só o título e não sabia se não havia dados ou se algo quebrou.
+  const load = () => {
+    setLoading(true); setLoadError(false)
+    api.stats().then(setStats).catch(() => setLoadError(true)).finally(() => setLoading(false))
+  }
+  useEffect(() => { load() }, [])
 
   return (
     <div style={{ maxWidth: 860 }}>
@@ -190,6 +195,25 @@ export function Dashboard() {
               animation: 'fadeIn 0.3s ease',
             }} />
           ))}
+        </div>
+      ) : loadError ? (
+        <div style={{
+          background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 14,
+          padding: 24, textAlign: 'center', fontFamily: SANS,
+        }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#B91C1C', marginBottom: 4 }}>
+            Não foi possível carregar os dados
+          </div>
+          <div style={{ fontSize: 13.5, color: '#7A5C4A', marginBottom: 16 }}>
+            A API não respondeu. Verifique sua conexão e tente de novo.
+          </div>
+          <button
+            onClick={load}
+            style={{
+              background: '#B91C1C', color: '#fff', border: 'none', borderRadius: 9,
+              padding: '9px 20px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: SANS,
+            }}
+          >Tentar novamente</button>
         </div>
       ) : stats && (
         <>

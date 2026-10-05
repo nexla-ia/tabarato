@@ -2,7 +2,7 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { ShoppingCart, MapPin, ChevronDown } from 'lucide-react'
+import { ShoppingCart, MapPin } from 'lucide-react'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
 import { useCartStore } from '@/stores/cart'
@@ -29,11 +29,12 @@ export function Navbar() {
           <Link href="/" className={styles.logo}>
             <Image src="/logo-wide.png" alt="Tá Barato" height={38} width={150} style={{ objectFit: 'contain', height: 38, width: 'auto' }} priority />
           </Link>
-          <button className={styles.location}>
+          {/* Marketplace de uma cidade só: isto é um RÓTULO, não um seletor.
+              Antes era um <button> com seta e hover que não fazia nada. */}
+          <span className={styles.location} title="Atendemos Vilhena e região">
             <MapPin size={15} />
             <span className={styles.locationText}>Vilhena<span className={styles.locationState}>, RO</span></span>
-            <ChevronDown size={14} className={styles.chev} />
-          </button>
+          </span>
         </div>
 
         {/* Busca mora aqui (não mais no hero da home) — funciona de qualquer
