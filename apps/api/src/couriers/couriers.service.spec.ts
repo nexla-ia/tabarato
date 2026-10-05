@@ -16,6 +16,7 @@ function makeService(over: any = {}) {
     withdrawal: {
       create: jest.fn(), update: jest.fn(), updateMany: jest.fn(),
       findUnique: jest.fn(), findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0),
     },
     delivery: {
       findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(),
@@ -576,5 +577,108 @@ describe('CouriersService.refuseDelivery', () => {
     const { svc, prisma } = makeService()
     prisma.courier.findUnique.mockResolvedValue(null)
     await expect(svc.refuseDelivery('u1', 'd1')).rejects.toBeInstanceOf(NotFoundException)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reconciliação de saques travados: o desfecho vem do webhook do Asaas; se ele
+// falhar, o saque fica PROCESSING pra sempre com o dinheiro já debitado.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('CouriersService.reconcileStuckTransfers', () => {
+  const travado = (over: any = {}) => ({
+    id: 'w1', ownerId: 'c1', ownerType: 'COURIER', courierId: 'c1',
+    amount: 50, status: 'PROCESSING', asaasTransferId: 'tr1',
+    createdAt: new Date(Date.now() - 60 * 60_000),
+    ...over,
+  })
+
+  it('Asaas desligado → nem consulta (sem key nao da pra reconciliar)', async () => {
+    const { svc, prisma } = makeService({ asaas: { enabled: false } })
+    await svc.reconcileStuckTransfers()
+    expect(prisma.withdrawal.findMany).not.toHaveBeenCalled()
+  })
+
+  it('so olha PROCESSING antigos que chegaram a ser enviados', async () => {
+    const { svc, prisma } = makeService({ asaas: { enabled: true } })
+    await svc.reconcileStuckTransfers()
+    expect(prisma.withdrawal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'PROCESSING',
+          asaasTransferId: { not: null },
+          createdAt: expect.objectContaining({ lt: expect.any(Date) }),
+        }),
+      }),
+    )
+  })
+
+  it('Asaas diz DONE → fecha como DONE e NAO credita nada', async () => {
+    const { svc, prisma, wallet } = makeService({
+      asaas: { enabled: true, getTransfer: jest.fn().mockResolvedValue({ status: 'DONE' }) },
+    })
+    prisma.withdrawal.findMany.mockResolvedValue([travado()])
+    prisma.withdrawal.updateMany.mockResolvedValue({ count: 1 })
+
+    await svc.reconcileStuckTransfers()
+
+    expect(prisma.withdrawal.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'w1', status: 'PROCESSING' }, data: { status: 'DONE' } }),
+    )
+    expect(wallet.credit).not.toHaveBeenCalled()
+  })
+
+  it('Asaas diz FAILED → fecha como FAILED e ESTORNA a carteira', async () => {
+    const { svc, prisma, wallet } = makeService({
+      asaas: { enabled: true, getTransfer: jest.fn().mockResolvedValue({ status: 'FAILED' }) },
+    })
+    prisma.withdrawal.findMany.mockResolvedValue([travado()])
+    prisma.withdrawal.updateMany.mockResolvedValue({ count: 1 })
+
+    await svc.reconcileStuckTransfers()
+
+    expect(prisma.withdrawal.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }),
+    )
+    expect(wallet.credit).toHaveBeenCalledWith('c1', 'COURIER', 50,
+      'Estorno de saque não concluído', 'estorno-saque-w1')
+  })
+
+  it.each(['PENDING', 'BANK_PROCESSING'])('Asaas diz %s → ainda em transito, nao mexe', async (status) => {
+    const { svc, prisma, wallet } = makeService({
+      asaas: { enabled: true, getTransfer: jest.fn().mockResolvedValue({ status }) },
+    })
+    prisma.withdrawal.findMany.mockResolvedValue([travado()])
+    await svc.reconcileStuckTransfers()
+    expect(prisma.withdrawal.updateMany).not.toHaveBeenCalled()
+    expect(wallet.credit).not.toHaveBeenCalled()
+  })
+
+  it('o webhook ja fechou antes (claim count=0) → NAO estorna de novo', async () => {
+    const { svc, prisma, wallet } = makeService({
+      asaas: { enabled: true, getTransfer: jest.fn().mockResolvedValue({ status: 'CANCELLED' }) },
+    })
+    prisma.withdrawal.findMany.mockResolvedValue([travado()])
+    prisma.withdrawal.updateMany.mockResolvedValue({ count: 0 })
+    await svc.reconcileStuckTransfers()
+    expect(wallet.credit).not.toHaveBeenCalled()
+  })
+
+  it('Asaas fora do ar → nao estorna no escuro (tenta na proxima rodada)', async () => {
+    const { svc, prisma, wallet } = makeService({
+      asaas: { enabled: true, getTransfer: jest.fn().mockRejectedValue(new Error('timeout')) },
+    })
+    prisma.withdrawal.findMany.mockResolvedValue([travado()])
+    await svc.reconcileStuckTransfers()
+    expect(prisma.withdrawal.updateMany).not.toHaveBeenCalled()
+    expect(wallet.credit).not.toHaveBeenCalled()
+  })
+
+  it('saque PENDING antigo (nunca enviado) aparece no log de alerta', async () => {
+    const { svc, prisma } = makeService({ asaas: { enabled: true } })
+    prisma.withdrawal.count.mockResolvedValue(3)
+    const warn = jest.spyOn((svc as any).logger, 'warn').mockImplementation(() => {})
+    await svc.reconcileStuckTransfers()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('3 saque(s) PENDING'))
+    warn.mockRestore()
   })
 })

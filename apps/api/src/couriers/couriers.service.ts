@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { Cron, CronExpression } from '@nestjs/schedule'
 import { DeliveryStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { PushService } from '../common/push.service'
@@ -587,6 +588,81 @@ export class CouriersService {
           await this.wallet.credit(ownerId, ownerType, Number(withdrawal.amount),
             'Estorno de saque não concluído', `estorno-saque-${withdrawal.id}`)
         }
+      }
+    }
+  }
+
+  // Quanto tempo um saque pode ficar PROCESSING antes de a gente desconfiar do webhook.
+  private static readonly STUCK_TRANSFER_MIN = 10
+
+  /**
+   * Reconciliação de saques travados.
+   *
+   * O desfecho de um saque (DONE/FAILED) chega pelo WEBHOOK do Asaas. Se o webhook
+   * falha — token trocado, instabilidade, URL errada — o saque fica PROCESSING pra
+   * sempre: dinheiro debitado da carteira, nunca confirmado, e ninguém percebe.
+   * Aqui a gente pergunta ao Asaas qual é o status real e fecha o caso.
+   *
+   * Usa o MESMO claim atômico do webhook (updateMany where status PROCESSING), então
+   * webhook e cron podem correr juntos sem estornar duas vezes: quem chegar primeiro
+   * muda o status, o segundo pega count=0 e não credita nada.
+   */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async reconcileStuckTransfers() {
+    if (!this.asaas.enabled) return
+
+    const cutoff = new Date(Date.now() - CouriersService.STUCK_TRANSFER_MIN * 60_000)
+    const stuck = await this.prisma.withdrawal.findMany({
+      where: { status: 'PROCESSING', asaasTransferId: { not: null }, createdAt: { lt: cutoff } },
+      take: 50,
+    })
+
+    // Saques que nunca chegaram a ser enviados (criados com o Asaas desligado):
+    // não dá pra resolver sozinho, mas tem que aparecer no log — é dinheiro parado.
+    const orphanPending = await this.prisma.withdrawal.count({
+      where: { status: 'PENDING', createdAt: { lt: cutoff } },
+    })
+    if (orphanPending > 0) {
+      this.logger.warn(`[Saques] ${orphanPending} saque(s) PENDING nunca enviados — saldo já debitado, precisa de ação manual.`)
+    }
+
+    if (stuck.length === 0) return
+    this.logger.log(`[Saques] Reconciliando ${stuck.length} saque(s) em PROCESSING há mais de ${CouriersService.STUCK_TRANSFER_MIN}min`)
+
+    for (const w of stuck) {
+      try {
+        const t = await this.asaas.getTransfer(w.asaasTransferId!)
+
+        if (t.status === 'DONE') {
+          await this.prisma.withdrawal.updateMany({
+            where: { id: w.id, status: 'PROCESSING' },
+            data: { status: 'DONE' },
+          })
+          this.logger.log(`[Saques] ${w.id.slice(0, 8)} confirmado como DONE pela reconciliação`)
+          continue
+        }
+
+        // Ainda em trânsito no banco: não é travamento, é só demora.
+        if (['PENDING', 'BANK_PROCESSING'].includes(t.status)) continue
+
+        // Qualquer outro status = não saiu. Fecha como FAILED e devolve o saldo.
+        const res = await this.prisma.withdrawal.updateMany({
+          where: { id: w.id, status: 'PROCESSING' },
+          data: { status: 'FAILED', failReason: `Reconciliação: Asaas retornou ${t.status}`.slice(0, 300) },
+        })
+        if (res.count > 0) {
+          const ownerId = w.ownerId ?? w.courierId
+          const ownerType = (w.ownerType ?? 'COURIER') as 'STORE' | 'COURIER'
+          if (ownerId) {
+            await this.wallet.credit(ownerId, ownerType, Number(w.amount),
+              'Estorno de saque não concluído', `estorno-saque-${w.id}`)
+          }
+          this.logger.warn(`[Saques] ${w.id.slice(0, 8)} falhou (${t.status}) — carteira estornada pela reconciliação`)
+        }
+      } catch (err) {
+        // Não conseguiu falar com o Asaas: deixa para a próxima rodada. Nunca
+        // estorna no escuro — isso é o que evita pagar duas vezes.
+        this.logger.warn(`[Saques] Falha ao reconciliar ${w.id.slice(0, 8)} — tentando de novo depois`)
       }
     }
   }
