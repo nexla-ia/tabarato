@@ -60,6 +60,12 @@ export class AdminController {
     return this.adminService.setProductBlock(id, !!body?.blocked, body?.reason)
   }
 
+  // Saques (loja e entregador) — visibilidade do dinheiro saindo.
+  @Get('withdrawals')
+  getWithdrawals(@Query('status') status?: string) {
+    return this.adminService.getWithdrawals(status)
+  }
+
   @Get('orders')
   getOrders(@Query('status') status?: string) {
     return this.adminService.getOrders(status)

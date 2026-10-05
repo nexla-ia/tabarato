@@ -11,6 +11,7 @@ import { api } from '@/lib/api'
 import { mapsUrl } from '@/lib/geocoding'
 import { Lightbox } from '@/components/Lightbox'
 import styles from './StoreClient.module.css'
+import { useDialogs } from '@/components/Dialogs'
 
 // Referência estável: se o seletor devolvesse `[]` inline a cada chamada, o
 // zustand nunca veria o valor como "igual" ao anterior e entraria em loop de
@@ -68,6 +69,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
   store: Store; products: Product[]; rating?: number | null; reviewCount?: number
   reviews?: Review[]; photos?: string[]
 }) {
+  const { toast, confirm } = useDialogs()
   const { addItem, storeTotal } = useCartStore()
   const storeItems = useCartStore(s => s.stores.find(g => g.storeId === store.id)?.items ?? EMPTY_ITEMS)
   const [query, setQuery] = useState('')
@@ -128,7 +130,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
     // Loja fechada (horário/pausa já refletidos em isOpen pelo backend): não adiciona
     // — senão o cliente monta o carrinho e o checkout recusa lá no fim.
     if (!store.isOpen) {
-      alert('Esta loja está fechada no momento. Não é possível adicionar itens agora.')
+      toast('Esta loja está fechada no momento. Não é possível adicionar itens agora.', 'info')
       return
     }
     const price = Number(variation?.price ?? product.basePrice ?? 0)

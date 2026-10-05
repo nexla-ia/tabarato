@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import { geocodeAddress, mapsUrl } from '@/lib/geocoding'
 import { useAuth } from '@/hooks/useAuth'
 import styles from './page.module.css'
+import { useDialogs } from '@/components/Dialogs'
 
 interface Address {
   id: string; label: string; street: string; number: string
@@ -33,6 +34,7 @@ const FIELDS: { key: keyof FormState; label: string; placeholder: string; requir
 ]
 
 export default function EnderecosPage() {
+  const { toast, confirm } = useDialogs()
   const { user, ready } = useAuth()
   const router = useRouter()
 
@@ -104,13 +106,13 @@ export default function EnderecosPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Remover este endereço?')) return
+    if (!(await confirm({ title: 'Remover endereço?', message: 'Ele sai da sua lista de entrega.', confirmText: 'Remover', danger: true }))) return
     setDeletingId(id)
     try {
       await api.delete(`/users/me/addresses/${id}`)
       setAddresses(prev => prev!.filter(a => a.id !== id))
     } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Não foi possível remover este endereço.')
+      toast(err.response?.data?.message ?? 'Não foi possível remover este endereço.', 'error')
     } finally { setDeletingId(null) }
   }
 

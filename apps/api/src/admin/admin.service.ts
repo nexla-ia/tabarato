@@ -221,6 +221,57 @@ export class AdminService {
     })
   }
 
+  /**
+   * Saques de lojas e entregadores. Existe para dar VISIBILIDADE: o desfecho é
+   * automático (PIX-out + webhook + cron de reconciliação), mas sem uma tela
+   * ninguém percebe um saque preso em PROCESSING ou um PENDING nunca enviado.
+   */
+  async getWithdrawals(status?: string) {
+    const rows = await this.prisma.withdrawal.findMany({
+      where: status ? { status: status as any } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    })
+
+    // Não há relação direta com Store (só com Courier, legado) — resolve o nome
+    // do dono em duas consultas em lote em vez de uma por linha.
+    const storeIds = rows.filter(r => r.ownerType === 'STORE' && r.ownerId).map(r => r.ownerId!)
+    const courierIds = rows
+      .filter(r => r.ownerType !== 'STORE')
+      .map(r => r.ownerId ?? r.courierId)
+      .filter((v): v is string => Boolean(v))
+
+    const [stores, couriers] = await Promise.all([
+      storeIds.length
+        ? this.prisma.store.findMany({ where: { id: { in: storeIds } }, select: { id: true, name: true } })
+        : Promise.resolve([]),
+      courierIds.length
+        ? this.prisma.courier.findMany({
+            where: { id: { in: courierIds } },
+            select: { id: true, user: { select: { name: true } } },
+          })
+        : Promise.resolve([]),
+    ])
+    const storeName = new Map<string, string>(stores.map(s => [s.id, s.name] as [string, string]))
+    const courierName = new Map<string, string | null>(couriers.map(c => [c.id, c.user?.name ?? null] as [string, string | null]))
+
+    return rows.map(r => ({
+      id: r.id,
+      ownerType: r.ownerType,
+      ownerName: r.ownerType === 'STORE'
+        ? storeName.get(r.ownerId ?? '') ?? null
+        : courierName.get(r.ownerId ?? r.courierId ?? '') ?? null,
+      amount: r.amount,
+      pixKey: r.pixKey,
+      pixKeyType: r.pixKeyType,
+      status: r.status,
+      failReason: r.failReason,
+      asaasTransferId: r.asaasTransferId,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    }))
+  }
+
   async getOrders(status?: string) {
     return this.prisma.order.findMany({
       where: status ? { status: status as any } : undefined,

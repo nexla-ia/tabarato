@@ -7,6 +7,7 @@ import { Coupon } from '@/lib/types'
 import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
 import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
+import { useDialogs } from '@/components/Dialogs'
 
 type DiscountType = 'percent' | 'fixed'
 
@@ -34,6 +35,7 @@ function money(v: number | string | null | undefined) {
 }
 
 export default function CuponsPage() {
+  const { toast, confirm } = useDialogs()
   const qc = useQueryClient()
   const [form, setForm] = useState<FormState | null>(null)
   const [error, setError] = useState('')
@@ -152,7 +154,7 @@ export default function CuponsPage() {
                   <button className={styles.iconBtn} onClick={() => edit(c)} title="Editar"><Pencil size={15} /></button>
                   <button
                     className={`${styles.iconBtn} ${styles.danger}`}
-                    onClick={() => { if (confirm(`Excluir o cupom "${c.code}"?`)) remove.mutate(c.id) }}
+                    onClick={async () => { if (await confirm({ title: `Excluir o cupom ${c.code}?`, message: 'Quem ainda não usou perde o desconto.', confirmText: 'Excluir', danger: true })) remove.mutate(c.id) }}
                     title="Excluir"
                   ><Trash2 size={15} /></button>
                 </div>

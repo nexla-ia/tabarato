@@ -12,6 +12,7 @@ import { useCartStore } from '@/stores/cart'
 import { useCourierPosition } from '@/hooks/useCourierPosition'
 import { api } from '@/lib/api'
 import styles from './page.module.css'
+import { useDialogs } from '@/components/Dialogs'
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Aguardando confirmação', CONFIRMED: 'Confirmado', PREPARING: 'Preparando',
@@ -27,6 +28,7 @@ const STEPS = ['PENDING','CONFIRMED','PREPARING','READY','DELIVERED']
 function fmtBRL(v: number | string) { return `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}` }
 
 export default function OrderDetailPage() {
+  const { toast, confirm } = useDialogs()
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { user } = useAuth()
@@ -69,19 +71,19 @@ export default function OrderDetailPage() {
     try {
       const { data } = await api.get(`/payments/orders/${id}/sync`)
       if (data?.status === 'PAID') api.get(`/orders/${id}`).then(r => setOrder(r.data))
-      else alert('Pagamento ainda não confirmado. Aguarde.')
+      else toast('Pagamento ainda não confirmado. Aguarde um instante.', 'info')
     } catch {} finally { setCheckingPix(false) }
   }
 
   async function handleCancel() {
-    if (!confirm('Tem certeza que deseja cancelar este pedido?')) return
+    if (!(await confirm({ title: 'Cancelar este pedido?', message: 'Essa ação não pode ser desfeita.', confirmText: 'Cancelar pedido', cancelText: 'Voltar', danger: true }))) return
     setCancelling(true)
     try {
       await api.patch(`/orders/${id}/cancel`)
       const r = await api.get(`/orders/${id}`)
       setOrder(r.data)
     } catch (e: any) {
-      alert(e?.response?.data?.message ?? 'Não foi possível cancelar o pedido.')
+      toast(e?.response?.data?.message ?? 'Não foi possível cancelar o pedido.', 'error')
     } finally { setCancelling(false) }
   }
   // Cliente só cancela antes de a loja começar a preparar (backend: PENDING/CONFIRMED).
@@ -104,8 +106,8 @@ export default function OrderDetailPage() {
       }, user?.id)
       added++
     }
-    if (added === 0) { alert('Nenhum item deste pedido está disponível no momento.'); return }
-    alert(skipped > 0 ? `${added} item(ns) adicionados ao carrinho (${skipped} indisponível(is)).` : 'Itens adicionados ao carrinho!')
+    if (added === 0) { toast('Nenhum item deste pedido está disponível no momento.', 'info'); return }
+    toast(skipped > 0 ? `${added} item(ns) adicionados ao carrinho (${skipped} indisponível(is)).` : 'Itens adicionados ao carrinho!', 'success')
     router.push('/cart')
   }
 

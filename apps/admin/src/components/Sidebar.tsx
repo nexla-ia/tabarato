@@ -80,6 +80,16 @@ function TagIcon() {
   )
 }
 
+function CashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="6" width="20" height="12" rx="2"/>
+      <circle cx="12" cy="12" r="2.5"/>
+      <path d="M6 12h.01M18 12h.01"/>
+    </svg>
+  )
+}
+
 function BoxIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -97,6 +107,7 @@ const NAV = [
   { to: '/stores',    label: 'Lojas',        Icon: ShopIcon },
   { to: '/produtos',  label: 'Produtos',     Icon: BoxIcon },
   { to: '/users',     label: 'Usuários',     Icon: PeopleIcon },
+  { to: '/saques',    label: 'Saques',       Icon: CashIcon },
   { to: '/precos',    label: 'Preços',       Icon: TagIcon },
 ]
 

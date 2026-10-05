@@ -7,6 +7,7 @@ import { Store, DaySchedule, ScheduleException } from '@/lib/types'
 import { formatPhone, onlyDigits } from '@/lib/masks'
 import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
+import { useDialogs } from '@/components/Dialogs'
 
 interface MpStatus { enabled: boolean; connected: boolean; mpUserId: string | null }
 interface AsaasStatus { required: boolean; onboarded: boolean }
@@ -23,6 +24,7 @@ const TABS: { key: Tab; label: string; Icon: typeof StoreIcon }[] = [
 ]
 
 export default function ConfigPage() {
+  const { toast, confirm } = useDialogs()
   const qc = useQueryClient()
   const storeQ = useQuery<Store>({ queryKey: ['store-my'], queryFn: async () => (await api.get('/stores/my')).data })
   const mpQ = useQuery<MpStatus>({ queryKey: ['mp-status'], queryFn: async () => (await api.get('/stores/mp/status')).data })
@@ -549,7 +551,7 @@ export default function ConfigPage() {
           {mpQ.data.connected ? (
             <div className={styles.mpConnected}>
               <span className={styles.mpBadgeOk}><Check size={14} /> Conectado</span>
-              <button className={styles.mpDisconnect} onClick={() => { if (confirm('Desconectar o Mercado Pago? Você não poderá receber pedidos até reconectar.')) disconnectMp.mutate() }} disabled={disconnectMp.isPending}>
+              <button className={styles.mpDisconnect} onClick={async () => { if (await confirm({ title: 'Desconectar o Mercado Pago?', message: 'Sua loja não poderá receber pedidos até reconectar.', confirmText: 'Desconectar', danger: true })) disconnectMp.mutate() }} disabled={disconnectMp.isPending}>
                 Desconectar
               </button>
             </div>

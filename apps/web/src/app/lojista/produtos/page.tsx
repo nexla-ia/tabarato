@@ -8,6 +8,7 @@ import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
 import { CategorySelect } from '@/components/CategorySelect'
 import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
+import { useDialogs } from '@/components/Dialogs'
 
 const MAX_GALLERY_IMAGES = 8
 
@@ -28,6 +29,7 @@ interface FormState {
 const EMPTY: FormState = { name: '', description: '', basePrice: '', stock: '', categoryId: '', imageUrl: '', images: [], isActive: true, promoBuyQty: '', promoPayQty: '' }
 
 export default function ProdutosPage() {
+  const { toast, confirm } = useDialogs()
   const qc = useQueryClient()
   const [form, setForm] = useState<FormState | null>(null)
   const [variationsProduct, setVariationsProduct] = useState<Product | null>(null)
@@ -72,7 +74,7 @@ export default function ProdutosPage() {
       return (await api.post(`/products/store/${storeQ.data!.id}`, payload)).data
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['products-my'] }); setForm(null) },
-    onError: (e: any) => alert(e?.response?.data?.message ?? e?.message ?? 'Não foi possível salvar o produto.'),
+    onError: (e: any) => toast(e?.response?.data?.message ?? e?.message ?? 'Não foi possível salvar o produto.', 'error'),
   })
 
   async function handleImageFile(file: File) {
@@ -247,7 +249,7 @@ export default function ProdutosPage() {
                   <button className={styles.iconBtn} onClick={() => edit(p)} title="Editar"><Pencil size={15} /></button>
                   <button
                     className={`${styles.iconBtn} ${styles.danger}`}
-                    onClick={() => { if (confirm(`Excluir "${p.name}"?`)) remove.mutate(p.id) }}
+                    onClick={async () => { if (await confirm({ title: `Excluir "${p.name}"?`, message: 'O produto sai do app na hora.', confirmText: 'Excluir', danger: true })) remove.mutate(p.id) }}
                     title="Excluir"
                   ><Trash2 size={15} /></button>
                 </div>
@@ -415,6 +417,7 @@ function VariationsModal({ product, onClose, onChanged }: {
   onClose: () => void
   onChanged: () => void
 }) {
+  const { toast, confirm } = useDialogs()
   const qc = useQueryClient()
   const [vf, setVf] = useState<VarFormState>(EMPTY_VAR)
 
@@ -441,7 +444,7 @@ function VariationsModal({ product, onClose, onChanged }: {
       return (await api.post(`/products/${product.id}/variations`, payload)).data
     },
     onSuccess: () => { setVf(EMPTY_VAR); afterChange() },
-    onError: (e: any) => alert(e?.response?.data?.message ?? 'Não foi possível salvar a variação.'),
+    onError: (e: any) => toast(e?.response?.data?.message ?? 'Não foi possível salvar a variação.', 'error'),
   })
   const toggle = useMutation({
     mutationFn: async (id: string) => (await api.patch(`/products/variations/${id}/toggle`)).data,
@@ -509,7 +512,7 @@ function VariationsModal({ product, onClose, onChanged }: {
                 ><Pencil size={14} /></button>
                 <button
                   className={`${styles.iconBtn} ${styles.danger}`}
-                  onClick={() => { if (confirm(`Excluir a variação "${v.name}"?`)) remove.mutate(v.id) }}
+                  onClick={async () => { if (await confirm({ title: `Excluir a variação "${v.name}"?`, confirmText: 'Excluir', danger: true })) remove.mutate(v.id) }}
                   title="Excluir"
                 ><Trash2 size={14} /></button>
               </div>

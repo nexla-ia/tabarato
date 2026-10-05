@@ -71,6 +71,9 @@ export const api = {
       body: JSON.stringify({ blocked, ...(reason ? { reason } : {}) }),
     }),
 
+  withdrawals: (status?: string) =>
+    request<AdminWithdrawal[]>(`/admin/withdrawals${status ? `?status=${status}` : ''}`),
+
   orders: (status?: string) =>
     request<any[]>(`/admin/orders${status ? `?status=${status}` : ''}`),
 
@@ -85,6 +88,20 @@ export const api = {
   getSettings: () => request<Pricing>('/admin/settings'),
   updateSettings: (patch: Partial<Pricing>) =>
     request<Pricing>('/admin/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
+}
+
+export interface AdminWithdrawal {
+  id: string
+  ownerType: 'STORE' | 'COURIER'
+  ownerName: string | null
+  amount: number | string
+  pixKey: string
+  pixKeyType: string | null
+  status: 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED'
+  failReason: string | null
+  asaasTransferId: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface AdminProduct {
