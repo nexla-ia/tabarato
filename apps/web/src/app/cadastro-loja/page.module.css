@@ -212,3 +212,21 @@
 }
 .legalNote a { color: var(--orange-dark); font-weight: 600; text-decoration: underline; }
 .legalNote a:hover { color: var(--orange); }
+
+/* Aceite dos Termos do Lojista — checkbox de verdade, não frase ao lado do botão.
+   É o que registra a concordância com a comissão, então precisa ser um ato. */
+.termsBox {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 16px 0 4px; padding: 13px 14px;
+  background: var(--surface-2, #FFF8F3);
+  border: 1px solid var(--border); border-radius: 12px;
+  cursor: pointer;
+}
+.termsBox:has(:focus-visible) { outline: 2px solid var(--orange); outline-offset: 2px; }
+.termsCheck {
+  width: 18px; height: 18px; margin: 1px 0 0; flex-shrink: 0;
+  accent-color: var(--orange-dark); cursor: pointer;
+}
+.termsText { font-size: 12.8px; line-height: 1.55; color: var(--text); }
+.termsText a { color: var(--orange-dark); font-weight: 600; text-decoration: underline; }
+.termsText a:hover { color: var(--orange); }

@@ -103,6 +103,11 @@ export function Precos() {
 
           <Section title="Comissão da plataforma">
             <Field label="Comissão sobre os produtos" value={p.platformCommissionPct} onChange={set('platformCommissionPct')} suffix="%" />
+            <div style={{ fontSize: 11.5, color: MUTED, marginTop: -4, lineHeight: 1.5 }}>
+              Este número aparece nos Termos do Lojista, que a loja aceita ao se cadastrar. Pelos
+              próprios Termos, <strong>aumento de comissão precisa ser avisado com antecedência</strong>{' '}
+              às lojas já cadastradas — avise antes de salvar.
+            </div>
           </Section>
 
           <Section title="Segurança da entrega">

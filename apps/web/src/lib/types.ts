@@ -36,6 +36,9 @@ export interface Store {
   photos?: string[]
   documentUrl?: string | null
   maxConcurrentOrders?: number | null
+  /** Aceite dos Termos do Lojista — null nas lojas criadas antes do registro. */
+  termsAcceptedAt?: string | null
+  termsVersion?: string | null
 }
 
 export interface ProductVariation {

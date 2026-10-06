@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalPage, Callout, LegalTable } from '@/components/LegalPage'
-import { EMPRESA, REGRAS, TERMOS_VERSAO, pendente } from '@/lib/legal'
+import { EMPRESA, REGRAS, TERMOS_VERSAO, brl, buscarPrecos, pendente } from '@/lib/legal'
 
 export const metadata: Metadata = {
   title: 'Termos de Uso — Tá Barato',
@@ -9,17 +9,19 @@ export const metadata: Metadata = {
 }
 
 /**
- * RASCUNHO — o texto descreve fielmente o comportamento do app em 26/08/2026,
+ * RASCUNHO — o texto descreve fielmente o comportamento do app em 06/10/2026,
  * mas não passou por revisão jurídica. Ver comentário em src/lib/legal.ts.
  *
- * Ao mudar regra de negócio (comissão, taxa de entrega, pontos), atualize
- * src/lib/legal.ts — os números daqui vêm de lá justamente pra não desencontrar
- * do que a API cobra de fato.
+ * As taxas são lidas da API (`GET /config/pricing`), não escritas aqui: elas são
+ * editáveis pelo admin, e número de contrato que desencontra do que é cobrado é
+ * pior do que número nenhum. Os valores de fidelidade seguem em src/lib/legal.ts
+ * porque são constantes no código da API.
  */
-export default function TermosPage() {
+export default async function TermosPage() {
   const razao = pendente(EMPRESA.razaoSocial, 'razão social')
   const cnpj = pendente(EMPRESA.cnpj, 'CNPJ')
   const email = pendente(EMPRESA.emailContato, 'e-mail de contato')
+  const { precos, aoVivo } = await buscarPrecos()
 
   return (
     <LegalPage
@@ -96,6 +98,21 @@ export default function TermosPage() {
         seu pedido. Ele confirma que o pedido chegou a quem devia.
       </p>
       <p>
+        <strong>Retirada na loja.</strong> Quando a loja oferece essa opção, você pode escolher
+        buscar o pedido no balcão dela em vez de receber em casa. Nesse caso não há taxa de entrega
+        nem entregador: você vai até o endereço da loja e informa o{' '}
+        <strong>código de retirada</strong> que aparece no pedido. Esse código é seu — a loja não o
+        vê antes de você mostrar.
+      </p>
+      <Callout>
+        <p>
+          <strong>Pedidos de valor alto só por retirada.</strong> Acima de{' '}
+          {brl(precos.maxDeliveryValue)} em produtos, a entrega por entregador fica indisponível e o
+          pedido só pode ser retirado na loja. É uma medida de segurança, para o entregador e para a
+          mercadoria.
+        </p>
+      </Callout>
+      <p>
         Os tempos exibidos (preparo e deslocamento) são <strong>estimativas</strong>, calculadas a
         partir do tempo de preparo declarado pela loja e da distância até o endereço. Atrasos podem
         acontecer por fatores fora do nosso controle, como trânsito, clima e volume de pedidos.
@@ -112,26 +129,45 @@ export default function TermosPage() {
           ['Produtos', 'Preço definido pela loja', 'Cliente'],
           [
             'Taxa de entrega',
-            `R$ ${REGRAS.entregaBase} + R$ ${REGRAS.entregaPorKm} por km entre a loja e o endereço`,
-            'Cliente (repassada ao entregador)',
+            `${brl(precos.deliveryBaseFee)} + ${brl(precos.deliveryPerKm)} por km entre a loja e o `
+              + `endereço, com mínimo de ${brl(precos.deliveryMinFee)}. Não há taxa na retirada na loja.`,
+            'Cliente',
+          ],
+          [
+            'Remuneração do entregador',
+            `${brl(precos.courierBaseFee)} + ${brl(precos.courierPerKm)} por km, paga pela plataforma`,
+            'Plataforma',
           ],
           [
             'Comissão da plataforma',
-            `${REGRAS.comissaoPlataformaPct}% sobre o valor dos produtos`,
+            `${precos.platformCommissionPct}% sobre o valor dos produtos`,
             'Loja',
           ],
         ]}
       />
       <p>
-        Aceitamos <strong>PIX, cartão de crédito e cartão de débito</strong>, processados pelo
-        Mercado Pago. Os dados do seu cartão são tratados diretamente por ele — não guardamos
-        número de cartão nos nossos servidores.
+        A taxa de entrega e a remuneração do entregador são calculadas separadamente — elas não são
+        necessariamente iguais, e a diferença fica com a plataforma para custear o serviço.
       </p>
       <p>
-        O valor é dividido automaticamente no momento do pagamento: a loja recebe o valor dos
-        produtos menos a comissão, o entregador recebe a taxa de entrega e a plataforma retém a
-        comissão.
+        Aceitamos <strong>PIX e cartão</strong>, processados por operadora de pagamento contratada.
+        Os dados do seu cartão são tratados diretamente por ela — não guardamos número de cartão nos
+        nossos servidores.
       </p>
+      <p>
+        O pagamento é recebido pela plataforma, que repassa a loja e o entregador depois que o
+        pedido é concluído — não no momento do pagamento. O caminho do dinheiro da loja está
+        detalhado nos <Link href="/termos/lojista">Termos do Lojista</Link>.
+      </p>
+      {!aoVivo && (
+        <Callout>
+          <p>
+            Não conseguimos consultar as taxas vigentes agora. Os valores acima são os da última
+            atualização conhecida — os valores que realmente serão cobrados aparecem sempre na tela
+            de pagamento, antes de você confirmar o pedido.
+          </p>
+        </Callout>
+      )}
       <Callout>
         <p>
           <strong>Pague sempre dentro da plataforma.</strong> Combinar pagamento por fora — PIX
@@ -176,9 +212,9 @@ export default function TermosPage() {
           informando o motivo. Depois da coleta, não é mais possível cancelar.
         </li>
         <li>
-          <strong>Todo cancelamento devolve o dinheiro.</strong> O estorno é solicitado ao Mercado
-          Pago antes de o pedido ser marcado como cancelado — se o estorno falhar, o cancelamento
-          não se completa.
+          <strong>Todo cancelamento devolve o dinheiro.</strong> O estorno é solicitado à operadora
+          de pagamento antes de o pedido ser marcado como cancelado — se o estorno falhar, o
+          cancelamento não se completa.
         </li>
         <li>
           Pagamentos em PIX voltam para a conta de origem. Pagamentos em cartão aparecem como
@@ -225,35 +261,34 @@ export default function TermosPage() {
       </p>
 
       <h2>9. Regras para lojistas</h2>
+      <p>
+        Quem vende no Tá Barato aceita, além destes Termos, os{' '}
+        <strong><Link href="/termos/lojista">Termos do Lojista</Link></strong> — documento à parte,
+        com as regras de anúncio, repasse, saque, cancelamento e sanções que valem para a loja. Em
+        caso de divergência sobre a relação entre loja e plataforma, prevalece aquele documento.
+      </p>
+      <p>Em resumo, e sem substituir o texto completo:</p>
       <ul>
         <li>
           A loja só passa a vender depois de aprovada. Analisamos CNPJ ativo, documento da empresa e
           endereço antes de liberar.
         </li>
         <li>
-          O anúncio deve descrever o produto com precisão — nome, descrição, foto, preço, variações
-          e estoque reais. Anunciar o que não se tem em estoque gera cancelamento e afeta a
-          avaliação da loja.
+          <strong>A loja é a fornecedora perante o consumidor</strong>: garantia, vício do produto e
+          informação correta são responsabilidade dela. A plataforma intermedeia pagamento e
+          entrega.
         </li>
         <li>
-          A loja é a fornecedora perante o consumidor: garantia, vício do produto e informação
-          correta são responsabilidade dela.
-        </li>
-        <li>
-          É proibido anunciar produtos ilícitos, falsificados, sem a certificação exigida por lei
-          (Anvisa, Inmetro, Anatel, quando aplicável) ou vedados por estes Termos.
+          O anúncio deve descrever o produto com precisão, e é proibido anunciar produto ilícito,
+          falsificado ou sem a certificação exigida por lei.
         </li>
         <li>
           Obrigações fiscais — emissão de nota, tributos, inscrições — são da loja. A plataforma não
           emite documento fiscal em nome dela.
         </li>
         <li>
-          Toda a comunicação com o cliente deve acontecer dentro da plataforma. Direcionar o cliente
-          para fechar por fora é infração grave.
-        </li>
-        <li>
-          Para receber, a loja conecta a própria conta Mercado Pago. O repasse é automático a cada
-          pedido pago, já descontada a comissão de {REGRAS.comissaoPlataformaPct}%.
+          A loja recebe o valor dos produtos menos a comissão de{' '}
+          {precos.platformCommissionPct}%, creditado quando o pedido é concluído e sacável por PIX.
         </li>
       </ul>
 

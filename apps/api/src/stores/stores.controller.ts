@@ -8,6 +8,7 @@ import { StoresService } from './stores.service'
 import { CreateStoreDto } from './dto/create-store.dto'
 import { UpdateStoreDto } from './dto/update-store.dto'
 import { AsaasOnboardDto } from './dto/asaas-onboard.dto'
+import { AcceptTermsDto } from './dto/accept-terms.dto'
 
 @Controller('stores')
 export class StoresController {
@@ -35,6 +36,15 @@ export class StoresController {
   @Get('my')
   getMyStore(@CurrentUser() user: any) {
     return this.storesService.findMyStore(user.sub)
+  }
+
+  // Aceite dos Termos do Lojista fora do cadastro — lojas criadas antes de existir
+  // registro de aceite, ou quando a versao do texto muda.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STORE_OWNER')
+  @Post('my/accept-terms')
+  acceptTerms(@CurrentUser() user: any, @Body() dto: AcceptTermsDto) {
+    return this.storesService.acceptTerms(user.sub, dto.version)
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

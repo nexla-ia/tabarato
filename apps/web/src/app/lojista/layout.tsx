@@ -10,6 +10,7 @@ import { Store, Order, isOrderLate } from '@/lib/types'
 import { playNewOrderSound, playLateOrderAlert } from '@/lib/notifySound'
 import { Spinner } from '@/components/Spinner'
 import { NotificationBell } from '@/components/NotificationBell'
+import { TermsGate } from '@/components/TermsGate'
 import styles from './layout.module.css'
 
 interface MpStatus { enabled: boolean; connected: boolean }
@@ -180,7 +181,10 @@ export default function LojistaLayout({ children }: { children: React.ReactNode 
         </div>
       </aside>
 
-      <main className={styles.main}>{children}</main>
+      <main className={styles.main}>
+        {store && <TermsGate termsAcceptedAt={store.termsAcceptedAt} termsVersion={store.termsVersion} />}
+        {children}
+      </main>
     </div>
   )
 }

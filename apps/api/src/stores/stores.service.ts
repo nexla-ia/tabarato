@@ -113,11 +113,37 @@ export class StoresService {
     const cnpjExists = await this.prisma.store.findUnique({ where: { cnpj: dto.cnpj } })
     if (cnpjExists) throw new ConflictException('CNPJ already registered')
 
+    // acceptedTerms/termsVersion não são colunas — separa e grava o aceite.
+    const { acceptedTerms, termsVersion, ...data } = dto
+
     // Loja nasce PENDENTE e só aparece no marketplace após aprovação do admin
     // (evita loja falsa com CNPJ de terceiros + chave PIX do golpista).
     return this.prisma.store.create({
-      data: { ...dto, userId, status: 'PENDING' },
+      data: {
+        ...data,
+        userId,
+        status: 'PENDING',
+        ...(acceptedTerms
+          ? { termsAcceptedAt: new Date(), termsVersion: termsVersion ?? null }
+          : {}),
+      },
     })
+  }
+
+  /**
+   * Aceite dos Termos do Lojista fora do cadastro.
+   *
+   * Serve para dois casos: as lojas criadas antes de existir registro de aceite,
+   * e a troca de versão do texto — em ambos o painel mostra o aviso e chama aqui.
+   */
+  async acceptTerms(userId: string, version: string) {
+    const store = await this.prisma.store.findUnique({ where: { userId }, select: { id: true } })
+    if (!store) throw new NotFoundException('Store not found')
+    await this.prisma.store.update({
+      where: { id: store.id },
+      data: { termsAcceptedAt: new Date(), termsVersion: version },
+    })
+    return { acceptedAt: new Date().toISOString(), version }
   }
 
   async findAll(categoryId?: string, search?: string, userLat?: number, userLng?: number) {

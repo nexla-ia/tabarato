@@ -203,6 +203,10 @@ model Store {
   asaasWalletId     String?   @map("asaas_wallet_id")  // usado no split da cobrança
   asaasApiKey       String?   @map("asaas_api_key")    // criptografado (saque da subconta)
   asaasOnboarded    Boolean   @default(false) @map("asaas_onboarded")
+  // Aceite dos Termos do Lojista. Guarda QUANDO e QUAL versao foi aceita — sem isso
+  // o aceite e so uma frase na tela, sem prova de que a loja concordou com a comissao.
+  termsAcceptedAt   DateTime? @map("terms_accepted_at")
+  termsVersion      String?   @map("terms_version")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
@@ -481,8 +485,10 @@ model Courier {
   currentLat         Float?        @map("current_lat")
   currentLng         Float?        @map("current_lng")
   rating             Float         @default(5.0)
-  // Quando o entregador aceitou o Termo de Responsabilidade (no cadastro).
+  // Quando o entregador aceitou o Termo de Responsabilidade (no cadastro) e qual
+  // versao do texto estava no ar nessa hora.
   termsAcceptedAt    DateTime?     @map("terms_accepted_at")
+  termsVersion       String?       @map("terms_version")
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
 

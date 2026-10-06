@@ -4,7 +4,7 @@ import { StoresService } from './stores.service'
 // Service com dependências mockadas (unitário puro, sem DB).
 function makeService(over: any = {}) {
   const prisma = {
-    store: { findUnique: jest.fn(), update: jest.fn() },
+    store: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn() },
     withdrawal: {
       create: jest.fn(), update: jest.fn(), delete: jest.fn(), findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]),
     },
@@ -152,5 +152,54 @@ describe('StoresService.findWallet', () => {
     const refs = res.transactions.map((t: any) => t.referenceId)
     expect(refs).toEqual(['credito-entrega-1', 'saque-w2'])
     expect(res.pixKey).toBe('chave')
+  })
+})
+
+
+describe('StoresService — aceite dos Termos do Lojista', () => {
+  const dto: any = {
+    cnpj: '12345678000199', name: 'Loja', lat: -12.7, lng: -60.1, address: 'Rua X, 1',
+  }
+
+  it('grava quando e qual versão foi aceita no cadastro', async () => {
+    const { svc, prisma } = makeService()
+    prisma.store.findUnique.mockResolvedValue(null)
+    prisma.store.create.mockResolvedValue({ id: 's1' })
+
+    await svc.create('u1', { ...dto, acceptedTerms: true, termsVersion: '2026-10-06' })
+
+    const data = prisma.store.create.mock.calls[0][0].data
+    expect(data.termsVersion).toBe('2026-10-06')
+    expect(data.termsAcceptedAt).toBeInstanceOf(Date)
+    // Não são colunas — não podem vazar pro Prisma.
+    expect(data).not.toHaveProperty('acceptedTerms')
+  })
+
+  it('APK antigo (sem o campo) ainda cria a loja, só que sem aceite registrado', async () => {
+    const { svc, prisma } = makeService()
+    prisma.store.findUnique.mockResolvedValue(null)
+    prisma.store.create.mockResolvedValue({ id: 's1' })
+
+    await svc.create('u1', { ...dto })
+
+    const data = prisma.store.create.mock.calls[0][0].data
+    expect(data.termsAcceptedAt).toBeUndefined()
+    expect(data.status).toBe('PENDING')
+  })
+
+  it('acceptTerms registra o aceite da loja existente', async () => {
+    const { svc, prisma } = makeService()
+    prisma.store.findUnique.mockResolvedValue({ id: 's1' })
+    prisma.store.update.mockResolvedValue({})
+
+    const out = await svc.acceptTerms('u1', '2026-10-06')
+
+    expect(prisma.store.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 's1' },
+        data: expect.objectContaining({ termsVersion: '2026-10-06', termsAcceptedAt: expect.any(Date) }),
+      }),
+    )
+    expect(out.version).toBe('2026-10-06')
   })
 })

@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { onlyDigits, formatCnpj, formatPhone, validateCnpj, joinList } from '@/lib/masks'
 import { sortCategoriesOutrosLast } from '@/lib/categoryIcons'
 import { lookupCnpj } from '@/lib/cnpjLookup'
+import { TERMOS_LOJISTA_VERSAO } from '@/lib/legal'
 import { reverseGeocode } from '@/lib/geocoding'
 import { AuthBrandPanel, AuthBrandAccent } from '@/components/AuthBrandPanel'
 import styles from './page.module.css'
@@ -69,6 +70,7 @@ export default function CadastroLojaPage() {
   const [selectedCats, setSelectedCats] = useState<string[]>([])
   const [customCategory, setCustomCategory] = useState('')
   const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   // pagamento / entrega
   const [deliveryRadius, setDeliveryRadius] = useState('5')
@@ -183,6 +185,10 @@ export default function CadastroLojaPage() {
   /* Passo 2 — cria a LOJA + vincula categorias (retryável: a conta já existe). */
   async function submitStore() {
     setError('')
+    if (!acceptedTerms) {
+      setError('É preciso aceitar os Termos do Lojista para criar a loja.')
+      return
+    }
     setLoading(true)
     try {
       // Não há campo próprio pra categoria personalizada — anota na descrição
@@ -201,6 +207,8 @@ export default function CadastroLojaPage() {
         lng: coords?.lng ?? -60.1402,
         deliveryRadiusKm: Number(deliveryRadius) || 5,
         prepTimeMin: Number(prepTime) || 30,
+        acceptedTerms: true,
+        termsVersion: TERMOS_LOJISTA_VERSAO,
       })
       // Vincula as categorias — sem isso a loja não aparece em nenhum filtro/aba.
       for (const catId of selectedCats) {
@@ -404,16 +412,30 @@ export default function CadastroLojaPage() {
                 <SummaryRow Icon={MapPin} label="Endereço" value={address} />
               </div>
 
+              <label className={styles.termsBox}>
+                <input
+                  type="checkbox"
+                  className={styles.termsCheck}
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                />
+                <span className={styles.termsText}>
+                  Li e aceito os{' '}
+                  <Link href="/termos/lojista" target="_blank">Termos do Lojista</Link>
+                  {' '}— inclusive a comissão da plataforma sobre cada venda — os{' '}
+                  <Link href="/termos" target="_blank">Termos de Uso</Link> e a{' '}
+                  <Link href="/privacidade" target="_blank">Política de Privacidade</Link>.
+                </span>
+              </label>
+
               {error && <div className={styles.error}>{error}</div>}
-              <button className={styles.cta} onClick={submitStore} disabled={loading}>
+              <button className={styles.cta} onClick={submitStore} disabled={loading || !acceptedTerms}>
                 {loading ? <Loader2 size={18} className={styles.spin} /> : <><Check size={18} /> Criar minha loja</>}
               </button>
 
               <p className={styles.legalNote}>
-                Ao criar a loja você concorda com os{' '}
-                <Link href="/termos">Termos de Uso</Link> — inclusive com a comissão da
-                plataforma e as regras para lojistas — e com a{' '}
-                <Link href="/privacidade">Política de Privacidade</Link>.
+                Os valores de comissão e taxas vigentes estão nos{' '}
+                <Link href="/termos/lojista" target="_blank">Termos do Lojista</Link>.
               </p>
             </div>
           )}
