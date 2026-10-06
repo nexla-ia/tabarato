@@ -11,9 +11,10 @@ import { BASE } from './api'
  * quem opera o Tá Barato. Enquanto estiverem pendentes, as páginas renderizam um
  * aviso no lugar do dado.
  *
- * ⚠️ A operadora hoje é PESSOA FÍSICA. O texto abaixo (e o das páginas) está
- * escrito em cima de "razão social / CNPJ" — isso NÃO se resolve preenchendo
- * campo, precisa de decisão jurídica sobre quem figura como operadora.
+ * A operadora será PESSOA JURÍDICA — confirmado pela cliente em 06/10/2026, os
+ * dados do CNPJ virão dela. Por isso o texto em cima de "razão social / CNPJ"
+ * está correto e é só preencher aqui; antes dessa definição ele não casava com a
+ * operação, que era pessoa física.
  */
 
 export const EMPRESA = {
