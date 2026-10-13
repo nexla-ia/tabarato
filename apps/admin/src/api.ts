@@ -6,6 +6,26 @@ function getToken() {
   return localStorage.getItem('admin_token')
 }
 
+/**
+ * Sessão expirada derruba para o login, em vez de deixar o painel inteiro
+ * mostrando "erro ao carregar".
+ *
+ * O token do admin vale 7 dias e não há refresh. Sem isto, quando ele vence o
+ * painel continua parecendo logado (nome e menu vêm do localStorage) e TODAS as
+ * telas falham ao mesmo tempo — sintoma que parece queda da API, e não sessão
+ * velha. Já custou um diagnóstico.
+ *
+ * Redireciona na mão porque o cliente HTTP não enxerga o router.
+ */
+function onSessionExpired(): never {
+  localStorage.removeItem('admin_token')
+  localStorage.removeItem('admin_user')
+  if (!location.pathname.startsWith('/login')) {
+    location.replace('/login?expirou=1')
+  }
+  throw new Error('Sua sessão expirou. Entre novamente.')
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken()
   const res = await fetch(`${BASE}${path}`, {
@@ -17,6 +37,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     },
   })
   if (!res.ok) {
+    // 401 no /auth/login é senha errada, não sessão vencida — esse segue o fluxo
+    // normal de erro para a tela de login mostrar a mensagem.
+    if (res.status === 401 && token && !path.startsWith('/auth/login')) onSessionExpired()
     const err = await res.json().catch(() => ({}))
     throw new Error((err as { message?: string }).message ?? `HTTP ${res.status}`)
   }

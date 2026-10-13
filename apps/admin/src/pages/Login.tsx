@@ -9,7 +9,13 @@ const SANS = "'DM Sans', sans-serif"
 export function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  // Chegou aqui porque a sessão venceu (ver onSessionExpired em api.ts): avisa,
+  // senão a pessoa acha que foi deslogada do nada.
+  const [error, setError] = useState(
+    new URLSearchParams(location.search).has('expirou')
+      ? 'Sua sessão expirou. Entre novamente.'
+      : '',
+  )
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
