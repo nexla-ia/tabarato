@@ -74,6 +74,12 @@ export const api = {
   withdrawals: (status?: string) =>
     request<AdminWithdrawal[]>(`/admin/withdrawals${status ? `?status=${status}` : ''}`),
 
+  bibleRequests: (status?: string) =>
+    request<AdminBibleRequest[]>(`/admin/bible-requests${status ? `?status=${status}` : ''}`),
+
+  updateBibleRequest: (id: string, body: { status?: string; notes?: string }) =>
+    request<any>(`/admin/bible-requests/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
   orders: (status?: string) =>
     request<any[]>(`/admin/orders${status ? `?status=${status}` : ''}`),
 
@@ -88,6 +94,17 @@ export const api = {
   getSettings: () => request<Pricing>('/admin/settings'),
   updateSettings: (patch: Partial<Pricing>) =>
     request<Pricing>('/admin/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
+}
+
+export interface AdminBibleRequest {
+  id: string
+  status: 'PENDING' | 'SENT' | 'CANCELLED'
+  notes: string | null
+  sentAt: string | null
+  createdAt: string
+  user: { id: string; name: string; email: string; phone: string | null }
+  /** Nulo enquanto o cliente não cadastrar endereço — o pedido é feito antes disso. */
+  address: { linha1: string; linha2: string; cep: string } | null
 }
 
 export interface AdminWithdrawal {

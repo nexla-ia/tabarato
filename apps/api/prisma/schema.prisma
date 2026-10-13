@@ -107,6 +107,10 @@ model User {
   referredBy   String?  @map("referred_by")
   // Bônus de indicação só é pago no 1º pedido ENTREGUE do indicado (anti-farming).
   referralRewarded Boolean @default(false) @map("referral_rewarded")
+  // Cortesia da Biblia: marca QUANDO a oferta foi exibida, nao a resposta. Quem
+  // recusou nao vira registro nenhum — conviccao religiosa e dado sensivel na
+  // LGPD (art. 5, II), entao so guardamos de quem pediu, e por pedido expresso.
+  bibleOfferedAt DateTime? @map("bible_offered_at")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -122,6 +126,7 @@ model User {
   loyaltyAccount  LoyaltyAccount?
   chatMessages    ChatMessage[]
   passwordResets  PasswordReset[]
+  bibleRequest    BibleRequest?
 
   @@map("users")
 }
@@ -698,4 +703,28 @@ model CouponUse {
 
   @@unique([couponId, userId])
   @@map("coupon_uses")
+}
+
+/// Pedido da Biblia de cortesia que a plataforma envia pelos Correios.
+/// So existe linha para quem ACEITOU — ver comentario em User.bibleOfferedAt.
+model BibleRequest {
+  id        String             @id @default(uuid())
+  userId    String             @unique @map("user_id")
+  status    BibleRequestStatus @default(PENDING)
+  /// Observacao do admin (codigo de rastreio, motivo de cancelamento...).
+  notes     String?
+  sentAt    DateTime?          @map("sent_at")
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("bible_requests")
+}
+
+enum BibleRequestStatus {
+  PENDING
+  SENT
+  CANCELLED
 }

@@ -7,6 +7,7 @@ import { UpdateUserDto } from './dto/update-user.dto'
 import { CreateAddressDto } from './dto/create-address.dto'
 import { PushTokenDto } from './dto/push-token.dto'
 import { ChangePasswordDto } from './dto/change-password.dto'
+import { BibleOfferDto } from './dto/bible-offer.dto'
 
 @UseGuards(JwtAuthGuard)
 @Controller('users')
@@ -42,6 +43,12 @@ export class UsersController {
   @Patch('me/password')
   changePassword(@CurrentUser() user: any, @Body() dto: ChangePasswordDto) {
     return this.usersService.changePassword(user.sub, dto)
+  }
+
+  // Resposta à oferta da Bíblia de cortesia (ver users.service.answerBibleOffer).
+  @Post('me/bible-offer')
+  answerBibleOffer(@CurrentUser() user: any, @Body() dto: BibleOfferDto) {
+    return this.usersService.answerBibleOffer(user.sub, dto.accepted)
   }
 
   @Get('me/addresses')

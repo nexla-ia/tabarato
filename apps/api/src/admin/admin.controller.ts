@@ -60,6 +60,20 @@ export class AdminController {
     return this.adminService.setProductBlock(id, !!body?.blocked, body?.reason)
   }
 
+  // Bíblia de cortesia — quem pediu e para onde enviar.
+  @Get('bible-requests')
+  getBibleRequests(@Query('status') status?: string) {
+    return this.adminService.getBibleRequests(status)
+  }
+
+  @Patch('bible-requests/:id')
+  updateBibleRequest(
+    @Param('id') id: string,
+    @Body() body: { status?: string; notes?: string },
+  ) {
+    return this.adminService.updateBibleRequest(id, body?.status, body?.notes)
+  }
+
   // Saques (loja e entregador) — visibilidade do dinheiro saindo.
   @Get('withdrawals')
   getWithdrawals(@Query('status') status?: string) {

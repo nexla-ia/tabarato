@@ -115,8 +115,32 @@ export default function PrivacidadePage() {
           ['Guardar registros de pedidos e pagamentos por prazo legal', 'Obrigação legal'],
           ['Resolver reclamações e disputas', 'Execução de contrato e exercício de direitos'],
           ['Promoções e novidades por push', 'Consentimento — revogável a qualquer momento'],
+          [
+            'Enviar o exemplar da Bíblia de cortesia a quem pediu',
+            'Consentimento específico para dado sensível (art. 11, I) — revogável a qualquer momento',
+          ],
         ]}
       />
+
+      <Callout>
+        <p>
+          <strong>Sobre a Bíblia de cortesia.</strong> Ao criar a conta perguntamos se você quer
+          receber um exemplar em casa, por conta da plataforma. Responder não é obrigatório para
+          usar o Tá Barato, e recusar não muda nada na sua experiência.
+        </p>
+        <p>
+          Se você <strong>recusa</strong>, não guardamos registro algum sobre o assunto — apenas a
+          marca de que a pergunta já foi feita, para não perguntarmos de novo. Se você{' '}
+          <strong>aceita</strong>, guardamos esse pedido junto ao seu cadastro e usamos seu nome,
+          telefone e endereço de entrega só para postar o exemplar pelos Correios. Esse dado não é
+          compartilhado com lojas, entregadores nem com qualquer terceiro além da transportadora, e
+          é apagado quando o envio se conclui ou quando você pede.
+        </p>
+        <p>
+          Convicção religiosa é <strong>dado pessoal sensível</strong> na LGPD. Por isso o pedido só
+          existe com o seu "sim" expresso, e você pode voltar atrás falando com a gente pelo {emailPriv}.
+        </p>
+      </Callout>
 
       <h2>4. O que não fazemos</h2>
       <ul>
@@ -124,6 +148,10 @@ export default function PrivacidadePage() {
         <li>Não compartilhamos seu contato com anunciantes.</li>
         <li>Não guardamos número de cartão de crédito nos nossos servidores.</li>
         <li>Não usamos suas mensagens do chat para publicidade.</li>
+        <li>
+          Não usamos o pedido da Bíblia de cortesia para segmentar anúncio, montar perfil ou
+          qualquer finalidade que não seja a postagem do exemplar.
+        </li>
       </ul>
 
       <h2>5. Com quem compartilhamos</h2>

@@ -30,7 +30,7 @@ export const EMPRESA = {
 
 /** Bump ao alterar o texto — é o que o aceite do usuário referencia. */
 export const TERMOS_VERSAO = '2026-10-06'
-export const PRIVACIDADE_VERSAO = '2026-08-26'
+export const PRIVACIDADE_VERSAO = '2026-10-13'
 
 /**
  * Versão dos Termos do Lojista. É gravada em `stores.terms_version` no aceite,

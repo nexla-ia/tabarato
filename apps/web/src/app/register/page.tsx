@@ -8,6 +8,7 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { formatPhone, onlyDigits } from '@/lib/masks'
 import { AuthBrandPanel } from '@/components/AuthBrandPanel'
+import { BibleOfferModal } from '@/components/BibleOfferModal'
 import styles from '../login/page.module.css'
 
 export default function RegisterPage() {
@@ -30,6 +31,9 @@ function RegisterForm() {
   const [referralCode, setReferralCode] = useState('')
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
+  // Oferta da Bíblia de cortesia: aparece com a conta já criada, antes de entrar.
+  const [bibleOpen, setBibleOpen]     = useState(false)
+  const [bibleSaving, setBibleSaving] = useState(false)
 
   useEffect(() => {
     const ref = searchParams.get('ref')
@@ -45,7 +49,7 @@ function RegisterForm() {
         referralCode: referralCode.trim() || undefined,
       })
       login(data.accessToken, data.user)
-      router.push('/')
+      setBibleOpen(true)
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Erro ao criar conta')
     } finally {
@@ -53,8 +57,27 @@ function RegisterForm() {
     }
   }
 
+  /**
+   * Resposta da cortesia. Entrar no site não pode depender disso: se a chamada
+   * falhar, segue mesmo assim — a oferta reaparece depois, que é bem menos
+   * grave do que prender a pessoa num modal logo após criar a conta.
+   */
+  async function answerBible(accepted: boolean) {
+    setBibleSaving(true)
+    try {
+      await api.post('/users/me/bible-offer', { accepted })
+    } catch {
+      // silencioso de propósito — ver comentário acima
+    } finally {
+      setBibleSaving(false)
+      setBibleOpen(false)
+      router.push('/')
+    }
+  }
+
   return (
     <div className={styles.page}>
+      <BibleOfferModal open={bibleOpen} saving={bibleSaving} onAnswer={answerBible} />
       <AuthBrandPanel />
       <div className={styles.formPanel}>
       <div className={styles.card}>

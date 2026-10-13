@@ -44,12 +44,46 @@ export class UsersService {
         cpf: true,
         referralCode: true,
         isActive: true,
+        bibleOfferedAt: true,
         createdAt: true,
         updatedAt: true,
       },
     })
     if (!user) throw new NotFoundException('User not found')
-    return user
+    // O app usa isto pra decidir se mostra a oferta da Bíblia — nunca mostrar
+    // duas vezes para a mesma pessoa, tenha ela aceitado ou não.
+    const { bibleOfferedAt, ...rest } = user
+    return { ...rest, shouldOfferBible: bibleOfferedAt == null }
+  }
+
+  /**
+   * Resposta à oferta da Bíblia de cortesia.
+   *
+   * Guarda linha só de quem ACEITA: convicção religiosa é dado sensível na LGPD
+   * (art. 5º, II), então de quem recusa fica apenas a marca de que a pergunta já
+   * foi feita. Idempotente — responder de novo não duplica nem reabre um pedido
+   * que o admin já tratou.
+   */
+  async answerBibleOffer(userId: string, accepted: boolean) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { bibleOfferedAt: new Date() },
+    })
+
+    if (!accepted) {
+      // Mudou de ideia depois de ter pedido: remove o pedido ainda não enviado.
+      await this.prisma.bibleRequest
+        .deleteMany({ where: { userId, status: 'PENDING' } })
+        .catch(() => undefined)
+      return { accepted: false }
+    }
+
+    await this.prisma.bibleRequest.upsert({
+      where: { userId },
+      update: {},   // já pediu antes: não mexe no status nem reabre
+      create: { userId },
+    })
+    return { accepted: true }
   }
 
   async update(id: string, dto: UpdateUserDto) {

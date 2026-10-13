@@ -13,6 +13,7 @@ import { Users } from './pages/Users'
 import { Orders } from './pages/Orders'
 import { Produtos } from './pages/Produtos'
 import { Saques } from './pages/Saques'
+import { Biblias } from './pages/Biblias'
 
 function Layout() {
   return (
@@ -62,6 +63,7 @@ export default function App() {
                 <Route path="/produtos" element={<Produtos />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/saques" element={<Saques />} />
+                <Route path="/biblias" element={<Biblias />} />
                 <Route path="/precos" element={<Precos />} />
               </Route>
             </Route>

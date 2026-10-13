@@ -226,6 +226,73 @@ export class AdminService {
    * automático (PIX-out + webhook + cron de reconciliação), mas sem uma tela
    * ninguém percebe um saque preso em PROCESSING ou um PENDING nunca enviado.
    */
+  /**
+   * Pedidos da Bíblia de cortesia, com o endereço para postagem.
+   *
+   * O pedido é feito no cadastro, quando a pessoa ainda não tem endereço — por
+   * isso `address` vem nulo com frequência e a tela separa "pronto para enviar"
+   * de "esperando endereço". Usa o endereço padrão; se não houver, o mais antigo.
+   */
+  async getBibleRequests(status?: string) {
+    const rows = await this.prisma.bibleRequest.findMany({
+      where: status ? { status: status as any } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+      include: {
+        user: {
+          select: {
+            id: true, name: true, email: true, phone: true,
+            addresses: {
+              orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+              take: 1,
+              select: {
+                street: true, number: true, complement: true,
+                district: true, city: true, state: true, zipCode: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    return rows.map(r => {
+      const a = r.user.addresses[0]
+      return {
+        id: r.id,
+        status: r.status,
+        notes: r.notes,
+        sentAt: r.sentAt,
+        createdAt: r.createdAt,
+        user: { id: r.user.id, name: r.user.name, email: r.user.email, phone: r.user.phone },
+        address: a
+          ? {
+              linha1: [a.street, a.number].filter(Boolean).join(', ') + (a.complement ? ` — ${a.complement}` : ''),
+              linha2: `${a.district} · ${a.city}/${a.state}`,
+              cep: a.zipCode,
+            }
+          : null,
+      }
+    })
+  }
+
+  /** Marca o pedido como enviado/cancelado e guarda a observação (rastreio). */
+  async updateBibleRequest(id: string, status?: string, notes?: string) {
+    const allowed = ['PENDING', 'SENT', 'CANCELLED']
+    if (status && !allowed.includes(status)) {
+      throw new BadRequestException('Status inválido.')
+    }
+    const exists = await this.prisma.bibleRequest.findUnique({ where: { id }, select: { id: true } })
+    if (!exists) throw new NotFoundException('Pedido não encontrado.')
+
+    return this.prisma.bibleRequest.update({
+      where: { id },
+      data: {
+        ...(status ? { status: status as any, sentAt: status === 'SENT' ? new Date() : null } : {}),
+        ...(notes !== undefined ? { notes: notes.trim() || null } : {}),
+      },
+    })
+  }
+
   async getWithdrawals(status?: string) {
     const rows = await this.prisma.withdrawal.findMany({
       where: status ? { status: status as any } : undefined,
