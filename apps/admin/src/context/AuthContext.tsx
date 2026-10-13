@@ -4,7 +4,7 @@ import type { AuthUser } from '../types'
 interface AuthContextType {
   user: AuthUser | null
   token: string | null
-  login: (token: string, user: AuthUser) => void
+  login: (token: string, user: AuthUser, refreshToken?: string) => void
   logout: () => void
 }
 
@@ -17,8 +17,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return stored ? (JSON.parse(stored) as AuthUser) : null
   })
 
-  const login = (newToken: string, newUser: AuthUser) => {
+  const login = (newToken: string, newUser: AuthUser, refreshToken?: string) => {
     localStorage.setItem('admin_token', newToken)
+    // Sem refresh a sessão morre em 7 dias e o painel inteiro para; com ele o
+    // api.ts renova sozinho e a pessoa só volta ao login depois de 30 dias.
+    if (refreshToken) localStorage.setItem('admin_refresh', refreshToken)
     localStorage.setItem('admin_user', JSON.stringify(newUser))
     setToken(newToken)
     setUser(newUser)
@@ -26,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_refresh')
     localStorage.removeItem('admin_user')
     setToken(null)
     setUser(null)

@@ -6,6 +6,10 @@ function getToken() {
   return localStorage.getItem('admin_token')
 }
 
+function getRefresh() {
+  return localStorage.getItem('admin_refresh')
+}
+
 /**
  * Sessão expirada derruba para o login, em vez de deixar o painel inteiro
  * mostrando "erro ao carregar".
@@ -17,8 +21,45 @@ function getToken() {
  *
  * Redireciona na mão porque o cliente HTTP não enxerga o router.
  */
+/**
+ * Renova o acesso com o refresh token (mesma rota que o app usa).
+ *
+ * Uma renovação por vez: se três telas tomarem 401 juntas, as três esperam a
+ * mesma promessa em vez de disparar três refresh — o que invalidaria os tokens
+ * umas das outras e derrubaria a sessão justamente ao tentar salvá-la.
+ */
+let renovando: Promise<boolean> | null = null
+
+function renovarSessao(): Promise<boolean> {
+  if (renovando) return renovando
+  renovando = (async () => {
+    const refreshToken = getRefresh()
+    if (!refreshToken) return false
+    try {
+      const res = await fetch(`${BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      })
+      if (!res.ok) return false
+      const data = (await res.json()) as { accessToken?: string; refreshToken?: string }
+      if (!data.accessToken) return false
+      localStorage.setItem('admin_token', data.accessToken)
+      if (data.refreshToken) localStorage.setItem('admin_refresh', data.refreshToken)
+      return true
+    } catch {
+      return false
+    } finally {
+      // Libera a próxima tentativa só depois de concluída esta.
+      setTimeout(() => { renovando = null }, 0)
+    }
+  })()
+  return renovando
+}
+
 function onSessionExpired(): never {
   localStorage.removeItem('admin_token')
+  localStorage.removeItem('admin_refresh')
   localStorage.removeItem('admin_user')
   if (!location.pathname.startsWith('/login')) {
     location.replace('/login?expirou=1')
@@ -27,19 +68,29 @@ function onSessionExpired(): never {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = getToken()
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...((options?.headers as Record<string, string>) ?? {}),
-    },
-  })
+  const enviar = () => {
+    const token = getToken()
+    return fetch(`${BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...((options?.headers as Record<string, string>) ?? {}),
+      },
+    })
+  }
+
+  // Rotas de autenticação não entram no ciclo de renovação: o 401 do login é
+  // senha errada, e tentar renovar a partir do refresh seria recursivo.
+  const ehAuth = path.startsWith('/auth/')
+  let res = await enviar()
+
+  if (res.status === 401 && !ehAuth && getToken()) {
+    res = (await renovarSessao()) ? await enviar() : onSessionExpired()
+  }
+
   if (!res.ok) {
-    // 401 no /auth/login é senha errada, não sessão vencida — esse segue o fluxo
-    // normal de erro para a tela de login mostrar a mensagem.
-    if (res.status === 401 && token && !path.startsWith('/auth/login')) onSessionExpired()
+    if (res.status === 401 && !ehAuth) onSessionExpired()
     const err = await res.json().catch(() => ({}))
     throw new Error((err as { message?: string }).message ?? `HTTP ${res.status}`)
   }
@@ -48,7 +99,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   login: (email: string, password: string) =>
-    request<{ accessToken: string; user: AuthUser }>('/auth/login', {
+    request<{ accessToken: string; refreshToken?: string; user: AuthUser }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),

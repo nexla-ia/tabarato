@@ -25,12 +25,12 @@ export function Login() {
     setError('')
     setLoading(true)
     try {
-      const { accessToken, user } = await api.login(email, password)
+      const { accessToken, refreshToken, user } = await api.login(email, password)
       if (user.role !== 'ADMIN') {
         setError('Acesso restrito a administradores.')
         return
       }
-      login(accessToken, user)
+      login(accessToken, user, refreshToken)
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
       setError((err as Error).message || 'Credenciais inválidas')
