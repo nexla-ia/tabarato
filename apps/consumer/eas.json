@@ -12,7 +12,10 @@
         "gradleCommand": ":app:assembleDebug"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://SEU_IP_LOCAL:3000/api"
+        "EXPO_PUBLIC_API_URL": "http://SEU_IP_LOCAL:3000/api",
+        "EXPO_PUBLIC_MP_PUBLIC_KEY": "APP_USR-eef006ec-5cb1-4640-9822-285141534fce",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "721316096829-1cf2dg6rn1n0vlfp2v44h1uvt6na04hr.apps.googleusercontent.com",
+        "EXPO_PUBLIC_WEB_URL": "https://tabaratoapp.com.br"
       }
     },
     "preview": {
@@ -22,13 +25,19 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api-production-b730d.up.railway.app/api"
+        "EXPO_PUBLIC_API_URL": "https://api-production-b730d.up.railway.app/api",
+        "EXPO_PUBLIC_MP_PUBLIC_KEY": "APP_USR-eef006ec-5cb1-4640-9822-285141534fce",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "721316096829-1cf2dg6rn1n0vlfp2v44h1uvt6na04hr.apps.googleusercontent.com",
+        "EXPO_PUBLIC_WEB_URL": "https://tabaratoapp.com.br"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api-production-b730d.up.railway.app/api"
+        "EXPO_PUBLIC_API_URL": "https://api-production-b730d.up.railway.app/api",
+        "EXPO_PUBLIC_MP_PUBLIC_KEY": "APP_USR-eef006ec-5cb1-4640-9822-285141534fce",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "721316096829-1cf2dg6rn1n0vlfp2v44h1uvt6na04hr.apps.googleusercontent.com",
+        "EXPO_PUBLIC_WEB_URL": "https://tabaratoapp.com.br"
       }
     }
   },
