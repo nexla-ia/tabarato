@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "487138629855",
+    "project_id": "ta-barato-fec1d",
+    "storage_bucket": "ta-barato-fec1d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:487138629855:android:8610343e6c28112d93f16a",
+        "android_client_info": {
+          "package_name": "com.tabarato.consumer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtqxya5H_S3OYt_iAiAu30BFpmtOf2Pso"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -19,7 +19,9 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para calcular distâncias de entrega e exibir rotas.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Enquanto você estiver online como entregador, compartilhamos sua localização em segundo plano para o cliente acompanhar a entrega em tempo real.",
-        "UIBackgroundModes": ["location"]
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
@@ -37,7 +39,8 @@
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION"
-      ]
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",

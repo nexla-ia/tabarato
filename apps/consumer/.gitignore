@@ -43,3 +43,10 @@ yarn-error.*
 # EAS local signing credentials (NUNCA commitar)
 credentials.json
 credentials/
+
+# Chave de conta de servico do Firebase/FCM (NUNCA commitar — contem private key).
+# O google-services.json pode ser versionado: ele ja viaja dentro do APK e nao e
+# segredo. Este aqui e outra coisa: da poder de enviar push em nome do projeto.
+*-firebase-adminsdk-*.json
+firebase-service-account*.json
+service-account*.json
