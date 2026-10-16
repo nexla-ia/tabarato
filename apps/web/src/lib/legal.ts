@@ -11,6 +11,15 @@ import { BASE } from './api'
  * quem opera o Tá Barato. Enquanto estiverem pendentes, as páginas renderizam um
  * aviso no lugar do dado.
  *
+ * PENDENTE DE ADVOGADO, hoje sem resposta no texto:
+ *   1. Chargeback e retenção de saldo (Callout marcado em /termos/lojista).
+ *   2. NATUREZA DA OPERAÇÃO FINANCEIRA. A cliente enviou cláusula dizendo que a
+ *      plataforma "não retém valores" e que o repasse segue "regras de split".
+ *      Isso descreve o modelo que foi RECUSADO. O sistema recebe tudo numa conta
+ *      só e retém até a loja sacar — ver [[project_store_payment_model]]. Reter
+ *      dinheiro de terceiro é atividade regulada pelo Bacen; o advogado precisa
+ *      analisar sabendo que o modelo é centralizado, não split.
+ *
  * A operadora será PESSOA JURÍDICA — confirmado pela cliente em 06/10/2026, os
  * dados do CNPJ virão dela. Por isso o texto em cima de "razão social / CNPJ"
  * está correto e é só preencher aqui; antes dessa definição ele não casava com a
@@ -23,14 +32,17 @@ export const EMPRESA = {
   cnpj: '' as string,          // PENDENTE — CNPJ da operadora
   endereco: 'Vilhena — RO',
   emailContato: '' as string,  // PENDENTE — ex: 'contato@tabarato.com.br'
-  emailPrivacidade: '' as string, // PENDENTE — canal do encarregado (LGPD)
+  // Informado pela cliente como 'privacidade@tabarato.com.br' — dominio errado,
+  // esse nao e dela. Corrigido para o dominio real. A CAIXA PRECISA EXISTIR:
+  // canal de encarregado que nao recebe e-mail e descumprimento do art. 41 da LGPD.
+  emailPrivacidade: 'privacidade@tabaratoapp.com.br' as string,
   cidadeForo: 'Vilhena',
   ufForo: 'RO',
 } as const
 
 /** Bump ao alterar o texto — é o que o aceite do usuário referencia. */
-export const TERMOS_VERSAO = '2026-10-06'
-export const PRIVACIDADE_VERSAO = '2026-10-13'
+export const TERMOS_VERSAO = '2026-10-16'
+export const PRIVACIDADE_VERSAO = '2026-10-16'
 
 /**
  * Versão dos Termos do Lojista. É gravada em `stores.terms_version` no aceite,
@@ -39,8 +51,22 @@ export const PRIVACIDADE_VERSAO = '2026-10-13'
  */
 export const TERMOS_LOJISTA_VERSAO = '2026-10-06'
 
-/** Exibido no cabeçalho das páginas legais. */
-export const VIGENCIA = '6 de outubro de 2026'
+/**
+ * Vigência por extenso, derivada da própria versão do documento.
+ *
+ * Era uma constante única para as três páginas, o que dava errado de dois jeitos:
+ * quem subia a versão esquecia de mudar a data, e documentos com versões
+ * diferentes exibiam a mesma vigência. Derivando, nunca desencontra.
+ */
+export function vigenciaDe(versao: string): string {
+  const [ano, mes, dia] = versao.split('-').map(Number)
+  if (!ano || !mes || !dia) return versao
+  const MESES = [
+    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+  ]
+  return `${dia} de ${MESES[mes - 1]} de ${ano}`
+}
 
 /**
  * Números de fidelidade — estes SÃO constantes no código da API

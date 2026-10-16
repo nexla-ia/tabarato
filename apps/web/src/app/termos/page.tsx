@@ -323,6 +323,18 @@ export default async function TermosPage() {
         <li>Manipular avaliações, pontos, cupons ou indicações, inclusive com múltiplas contas.</li>
         <li>Usar linguagem ofensiva, discriminatória ou ameaçadora no chat e nas avaliações.</li>
         <li>Tentar burlar, sobrecarregar ou explorar falhas da plataforma.</li>
+        <li>
+          Criar contas falsas, ou usar robôs, scripts e automações para operar na plataforma,
+          manipular pedidos, avaliações ou benefícios.
+        </li>
+        <li>
+          Tentar burlar as regras de repasse ou as taxas — combinando pagamento por fora,
+          cancelando pedido já entregue ou fracionando venda para pagar menos comissão.
+        </li>
+        <li>
+          Extrair dados da plataforma em massa, por raspagem ou qualquer sistema automatizado, e
+          monitorar ou acessar áreas sem autorização.
+        </li>
         <li>Divulgar dados pessoais de outro usuário.</li>
       </ul>
 
@@ -331,6 +343,11 @@ export default async function TermosPage() {
         Conforme a gravidade e a reincidência, podemos advertir, restringir funcionalidades, remover
         anúncios ou conteúdo, suspender temporariamente ou encerrar a conta, além de cancelar
         benefícios obtidos de forma irregular.
+      </p>
+      <p>
+        Em caso de <strong>suspeita fundada de fraude</strong> — conta falsa, automação, manipulação
+        de repasses ou atividade ilegal — a conta pode ser bloqueada <strong>de imediato</strong>,
+        antes da apuração, para conter o dano. Também podemos adotar as medidas legais cabíveis.
       </p>
       <Callout>
         <p>
@@ -348,14 +365,50 @@ export default async function TermosPage() {
         cancelados com estorno.
       </p>
 
-      <h2>14. Alterações destes Termos</h2>
+      <h2>14. Propriedade intelectual</h2>
       <p>
-        Podemos alterar estes Termos para refletir mudanças no serviço ou na lei. A versão vigente
-        fica sempre nesta página, com a data no topo. Mudanças relevantes são avisadas na
-        plataforma, e o uso após o aviso vale como concordância.
+        O aplicativo, o site, a marca <strong>Tá Barato</strong>, o logotipo, o design, os textos e o
+        software são protegidos por direito autoral e de marca, e pertencem a {razao}. Usar a
+        plataforma não transfere nenhum desses direitos a você.
+      </p>
+      <p>
+        Sem autorização por escrito, não é permitido copiar, modificar, distribuir, descompilar ou
+        criar produto derivado da plataforma, nem usar a marca e o logotipo em qualquer material.
+      </p>
+      <p>
+        O que você publica continua seu. Fotos de produto, descrições e avaliações seguem pertencendo
+        a quem as enviou — ao publicá-las, você nos autoriza a exibi-las na plataforma e a usá-las
+        para divulgar o próprio Tá Barato, e garante que tem o direito de publicá-las.
       </p>
 
-      <h2>15. Lei aplicável e foro</h2>
+      <h2>15. Limitação de responsabilidade</h2>
+      <p>
+        Não respondemos por danos indiretos, lucros cessantes ou perda de oportunidade decorrentes
+        de falha técnica temporária, queda de conexão, indisponibilidade de serviço de terceiro ou
+        uso indevido da plataforma por outra pessoa.
+      </p>
+      <Callout>
+        <p>
+          Esta limitação <strong>não afasta</strong> o que a lei garante ao consumidor. Permanecem
+          integralmente válidas as nossas obrigações de reembolso, as regras de cancelamento e tudo
+          que o Código de Defesa do Consumidor assegura — inclusive a responsabilidade por vício ou
+          defeito na prestação do serviço.
+        </p>
+      </Callout>
+
+      <h2>16. Alterações destes Termos</h2>
+      <p>
+        Podemos alterar estes Termos para refletir mudanças no serviço ou na lei. A versão vigente
+        fica sempre nesta página, com a data e o número de versão no topo. Mudanças relevantes são
+        avisadas na plataforma, e o uso após o aviso vale como concordância.
+      </p>
+      <p>
+        Para quem vende, a regra é mais estrita: registramos <strong>qual versão</strong> cada loja
+        aceitou e <strong>quando</strong>, e uma mudança relevante faz o painel pedir um novo aceite
+        antes de continuar vendendo. Aumento de comissão é sempre avisado com antecedência.
+      </p>
+
+      <h2>17. Lei aplicável e foro</h2>
       <p>
         Aplica-se a lei brasileira. Fica eleito o foro de {EMPRESA.cidadeForo} — {EMPRESA.ufForo},
         sem prejuízo do direito de o consumidor demandar no foro do seu domicílio, como assegura o

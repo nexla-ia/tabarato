@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { VIGENCIA } from '@/lib/legal'
+import { vigenciaDe } from '@/lib/legal'
 import styles from './LegalPage.module.css'
 
 /**
@@ -30,7 +30,7 @@ export function LegalPage({
         <header className={styles.head}>
           <h1 className={styles.title}>{title}</h1>
           <p className={styles.meta}>
-            Vigente desde {VIGENCIA}
+            Vigente desde {vigenciaDe(versao)}
             <span className={styles.metaSep}>·</span>
             versão {versao}
           </p>

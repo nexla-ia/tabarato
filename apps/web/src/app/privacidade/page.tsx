@@ -96,9 +96,16 @@ export default function PrivacidadePage() {
 
       <Callout>
         <p>
-          <strong>Sobre localização:</strong> no cadastro de loja e no preenchimento de endereço
-          pedimos acesso à localização do navegador. É opcional — se negar, basta digitar o endereço
-          manualmente. Já a localização do entregador durante a entrega é parte do serviço.
+          <strong>Sobre localização.</strong> Para o cliente e para a loja, a leitura é{' '}
+          <strong>pontual e só com o app aberto</strong>: acontece quando você preenche um endereço
+          ou pede para ver as lojas próximas. É opcional — se negar, basta digitar o endereço
+          manualmente.
+        </p>
+        <p>
+          <strong>Rastreamento contínuo, inclusive em segundo plano, existe apenas no perfil do
+          entregador</strong>, e somente enquanto ele está online prestando o serviço. É o que permite
+          rotear a corrida e deixar o cliente acompanhar o pedido no mapa. Ficando offline, o
+          compartilhamento para. <strong>Nenhum comprador é rastreado em segundo plano.</strong>
         </p>
       </Callout>
 
@@ -245,7 +252,9 @@ export default function PrivacidadePage() {
         <li>Se opor a um tratamento feito com base em legítimo interesse.</li>
       </ul>
       <p>
-        Para exercer qualquer um deles, escreva para {emailPriv}. Respondemos em até 15 dias.
+        Para exercer qualquer um deles, escreva para o nosso <strong>Encarregado de Proteção de
+        Dados</strong> em {emailPriv}. É o mesmo canal para dúvidas e reclamações sobre o tratamento
+        dos seus dados. Respondemos em até 15 dias.
         Precisamos confirmar sua identidade antes de atender — é o que impede que outra pessoa peça
         seus dados se passando por você.
       </p>
