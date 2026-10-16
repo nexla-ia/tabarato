@@ -32,6 +32,7 @@ interface Product {
   name: string
   category: Category
   basePrice: number | null
+  comparePrice?: number | null
   stock: number | null
   isActive: boolean
   blockedByAdmin?: boolean
@@ -46,6 +47,7 @@ interface ProductFormState {
   name: string
   categoryId: string
   basePrice: string
+  comparePrice: string
   stock: string
   imageUrl: string
   maxDeliveryKm: string
@@ -62,7 +64,7 @@ interface VariationFormState {
   stock: string
 }
 
-const EMPTY_FORM: ProductFormState = { name: '', categoryId: '', basePrice: '', stock: '', imageUrl: '', maxDeliveryKm: '', promoBuyQty: '', promoPayQty: '' }
+const EMPTY_FORM: ProductFormState = { name: '', categoryId: '', basePrice: '', comparePrice: '', stock: '', imageUrl: '', maxDeliveryKm: '', promoBuyQty: '', promoPayQty: '' }
 const EMPTY_VAR_FORM: VariationFormState = { name: '', size: '', color: '', price: '', stock: '' }
 
 function ProductCard({
@@ -334,6 +336,37 @@ function ProductModal({
                 placeholderTextColor="#C0B0A8"
                 keyboardType="numeric"
               />
+            </View>
+
+            <View style={modal.fieldWrap}>
+              <Text style={modal.fieldLabel}>OFERTA — PREÇO ANTIGO (R$)</Text>
+              <TextInput
+                style={modal.input}
+                value={form.comparePrice}
+                onChangeText={(v) => setForm((f) => ({ ...f, comparePrice: v }))}
+                placeholder="Vazio = sem oferta"
+                placeholderTextColor="#C0B0A8"
+                keyboardType="numeric"
+              />
+              {/* Avisa enquanto digita. O servidor recusa desconto inexistente,
+                  e descobrir isso só no erro ao salvar é pior. */}
+              {(() => {
+                const de = parseFloat((form.comparePrice || '').replace(',', '.'))
+                const por = parseFloat((form.basePrice || '').replace(',', '.'))
+                if (!de) return null
+                if (!por || de <= por) {
+                  return (
+                    <Text style={[modal.fieldHint, { color: colors.danger }]}>
+                      Precisa ser maior que o preço base — senão não há desconto.
+                    </Text>
+                  )
+                }
+                return (
+                  <Text style={[modal.fieldHint, { color: '#15803D' }]}>
+                    {Math.round(((de - por) / de) * 100)}% de desconto. Aparece em “Ofertas Imperdíveis”.
+                  </Text>
+                )
+              })()}
             </View>
 
             <View style={modal.fieldWrap}>
@@ -942,6 +975,10 @@ export default function StoreProductsScreen() {
       categoryId: form.categoryId,
     }
     if (form.basePrice) payload.basePrice = parseFloat(form.basePrice.replace(',', '.'))
+    // Vazio manda null: no backend isso significa "tirar a oferta".
+    payload.comparePrice = form.comparePrice
+      ? parseFloat(form.comparePrice.replace(',', '.'))
+      : null
     // Campo vazio = enviar null pra LIMPAR (estoque ilimitado / sem limite de distância).
     // Antes usava `if (form.stock)` — string vazia é falsy, então nunca voltava pra ilimitado.
     payload.stock = form.stock.trim() === '' ? null : parseInt(form.stock, 10)
@@ -993,6 +1030,7 @@ export default function StoreProductsScreen() {
     name: editingProduct.name,
     categoryId: editingProduct.category?.id ?? '',
     basePrice: editingProduct.basePrice != null ? String(editingProduct.basePrice) : '',
+    comparePrice: editingProduct.comparePrice != null ? String(editingProduct.comparePrice) : '',
     stock: editingProduct.stock != null ? String(editingProduct.stock) : '',
     imageUrl: editingProduct.imageUrl ?? '',
     maxDeliveryKm: (editingProduct as any).maxDeliveryKm != null ? String((editingProduct as any).maxDeliveryKm) : '',
@@ -1241,6 +1279,8 @@ const modal = StyleSheet.create({
   content: { padding: 20, paddingBottom: 48 },
   fieldWrap: { marginBottom: 18 },
   fieldLabel: { fontSize: 11, fontWeight: '700', color: '#9A8880', marginBottom: 8, letterSpacing: 0.5 },
+  // Aviso abaixo de um campo (ex.: % de desconto da oferta). A cor vem de quem usa.
+  fieldHint: { fontSize: 12, marginTop: 6, lineHeight: 16, fontWeight: '600' },
   input: {
     backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: '#EDE5DF',
     paddingHorizontal: 14, paddingVertical: 14, fontSize: 15, color: '#1A0A00',

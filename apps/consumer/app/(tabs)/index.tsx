@@ -15,6 +15,7 @@ import { useTheme } from '../../src/theme/theme'
 import { Store, Category } from '../../src/types'
 import { useAuthStore } from '../../src/stores/auth.store'
 import { useFavoritesStore } from '../../src/stores/favorites.store'
+import { ProductRail } from '../../src/components/ProductRail'
 
 const SLOGAN = 'Entrega na sua casa'
 
@@ -189,6 +190,27 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Ofertas e Destaques — escondidos durante a busca, que tem foco próprio.
+          Cada trilho some sozinho quando não tem conteúdo. */}
+      {!isSearching && !selectedCategory && (
+        <>
+          <ProductRail
+            rota="/products/offers"
+            chave="offers"
+            titulo="Ofertas Imperdíveis"
+            subtitulo="Preço baixou, aproveite enquanto dura"
+            icone="pricetag"
+          />
+          <ProductRail
+            rota="/products/highlights"
+            chave="highlights"
+            titulo="Destaques da Semana"
+            subtitulo="O que mais saiu nos últimos 7 dias"
+            icone="sparkles"
+          />
+        </>
+      )}
+
       {/* Título do feed de ITENS */}
       <View style={styles.feedHeader}>
         {isSearching ? (
@@ -200,8 +222,8 @@ export default function HomeScreen() {
         ) : (
           <>
             <View>
-              <Text style={styles.feedTitle}>{activeCat ? activeCat.name : 'Destaques'}</Text>
-              <Text style={styles.feedSub}>{activeCat ? 'Itens desta categoria' : 'Os itens mais procurados perto de você'}</Text>
+              <Text style={styles.feedTitle}>{activeCat ? activeCat.name : 'Todos os itens'}</Text>
+              <Text style={styles.feedSub}>{activeCat ? 'Itens desta categoria' : 'Tudo que as lojas perto de você estão vendendo'}</Text>
             </View>
             <View style={styles.countBadge}><Text style={styles.countText}>{feed.length}</Text></View>
           </>

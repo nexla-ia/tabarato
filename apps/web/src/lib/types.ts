@@ -57,6 +57,8 @@ export interface Product {
   name: string
   description?: string | null
   basePrice: number | string
+  /** Preço "de" da oferta. null = produto sem oferta. */
+  comparePrice?: number | string | null
   imageUrl?: string | null
   images?: string[] | null
   stock?: number | null

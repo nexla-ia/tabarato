@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateProductDto } from './dto/create-product.dto'
 import { CreateVariationDto } from './dto/create-variation.dto'
@@ -19,26 +19,73 @@ export class ProductsService {
     }
   }
 
+  /**
+   * Valida o preco "de" da oferta.
+   *
+   * Recusa em vez de corrigir calado: anunciar "de R$ 30 por R$ 30" e desconto
+   * que nao existe, e o CDC (art. 37) trata isso como publicidade enganosa. O
+   * lojista precisa saber que o valor nao entrou, e por que.
+   *
+   * `precoAtual` vem do dto na criacao e do produto salvo na edicao, porque numa
+   * edicao parcial o basePrice pode nem vir no corpo.
+   */
+  private validarOferta(dto: Partial<CreateProductDto>, precoAtual: number | null) {
+    if (dto.comparePrice === undefined) return
+    // null ou 0 = tirar a oferta.
+    if (dto.comparePrice === null || dto.comparePrice === 0) {
+      dto.comparePrice = null
+      return
+    }
+    if (precoAtual == null) {
+      throw new BadRequestException(
+        'Para criar uma oferta, o produto precisa ter um preco unico. Produtos com variacoes nao suportam preco "de".',
+      )
+    }
+    if (dto.comparePrice <= precoAtual) {
+      throw new BadRequestException(
+        'O preco "de" precisa ser MAIOR que o preco atual — senao nao ha desconto para anunciar.',
+      )
+    }
+  }
+
   async create(userId: string, storeId: string, dto: CreateProductDto) {
     const store = await this.prisma.store.findUnique({ where: { id: storeId } })
     if (!store) throw new NotFoundException('Store not found')
     if (store.userId !== userId) throw new ForbiddenException('Not your store')
 
     this.normalizePromo(dto)
+    this.validarOferta(dto, dto.basePrice ?? null)
     return this.prisma.product.create({
       data: { ...dto, storeId, hasVariations: false },
       include: { category: true },
     })
   }
 
-  async findPopular(limit = 12) {
+  /** Janela dos "Destaques da Semana". Um numero so, facil de abrir para 15 ou
+   *  30 dias se o volume de pedidos nao sustentar 7. */
+  static readonly DESTAQUES_DIAS = 7
+
+  async findPopular(limit = 12, dias?: number) {
     // Aggregate order items to find most-ordered products
     const topItems = await this.prisma.orderItem.groupBy({
       by: ['productId'],
       _sum: { quantity: true },
       orderBy: { _sum: { quantity: 'desc' } },
+      // Com janela, conta so pedido ENTREGUE: pedido cancelado nao e venda, e
+      // deixa-lo pontuar deixaria a vitrine manipulavel por quem pede e cancela.
+      ...(dias
+        ? {
+            where: {
+              order: {
+                status: 'DELIVERED' as const,
+                createdAt: { gte: new Date(Date.now() - dias * 86_400_000) },
+              },
+            },
+          }
+        : {}),
       take: limit * 2, // fetch extra to account for inactive/unavailable
     })
+    if (topItems.length === 0) return []
 
     const productIds = topItems.map(t => t.productId)
     const products = await this.prisma.product.findMany({
@@ -65,6 +112,47 @@ export class ProductsService {
         totalOrdered: topItems.find(t => t.productId === p.id)?._sum.quantity ?? 0,
         displayPrice: p.basePrice ?? p.variations[0]?.price ?? null,
       }))
+  }
+
+  /**
+   * Ofertas Imperdíveis: quem tem preço "de" maior que o preço atual.
+   *
+   * O maior desconto vem primeiro. A comparação fica no banco (campo x campo),
+   * porque filtrar em memória exigiria carregar o catálogo inteiro.
+   */
+  async findOffers(limit = 12) {
+    const ids = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT p.id
+      FROM products p
+      JOIN stores s ON s.id = p.store_id
+      WHERE p.compare_price IS NOT NULL
+        AND p.base_price IS NOT NULL
+        AND p.compare_price > p.base_price
+        AND p.is_active = true
+        AND p.blocked_by_admin = false
+        AND s.status = 'APPROVED'
+      ORDER BY (p.compare_price - p.base_price) / p.compare_price DESC
+      LIMIT ${limit}
+    `
+    if (ids.length === 0) return []
+
+    const produtos = await this.prisma.product.findMany({
+      where: { id: { in: ids.map(r => r.id) } },
+      include: {
+        category: { select: { id: true, name: true } },
+        store: { select: { id: true, name: true, logoUrl: true, isOpen: true, prepTimeMin: true } },
+      },
+    })
+
+    // Preserva a ordem do ranking (findMany nao garante a ordem do IN).
+    const pos = new Map(ids.map((r, i) => [r.id, i]))
+    return produtos
+      .sort((a, b) => (pos.get(a.id) ?? 999) - (pos.get(b.id) ?? 999))
+      .map(p => {
+        const de = Number(p.comparePrice)
+        const por = Number(p.basePrice)
+        return { ...p, displayPrice: por, descontoPct: Math.round(((de - por) / de) * 100) }
+      })
   }
 
   /**
@@ -203,6 +291,7 @@ export class ProductsService {
     if (product.store.userId !== userId) throw new ForbiddenException('Not your product')
 
     this.normalizePromo(dto)
+    this.validarOferta(dto, dto.basePrice ?? (product.basePrice ? Number(product.basePrice) : null))
     return this.prisma.product.update({
       where: { id: productId },
       data: dto,

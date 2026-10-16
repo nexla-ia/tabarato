@@ -8,6 +8,12 @@ import { CreateProductDto } from './dto/create-product.dto'
 import { CreateVariationDto } from './dto/create-variation.dto'
 import { BulkToggleDto, BulkUpdateDto } from './dto/bulk-product.dto'
 
+/** Clamp do limite: vira `take` no Prisma; sem teto seria DoS, e NaN viraria 500. */
+function clampLimit(limit?: string, padrao = 12, teto = 50) {
+  const n = parseInt(limit ?? '', 10)
+  return Math.min(Math.max(1, Number.isFinite(n) ? n : padrao), teto)
+}
+
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
@@ -18,6 +24,19 @@ export class ProductsController {
     const n = parseInt(limit ?? '', 10)
     const safeLimit = Math.min(Math.max(1, Number.isFinite(n) ? n : 12), 50)
     return this.productsService.findPopular(safeLimit)
+  }
+
+  /** Ofertas Imperdiveis da home: quem tem preco "de" maior que o atual. */
+  @Get('offers')
+  getOffers(@Query('limit') limit?: string) {
+    return this.productsService.findOffers(clampLimit(limit))
+  }
+
+  /** Destaques da Semana: mais vendidos na janela de ProductsService.DESTAQUES_DIAS.
+   *  Devolve lista vazia quando nao houve venda — a home esconde a secao. */
+  @Get('highlights')
+  getHighlights(@Query('limit') limit?: string) {
+    return this.productsService.findPopular(clampLimit(limit), ProductsService.DESTAQUES_DIAS)
   }
 
   // Listagem geral de produtos (home focada em itens). Filtra por categoria da loja e busca.

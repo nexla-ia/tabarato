@@ -32,6 +32,14 @@ export class CreateProductDto {
   @Max(1_000_000)
   basePrice?: number
 
+  // Preco "de" (antigo) das ofertas. null/0 limpa a oferta. O servico recusa
+  // valor menor ou igual ao preco atual — ver products.service.
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(1_000_000)
+  comparePrice?: number | null
+
   @IsNumber()
   @IsOptional()
   @Min(0)

@@ -1,0 +1,31 @@
+/* Complementa PopularProducts.module.css com o que só a oferta precisa. */
+
+.selo {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  background: #DC2626;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.precos {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+/* Preço antigo: riscado e apagado, para o olho pousar no preço de agora. */
+.de {
+  font-size: 12.5px;
+  color: var(--faint, #9A8880);
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+}

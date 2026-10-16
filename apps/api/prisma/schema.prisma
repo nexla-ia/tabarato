@@ -317,6 +317,10 @@ model Product {
   images        String[] @default([])
   hasVariations  Boolean  @default(false) @map("has_variations")
   basePrice      Decimal? @map("base_price")
+  // Preco "de" das ofertas: o valor ANTIGO, riscado na vitrine. So vale como
+  // oferta quando e MAIOR que o preco atual — abaixo disso nao ha desconto, e
+  // anunciar desconto que nao existe e publicidade enganosa (CDC art. 37).
+  comparePrice   Decimal? @map("compare_price")
   maxDeliveryKm  Float?   @map("max_delivery_km")
   stock         Int?
   // Desconto progressivo "Leve X Pague Y" (ambos nulos = sem promoção)

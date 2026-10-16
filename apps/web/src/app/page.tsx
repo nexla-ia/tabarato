@@ -4,6 +4,8 @@ import { Navbar } from '@/components/Navbar'
 import { CategoryBrowser } from './CategoryBrowser'
 import { PromoStrip } from './PromoStrip'
 import { PopularProducts } from './PopularProducts'
+import { ProductRail } from './ProductRail'
+import { Tag, Sparkles } from 'lucide-react'
 import { StoreGrid } from './StoreGrid'
 import { getCategories, getStores } from './storesData'
 import styles from './page.module.css'
@@ -16,6 +18,21 @@ async function CategoryBrowserSection({ cat }: { cat?: string }) {
     <CategoryBrowser categories={categories} stores={stores} initialCat={cat}>
       <PromoStrip />
       <Suspense fallback={null}>
+        {/* Ofertas primeiro: e a secao com apelo mais forte e sempre tem
+            conteudo quando alguma loja cadastrou preco "de". Destaques vem
+            logo abaixo e some sozinho nas semanas sem venda. */}
+        <ProductRail
+          rota="/products/offers"
+          titulo="Ofertas Imperdíveis"
+          subtitulo="Preço baixou, aproveite enquanto dura"
+          icone={<Tag size={20} />}
+        />
+        <ProductRail
+          rota="/products/highlights"
+          titulo="Destaques da Semana"
+          subtitulo="O que mais saiu nos últimos 7 dias"
+          icone={<Sparkles size={20} />}
+        />
         <PopularProducts />
       </Suspense>
     </CategoryBrowser>

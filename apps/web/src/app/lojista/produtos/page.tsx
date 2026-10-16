@@ -17,6 +17,7 @@ interface FormState {
   name: string
   description: string
   basePrice: string // dígitos crus em centavos (máscara "de trás pra frente")
+  comparePrice: string // preço "de" da oferta, mesma máscara. Vazio = sem oferta.
   stock: string
   categoryId: string
   imageUrl: string
@@ -26,7 +27,7 @@ interface FormState {
   promoPayQty: string
 }
 
-const EMPTY: FormState = { name: '', description: '', basePrice: '', stock: '', categoryId: '', imageUrl: '', images: [], isActive: true, promoBuyQty: '', promoPayQty: '' }
+const EMPTY: FormState = { name: '', description: '', basePrice: '', comparePrice: '', stock: '', categoryId: '', imageUrl: '', images: [], isActive: true, promoBuyQty: '', promoPayQty: '' }
 
 export default function ProdutosPage() {
   const { toast, confirm } = useDialogs()
@@ -62,6 +63,8 @@ export default function ProdutosPage() {
         name: f.name,
         description: f.description || undefined,
         basePrice: moneyInputToNumber(f.basePrice),
+        // Vazio manda null, que no backend significa "tirar a oferta".
+        comparePrice: f.comparePrice ? moneyInputToNumber(f.comparePrice) : null,
         stock: f.stock === '' ? null : Number(f.stock),
         categoryId: f.categoryId || undefined,
         imageUrl: f.imageUrl || undefined,
@@ -148,7 +151,9 @@ export default function ProdutosPage() {
   function edit(p: Product) {
     setForm({
       id: p.id, name: p.name, description: p.description ?? '',
-      basePrice: String(Math.round(Number(p.basePrice) * 100)), stock: p.stock == null ? '' : String(p.stock),
+      basePrice: String(Math.round(Number(p.basePrice) * 100)),
+      comparePrice: p.comparePrice ? String(Math.round(Number(p.comparePrice) * 100)) : '',
+      stock: p.stock == null ? '' : String(p.stock),
       categoryId: p.categoryId ?? '', imageUrl: p.imageUrl ?? '', images: p.images ?? [], isActive: p.isActive,
       promoBuyQty: p.promoBuyQty != null ? String(p.promoBuyQty) : '',
       promoPayQty: p.promoPayQty != null ? String(p.promoPayQty) : '',
@@ -289,6 +294,38 @@ export default function ProdutosPage() {
                 <input className={styles.input} type="number" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} placeholder="vazio = livre" />
               </div>
             </div>
+
+            <label className={styles.label}>Oferta — preço antigo (opcional)</label>
+            <p className={styles.hint} style={{ marginTop: 0 }}>
+              Preencha o valor que o produto custava <strong>antes</strong>. Ele aparece riscado na
+              vitrine, junto do desconto, e o produto entra em “Ofertas Imperdíveis” na tela
+              inicial. Deixe vazio para tirar a oferta.
+            </p>
+            <input
+              className={styles.input} inputMode="numeric"
+              value={formatMoneyInput(form.comparePrice)}
+              onChange={e => setForm({ ...form, comparePrice: onlyDigits(e.target.value) })}
+              placeholder="0,00"
+            />
+            {(() => {
+              const de = moneyInputToNumber(form.comparePrice)
+              const por = moneyInputToNumber(form.basePrice)
+              if (!de) return null
+              // Avisa ANTES de salvar: o backend recusa, e descobrir isso só no
+              // erro do servidor é pior do que ver aqui enquanto digita.
+              if (!por || de <= por) {
+                return (
+                  <p className={styles.hint} style={{ color: '#B91C1C' }}>
+                    O preço antigo precisa ser maior que o preço atual — senão não há desconto.
+                  </p>
+                )
+              }
+              return (
+                <p className={styles.hint} style={{ color: '#15803D' }}>
+                  {Math.round(((de - por) / de) * 100)}% de desconto na vitrine.
+                </p>
+              )
+            })()}
 
             <label className={styles.label}>Promoção — Leve X Pague Y (opcional)</label>
             <p className={styles.hint} style={{ marginTop: 0 }}>
