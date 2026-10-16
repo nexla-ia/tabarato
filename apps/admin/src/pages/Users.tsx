@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import type { User } from '../types'
 import { useToast } from '../context/ToastContext'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const O = '#FF6600'
 const TEXT = '#1A0A00'
@@ -32,6 +33,9 @@ export function Users() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  // Alvo do diálogo de ativar/desativar. null = fechado.
+  const [alvo, setAlvo] = useState<User | null>(null)
+  const [salvando, setSalvando] = useState(false)
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -40,6 +44,24 @@ export function Users() {
       .catch(() => showToast('Erro ao carregar usuários', 'error'))
       .finally(() => setLoading(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function confirmarMudanca() {
+    if (!alvo) return
+    const ativar = !alvo.isActive
+    setSalvando(true)
+    try {
+      const atualizado = await api.setUserActive(alvo.id, ativar)
+      setUsers((lista) => lista.map((u) => (u.id === alvo.id ? { ...u, ...atualizado } : u)))
+      showToast(ativar ? 'Usuário reativado.' : 'Usuário desativado.', ativar ? 'success' : 'error')
+      setAlvo(null)
+    } catch (err) {
+      // O backend barra desativar a si mesmo e o último admin — a mensagem dele
+      // explica o motivo melhor do que qualquer texto genérico aqui.
+      showToast((err as Error).message || 'Não foi possível alterar o usuário', 'error')
+    } finally {
+      setSalvando(false)
+    }
+  }
 
   const filtered = users.filter(u =>
     u.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -114,7 +136,7 @@ export function Users() {
         <table style={{ width: '100%', borderCollapse: 'collapse' as const, minWidth: 580 }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-              {['Usuário', 'E-mail', 'Telefone', 'Tipo', 'Status', 'Cadastro'].map((c, i) => (
+              {['Usuário', 'E-mail', 'Telefone', 'Tipo', 'Status', 'Cadastro', 'Ações'].map((c, i) => (
                 <th key={i} style={TH}>{c}</th>
               ))}
             </tr>
@@ -178,6 +200,21 @@ export function Users() {
                     </span>
                   </td>
                   <td style={{ ...TD, fontSize: 12, color: LIGHT, fontFamily: SANS }}>{fmtDate(u.createdAt)}</td>
+                  <td style={TD}>
+                    <button
+                      onClick={() => setAlvo(u)}
+                      style={{
+                        padding: '5px 11px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                        fontSize: 12, fontWeight: 700, fontFamily: SANS, whiteSpace: 'nowrap' as const,
+                        background: u.isActive ? '#FEE2E2' : '#DCFCE7',
+                        color: u.isActive ? '#B91C1C' : '#15803D',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
+                    >
+                      {u.isActive ? 'Desativar' : 'Reativar'}
+                    </button>
+                  </td>
                 </tr>
               )
             })}
@@ -196,6 +233,28 @@ export function Users() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        aberto={!!alvo}
+        tom={alvo?.isActive ? 'perigo' : 'ok'}
+        titulo={alvo?.isActive ? `Desativar ${alvo?.name}?` : `Reativar ${alvo?.name}?`}
+        rotuloConfirmar={alvo?.isActive ? 'Desativar conta' : 'Reativar conta'}
+        carregando={salvando}
+        onConfirmar={confirmarMudanca}
+        onCancelar={() => { if (!salvando) setAlvo(null) }}
+        consequencia={alvo?.isActive
+          ? 'A pessoa perde o acesso na hora, mesmo com o app aberto, e não consegue mais entrar. Os pedidos, avaliações e valores dela continuam no sistema — nada é apagado. Dá para reativar quando quiser.'
+          : 'A pessoa volta a conseguir entrar e usar a conta normalmente, com todo o histórico de antes.'}
+      >
+        <div style={{
+          fontSize: 12.5, color: MUTED, fontFamily: SANS, lineHeight: 1.5,
+          background: '#FDF8F3', border: `1px solid ${BORDER}`, borderRadius: 10,
+          padding: '10px 12px', marginBottom: 12,
+        }}>
+          {alvo?.email}
+          {alvo ? ` · ${ROLE_CFG[alvo.role].label}` : ''}
+        </div>
+      </ConfirmDialog>
     </div>
   )
 }

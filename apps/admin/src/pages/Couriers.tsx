@@ -3,6 +3,7 @@ import { api } from '../api'
 import type { Courier } from '../types'
 import { useToast } from '../context/ToastContext'
 import { StatusBadge } from '../components/StatusBadge'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 type StatusFilter = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'
 type DocTab = 'cnh' | 'identity' | 'vehicle'
@@ -79,6 +80,16 @@ function Avatar({ name }: { name: string }) {
   )
 }
 
+const CONSEQUENCIA: Record<'APPROVED' | 'REJECTED' | 'SUSPENDED', (reativando: boolean) => string> = {
+  APPROVED: (reativando) => reativando
+    ? 'O entregador volta a ficar online e a receber corridas imediatamente. O histórico e o saldo dele continuam como estavam.'
+    : 'O entregador passa a receber corridas. Ele é avisado no app de que o cadastro foi aprovado.',
+  SUSPENDED: () =>
+    'Ele para de receber corridas na hora e não consegue mais ficar online. Entregas já em andamento não são canceladas automaticamente — confira antes. O saldo dele continua disponível para saque, e dá para reativar quando quiser.',
+  REJECTED: () =>
+    'O cadastro é recusado e ele não poderá aceitar entregas. Use quando os documentos não conferem; para bloquear temporariamente quem já trabalha, prefira Suspender.',
+}
+
 export function Couriers() {
   const [couriers, setCouriers] = useState<Courier[]>([])
   const [filter, setFilter] = useState<StatusFilter>('ALL')
@@ -87,6 +98,8 @@ export function Couriers() {
   const [selected, setSelected] = useState<Courier | null>(null)
   const [docTab, setDocTab] = useState<DocTab>('cnh')
   const [actioning, setActioning] = useState<string | null>(null) // 'approve' | 'reject' | 'doc-cnh-APPROVED' etc.
+  // Confirmacao de mudanca de status. Vem da linha da lista OU do modal.
+  const [confirmar, setConfirmar] = useState<{ courier: Courier; status: 'APPROVED' | 'REJECTED' | 'SUSPENDED' } | null>(null)
   const { showToast } = useToast()
 
   // Evita loop de recarga quando um doc realmente quebrado dispara onError repetido:
@@ -118,19 +131,26 @@ export function Couriers() {
     setRefresh(r => r + 1)
   }
 
-  const handleOverallAction = async (status: 'APPROVED' | 'REJECTED' | 'SUSPENDED') => {
-    if (!selected) return
-    // Confirma ações que bloqueiam o entregador de aceitar corridas.
-    if (status === 'REJECTED' && !window.confirm('Rejeitar este entregador? Ele não poderá aceitar entregas.')) return
-    if (status === 'SUSPENDED' && !window.confirm('Suspender este entregador? Ele fica bloqueado até ser reativado.')) return
+  /** Toda mudança de status passa por confirmação — vinda da lista ou do modal. */
+  const handleOverallAction = (status: 'APPROVED' | 'REJECTED' | 'SUSPENDED', courier?: Courier) => {
+    const alvo = courier ?? selected
+    if (alvo) setConfirmar({ courier: alvo, status })
+  }
+
+  const executarMudancaStatus = async () => {
+    if (!confirmar) return
+    const { courier, status } = confirmar
     setActioning(status)
     try {
-      const updated = await api.updateCourierStatus(selected.id, status)
-      const msg = status === 'APPROVED' ? (selected.status === 'SUSPENDED' ? 'Entregador reativado!' : 'Entregador aprovado!')
+      const updated = await api.updateCourierStatus(courier.id, status)
+      const msg = status === 'APPROVED' ? (courier.status === 'SUSPENDED' ? 'Entregador reativado!' : 'Entregador aprovado!')
         : status === 'SUSPENDED' ? 'Entregador suspenso.' : 'Entregador rejeitado.'
       showToast(msg, status === 'APPROVED' ? 'success' : 'error')
-      setSelected(updated)
+      // Só mexe no modal se ele estiver aberto neste mesmo entregador — senão
+      // agir pela lista abriria o modal do nada.
+      setSelected(atual => (atual && atual.id === courier.id ? updated : atual))
       setRefresh(r => r + 1)
+      setConfirmar(null)
     } catch (err: unknown) {
       showToast((err as Error).message || 'Erro', 'error')
     } finally {
@@ -253,6 +273,38 @@ export function Couriers() {
                 <td style={TD}><StatusBadge status={c.status} /></td>
                 <td style={{ ...TD, fontSize: 12, color: LIGHT, fontFamily: SANS, whiteSpace: 'nowrap' as const }}>{fmtDate(c.createdAt)}</td>
                 <td style={TD}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {/* Suspender e reativar saem do fundo do modal e ficam na linha:
+                      sao as acoes do dia a dia, e exigir abrir "Ver docs" para
+                      achar escondia justamente o que o cliente mais procura. */}
+                  {c.status === 'APPROVED' && (
+                    <button
+                      onClick={() => handleOverallAction('SUSPENDED', c)}
+                      style={{
+                        padding: '5px 11px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                        background: '#FEE2E2', color: '#B91C1C', fontSize: 12, fontWeight: 700,
+                        fontFamily: SANS, whiteSpace: 'nowrap' as const,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
+                      onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                    >
+                      Suspender
+                    </button>
+                  )}
+                  {c.status === 'SUSPENDED' && (
+                    <button
+                      onClick={() => handleOverallAction('APPROVED', c)}
+                      style={{
+                        padding: '5px 11px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                        background: '#DCFCE7', color: '#15803D', fontSize: 12, fontWeight: 700,
+                        fontFamily: SANS, whiteSpace: 'nowrap' as const,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
+                      onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                    >
+                      Reativar
+                    </button>
+                  )}
                   <button
                     onClick={() => openModal(c)}
                     style={{
@@ -265,6 +317,7 @@ export function Couriers() {
                   >
                     Ver docs
                   </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -464,6 +517,28 @@ export function Couriers() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        aberto={!!confirmar}
+        tom={confirmar?.status === 'APPROVED' ? 'ok' : confirmar?.status === 'SUSPENDED' ? 'aviso' : 'perigo'}
+        titulo={
+          confirmar?.status === 'SUSPENDED' ? `Suspender ${confirmar?.courier.user.name}?`
+          : confirmar?.status === 'REJECTED' ? `Rejeitar ${confirmar?.courier.user.name}?`
+          : confirmar?.courier.status === 'SUSPENDED' ? `Reativar ${confirmar?.courier.user.name}?`
+          : `Aprovar ${confirmar?.courier.user.name}?`
+        }
+        rotuloConfirmar={
+          confirmar?.status === 'SUSPENDED' ? 'Suspender'
+          : confirmar?.status === 'REJECTED' ? 'Rejeitar'
+          : confirmar?.courier.status === 'SUSPENDED' ? 'Reativar' : 'Aprovar'
+        }
+        carregando={!!actioning}
+        onConfirmar={executarMudancaStatus}
+        onCancelar={() => { if (!actioning) setConfirmar(null) }}
+        consequencia={confirmar
+          ? CONSEQUENCIA[confirmar.status](confirmar.courier.status === 'SUSPENDED')
+          : ''}
+      />
     </div>
   )
 }

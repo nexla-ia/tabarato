@@ -4,6 +4,7 @@ import { AdminService } from './admin.service'
 function makeAdmin(over: any = {}) {
   const prisma = {
     courier: { findUnique: jest.fn(), update: jest.fn() },
+    user: { findUnique: jest.fn(), update: jest.fn(), count: jest.fn() },
     delivery: { count: jest.fn(), updateMany: jest.fn(), findUnique: jest.fn() },
     ...(over.prisma ?? {}),
   }
@@ -164,5 +165,64 @@ describe('AdminService.assignDelivery (aviso da atribuição manual)', () => {
     expect(notifications.create).toHaveBeenCalledWith(
       'u1', 'DELIVERY_UPDATE', expect.any(String), expect.any(String), { orderId: 'o1' },
     )
+  })
+})
+
+
+describe('AdminService.setUserActive', () => {
+  it('nao deixa o admin desativar a si mesmo', async () => {
+    const { svc } = makeAdmin()
+    await expect(svc.setUserActive('a1', 'a1', false)).rejects.toBeInstanceOf(BadRequestException)
+  })
+
+  it('usuario inexistente → NotFound', async () => {
+    const { svc, prisma } = makeAdmin()
+    prisma.user.findUnique.mockResolvedValue(null)
+    await expect(svc.setUserActive('a1', 'u9', false)).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it('barra desativar o ULTIMO admin ativo', async () => {
+    const { svc, prisma } = makeAdmin()
+    prisma.user.findUnique.mockResolvedValue({ id: 'u2', role: 'ADMIN', isActive: true })
+    prisma.user.count.mockResolvedValue(0) // nenhum outro admin ativo
+    await expect(svc.setUserActive('a1', 'u2', false)).rejects.toBeInstanceOf(BadRequestException)
+    expect(prisma.user.update).not.toHaveBeenCalled()
+  })
+
+  it('permite desativar um admin quando existe outro ativo', async () => {
+    const { svc, prisma } = makeAdmin()
+    prisma.user.findUnique.mockResolvedValue({ id: 'u2', role: 'ADMIN', isActive: true })
+    prisma.user.count.mockResolvedValue(1)
+    prisma.user.update.mockResolvedValue({ id: 'u2', isActive: false })
+
+    await svc.setUserActive('a1', 'u2', false)
+
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'u2' }, data: { isActive: false } }),
+    )
+  })
+
+  it('reativar nao passa pela trava do ultimo admin', async () => {
+    const { svc, prisma } = makeAdmin()
+    prisma.user.findUnique.mockResolvedValue({ id: 'u2', role: 'ADMIN', isActive: false })
+    prisma.user.update.mockResolvedValue({ id: 'u2', isActive: true })
+
+    await svc.setUserActive('a1', 'u2', true)
+
+    expect(prisma.user.count).not.toHaveBeenCalled()
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { isActive: true } }),
+    )
+  })
+
+  it('cliente comum: desativa direto, sem checar admins', async () => {
+    const { svc, prisma } = makeAdmin()
+    prisma.user.findUnique.mockResolvedValue({ id: 'u3', role: 'CONSUMER', isActive: true })
+    prisma.user.update.mockResolvedValue({ id: 'u3', isActive: false })
+
+    await svc.setUserActive('a1', 'u3', false)
+
+    expect(prisma.user.count).not.toHaveBeenCalled()
+    expect(prisma.user.update).toHaveBeenCalled()
   })
 })

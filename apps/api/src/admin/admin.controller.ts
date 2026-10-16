@@ -2,10 +2,12 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@ne
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
+import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { AdminService } from './admin.service'
 import { UpdateCourierStatusDto } from './dto/update-courier-status.dto'
 import { UpdateCourierDocStatusDto } from './dto/update-courier-doc-status.dto'
 import { UpdateStoreStatusDto } from './dto/update-store-status.dto'
+import { UpdateUserStatusDto } from './dto/update-user-status.dto'
 import { UpdatePricingDto } from './dto/update-pricing.dto'
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -47,6 +49,17 @@ export class AdminController {
   @Get('users')
   getUsers() {
     return this.adminService.getUsers()
+  }
+
+  // Desativar/reativar conta. Ver admin.service.setUserActive — e o nosso
+  // "remover", porque apagar levaria junto pedidos e historico financeiro.
+  @Patch('users/:id/status')
+  setUserActive(
+    @CurrentUser() admin: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateUserStatusDto,
+  ) {
+    return this.adminService.setUserActive(admin.sub, id, dto.isActive)
   }
 
   // Moderação de produtos: lista todos (filtro busca/bloqueados) e bloqueia/desbloqueia.

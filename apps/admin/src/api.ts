@@ -132,6 +132,12 @@ export const api = {
 
   users: () => request<User[]>('/admin/users'),
 
+  setUserActive: (id: string, isActive: boolean) =>
+    request<User>(`/admin/users/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive }),
+    }),
+
   products: (search?: string, blocked?: 'true' | 'false') => {
     const q = new URLSearchParams()
     if (search) q.set('search', search)

@@ -34,7 +34,7 @@ export function Stores() {
 
   // Confirmação com resumo antes de aprovar/rejeitar — evita clique acidental
   // numa ação que já impacta o lojista na hora.
-  const [confirmTarget, setConfirmTarget] = useState<{ store: Store; status: 'APPROVED' | 'REJECTED' } | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<{ store: Store; status: 'APPROVED' | 'REJECTED' | 'SUSPENDED' } | null>(null)
   const [confirming, setConfirming] = useState(false)
 
   useEffect(() => {
@@ -55,7 +55,11 @@ export function Stores() {
     setConfirming(true)
     try {
       await api.updateStoreStatus(store.id, status)
-      showToast(status === 'APPROVED' ? 'Loja aprovada!' : 'Loja rejeitada.', status === 'APPROVED' ? 'success' : 'error')
+      showToast(
+        status === 'APPROVED' ? (store.status === 'SUSPENDED' ? 'Loja reativada!' : 'Loja aprovada!')
+          : status === 'SUSPENDED' ? 'Loja suspensa.' : 'Loja rejeitada.',
+        status === 'APPROVED' ? 'success' : 'error',
+      )
       setRefresh(r => r + 1)
       setConfirmTarget(null)
     } catch (err: unknown) {
@@ -167,7 +171,7 @@ export function Stores() {
                 <td style={{ ...TD, fontSize: 12, color: LIGHT, fontFamily: SANS, whiteSpace: 'nowrap' as const }}>{fmtDate(s.createdAt)}</td>
                 <td style={TD}>
                   <div style={{ display: 'flex', gap: 5 }}>
-                    {s.status !== 'APPROVED' && (
+                    {(s.status === 'PENDING' || s.status === 'REJECTED') && (
                       <button
                         onClick={() => setConfirmTarget({ store: s, status: 'APPROVED' })}
                         style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#DCFCE7', color: '#15803D', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: SANS, transition: 'opacity 0.1s' }}
@@ -177,7 +181,7 @@ export function Stores() {
                         ✓ Aprovar
                       </button>
                     )}
-                    {s.status !== 'REJECTED' && (
+                    {s.status === 'PENDING' && (
                       <button
                         onClick={() => setConfirmTarget({ store: s, status: 'REJECTED' })}
                         style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#FEE2E2', color: '#B91C1C', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: SANS, transition: 'opacity 0.1s' }}
@@ -185,6 +189,26 @@ export function Stores() {
                         onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
                       >
                         ✕ Rejeitar
+                      </button>
+                    )}
+                    {s.status === 'APPROVED' && (
+                      <button
+                        onClick={() => setConfirmTarget({ store: s, status: 'SUSPENDED' })}
+                        style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#FEF3C7', color: '#B45309', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: SANS, transition: 'opacity 0.1s' }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                      >
+                        Suspender
+                      </button>
+                    )}
+                    {s.status === 'SUSPENDED' && (
+                      <button
+                        onClick={() => setConfirmTarget({ store: s, status: 'APPROVED' })}
+                        style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#DCFCE7', color: '#15803D', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: SANS, transition: 'opacity 0.1s' }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                      >
+                        Reativar
                       </button>
                     )}
                   </div>
@@ -281,8 +305,12 @@ export function Stores() {
                 border: `1px solid ${confirmTarget.status === 'APPROVED' ? '#A7F3D0' : '#FDE68A'}`,
               }}>
                 {confirmTarget.status === 'APPROVED'
-                  ? 'A loja vai aparecer no marketplace pros clientes e já pode começar a receber pedidos.'
-                  : 'A loja não vai aparecer no marketplace. O lojista vai ver o cadastro como rejeitado no painel dele.'}
+                  ? (confirmTarget.store.status === 'SUSPENDED'
+                      ? 'A loja volta a aparecer no marketplace e a receber pedidos. Produtos, avaliações e saldo continuam como estavam.'
+                      : 'A loja vai aparecer no marketplace pros clientes e já pode começar a receber pedidos.')
+                  : confirmTarget.status === 'SUSPENDED'
+                    ? 'A loja some do marketplace na hora e para de receber pedidos novos. Pedidos em andamento NÃO são cancelados — confira antes. O saldo dela continua disponível para saque, e dá para reativar quando quiser.'
+                    : 'A loja não vai aparecer no marketplace. O lojista vai ver o cadastro como rejeitado no painel dele. Para bloquear temporariamente uma loja que JÁ vende, prefira Suspender.'}
               </div>
             </div>
 
@@ -299,7 +327,8 @@ export function Stores() {
                 disabled={confirming}
                 style={{
                   flex: 1, padding: 11, borderRadius: 10, border: 'none',
-                  background: confirmTarget.status === 'APPROVED' ? '#15803D' : '#B91C1C',
+                  background: confirmTarget.status === 'APPROVED' ? '#15803D'
+                    : confirmTarget.status === 'SUSPENDED' ? '#B45309' : '#B91C1C',
                   color: '#fff', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: SANS,
                   opacity: confirming ? 0.7 : 1,
                 }}

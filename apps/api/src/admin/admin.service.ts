@@ -191,6 +191,49 @@ export class AdminService {
     })
   }
 
+  /**
+   * Ativa ou desativa uma conta.
+   *
+   * Desativar é o nosso "remover": `JwtStrategy` revalida `isActive` a cada
+   * request, então o acesso cai na hora, sem esperar o token expirar. Apagar de
+   * verdade não é opção — a conta é referenciada por pedidos, avaliações e
+   * transações, e remover levaria junto o histórico financeiro.
+   *
+   * Duas travas contra o admin se trancar do lado de fora: não dá para desativar
+   * a própria conta, nem a do último administrador ativo.
+   */
+  async setUserActive(adminId: string, userId: string, isActive: boolean) {
+    if (adminId === userId) {
+      throw new BadRequestException('Você não pode desativar a sua própria conta.')
+    }
+
+    const alvo = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, isActive: true },
+    })
+    if (!alvo) throw new NotFoundException('Usuário não encontrado.')
+
+    if (!isActive && alvo.role === 'ADMIN') {
+      const outrosAdmins = await this.prisma.user.count({
+        where: { role: 'ADMIN', isActive: true, id: { not: userId } },
+      })
+      if (outrosAdmins === 0) {
+        throw new BadRequestException(
+          'Este é o último administrador ativo. Promova ou ative outro antes de desativar este.',
+        )
+      }
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { isActive },
+      select: {
+        id: true, name: true, email: true, phone: true,
+        role: true, isActive: true, createdAt: true,
+      },
+    })
+  }
+
   /** Moderação: lista produtos de todas as lojas (busca por nome, filtro bloqueados). */
   async getProducts(search?: string, blocked?: string) {
     const where: any = {}
