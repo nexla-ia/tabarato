@@ -58,23 +58,22 @@ export function BibleOfferModal({
           id="bible-offer-title"
           style={{ fontSize: 20, fontWeight: 900, color: 'var(--text)', margin: '0 0 8px', letterSpacing: '-0.3px' }}
         >
-          Um presente para você
+          O Tá Barato tem um presente para você!
         </h2>
 
-        <p style={{ fontSize: 14.5, color: 'var(--muted)', lineHeight: 1.5, margin: 0 }}>
-          O Tá Barato quer enviar, de cortesia, um exemplar da Bíblia para a sua casa.
-          Não custa nada e não tem pegadinha — é um presente de boas-vindas.
+        <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', lineHeight: 1.4, margin: '6px 0 0' }}>
+          Você quer ganhar um exemplar da Bíblia sem custo?
         </p>
 
-        <p
+        <ul
           style={{
-            fontSize: 12.5, color: 'var(--faint, var(--muted))', lineHeight: 1.45,
-            margin: '12px 0 0', paddingTop: 12, borderTop: '1px solid var(--border)',
+            fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.5,
+            margin: '14px 0 0', paddingLeft: 18, display: 'grid', gap: 7,
           }}
         >
-          Se aceitar, usamos seu nome e o endereço de entrega cadastrado no site só para
-          fazer a postagem pelos Correios. Você pode desistir quando quiser.
-        </p>
+          <li>O envio será gratuito via Correios.</li>
+          <li>Seus dados cadastrados serão usados exclusivamente para esta entrega.</li>
+        </ul>
 
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button
@@ -99,7 +98,7 @@ export function BibleOfferModal({
               fontSize: 14.5, fontWeight: 800,
             }}
           >
-            {saving ? 'Enviando…' : 'Quero receber'}
+            {saving ? 'Enviando…' : 'Sim, quero receber'}
           </button>
         </div>
       </div>

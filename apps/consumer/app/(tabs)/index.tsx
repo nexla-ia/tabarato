@@ -439,11 +439,6 @@ function ProductCard({ product }: { product: FeedProduct }) {
             <Ionicons name="cube-outline" size={34} color={colors.primary} />
           </View>
         )}
-        {closed && (
-          <View style={styles.closedOverlay}>
-            <Text style={styles.closedText}>Fechada</Text>
-          </View>
-        )}
         {product.store.rating != null && (
           <View style={styles.ratingBadge}>
             <Ionicons name="star" size={10} color="#F59E0B" />

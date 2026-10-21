@@ -34,17 +34,18 @@ export function BibleOfferModal({
             <Ionicons name="book-outline" size={26} color={colors.primary} />
           </View>
 
-          <Text style={styles.title}>Um presente para você</Text>
+          <Text style={styles.title}>O Tá Barato tem um presente para você!</Text>
 
-          <Text style={styles.body}>
-            O Tá Barato quer enviar, de cortesia, um exemplar da Bíblia para a sua casa.
-            Não custa nada e não tem pegadinha — é um presente de boas-vindas.
+          <Text style={styles.pergunta}>
+            Você quer ganhar um exemplar da Bíblia sem custo?
           </Text>
 
-          <Text style={styles.note}>
-            Se aceitar, usamos seu nome e o endereço de entrega cadastrado no app só para
-            fazer a postagem pelos Correios. Você pode desistir quando quiser.
-          </Text>
+          <View style={styles.lista}>
+            <Text style={styles.item}>{'\u2022'}  O envio será gratuito via Correios.</Text>
+            <Text style={styles.item}>
+              {'\u2022'}  Seus dados cadastrados serão usados exclusivamente para esta entrega.
+            </Text>
+          </View>
 
           <View style={styles.actions}>
             <TouchableOpacity
@@ -64,7 +65,7 @@ export function BibleOfferModal({
             >
               {saving
                 ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={styles.btnSolidText}>Quero receber</Text>}
+                : <Text style={styles.btnSolidText}>Sim, quero receber</Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -98,12 +99,12 @@ const styles = StyleSheet.create({
     fontSize: 20, fontWeight: '900', color: colors.text,
     letterSpacing: -0.3, marginBottom: 8,
   },
-  body: { fontSize: 14.5, color: colors.textMuted, lineHeight: 21 },
-  note: {
-    fontSize: 12.5, color: colors.textLight, lineHeight: 18,
-    marginTop: 12, paddingTop: 12,
-    borderTopWidth: 1, borderTopColor: colors.border,
+  pergunta: {
+    fontSize: 16, fontWeight: '700', color: colors.text,
+    lineHeight: 22, marginTop: 6,
   },
+  lista: { marginTop: 14, gap: 7 },
+  item: { fontSize: 13.5, color: colors.textMuted, lineHeight: 19 },
 
   actions: { flexDirection: 'row', gap: 10, marginTop: 20 },
   btn: {

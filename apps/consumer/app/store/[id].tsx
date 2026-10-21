@@ -14,6 +14,7 @@ import { promoLabel } from '../../src/utils/promo'
 import { colors } from '../../src/theme/colors'
 import { useCartStore } from '../../src/stores/cart.store'
 import { Store, Product, ProductVariation } from '../../src/types'
+import { AppAlert } from '../../src/components/AppAlert'
 
 const PRIMARY = '#FF5500'
 const PRIMARY_DARK = '#CC3300'
@@ -47,6 +48,15 @@ async function fetchReviews(storeId: string) {
   const { data } = await api.get<ReviewsData>(`/reviews/store/${storeId}?limit=5`)
   return data
 }
+
+/**
+ * Lojas cuja mensagem de "esta fechada" o cliente ja viu nesta sessao.
+ *
+ * O aviso existe para ele decidir, nao para repetir a cada item: avisar de novo
+ * no segundo produto da mesma loja vira obstaculo. Fica fora do componente de
+ * proposito, para sobreviver a sair da loja e voltar.
+ */
+const lojasAvisadas = new Set<string>()
 
 function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
   return (
@@ -108,13 +118,15 @@ const rStyles = StyleSheet.create({
 })
 
 function ProductDetailModal({
-  product, storeId, storeName, visible, onClose,
+  product, storeId, storeName, visible, onClose, aoAdicionar,
 }: {
   product: Product | null
   storeId: string
   storeName: string
   visible: boolean
   onClose: () => void
+  /** Intercala o aviso de loja fechada antes de adicionar de fato. */
+  aoAdicionar: (acao: () => void) => void
 }) {
   const insets = useSafeAreaInsets()
   const [selectedVariation, setSelectedVariation] = useState<ProductVariation | null>(null)
@@ -156,7 +168,9 @@ function ProductDetailModal({
     !variationOutOfStock && !productOutOfStock && !allVariationsOut
 
   function doAdd() {
-    addItem(storeId, storeName, product!, selectedVariation ?? undefined, quantity, notes.trim() || undefined)
+    aoAdicionar(() => {
+      addItem(storeId, storeName, product!, selectedVariation ?? undefined, quantity, notes.trim() || undefined)
+    })
     onClose()
   }
 
@@ -431,10 +445,26 @@ export default function StoreScreen() {
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  // Acao segurada esperando o cliente confirmar que viu o aviso de loja
+  // fechada. null = sem aviso na tela.
+  const [acaoPendente, setAcaoPendente] = useState<null | { run: () => void }>(null)
+
+  /**
+   * Adiciona ao carrinho, intercalando o aviso quando a loja esta fechada e o
+   * cliente ainda nao foi avisado dela nesta sessao.
+   */
+  function comAvisoSeFechada(acao: () => void) {
+    if (store && !store.isOpen && !lojasAvisadas.has(id)) {
+      lojasAvisadas.add(id)
+      setAcaoPendente({ run: acao })
+      return
+    }
+    acao()
+  }
 
   function handleAddProduct(product: Product) {
     // Multi-loja: pode juntar itens de várias lojas no mesmo carrinho.
-    addItem(id, store!.name, product)
+    comAvisoSeFechada(() => addItem(id, store!.name, product))
   }
 
   if (isLoading || !store) {
@@ -614,6 +644,28 @@ export default function StoreScreen() {
         storeId={id}
         storeName={store.name}
         onClose={() => setSelectedProduct(null)}
+        aoAdicionar={comAvisoSeFechada}
+      />
+
+      {/* Loja fechada: o cliente monta o pedido do mesmo jeito, so precisa
+          saber que a loja so vai ver quando abrir. */}
+      <AppAlert
+        visible={!!acaoPendente}
+        type="info"
+        title={`${store.name} esta fechada agora`}
+        message={
+          'Voce pode montar seu pedido normalmente. Ele fica guardado no carrinho e '
+          + 'a loja so vai receber quando abrir.'
+        }
+        confirmText="Entendi, adicionar"
+        cancelText="Agora nao"
+        onConfirm={() => { acaoPendente?.run(); setAcaoPendente(null) }}
+        onClose={() => {
+          // Desistiu: deixa a loja poder avisar de novo, senao a proxima
+          // tentativa adicionaria calado.
+          lojasAvisadas.delete(id)
+          setAcaoPendente(null)
+        }}
       />
     </View>
   )

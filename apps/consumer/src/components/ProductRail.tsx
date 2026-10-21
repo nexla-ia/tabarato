@@ -80,7 +80,9 @@ export function ProductRail({
               key={p.id}
               style={s.card}
               activeOpacity={0.85}
-              onPress={() => router.push(`/product/${p.id}` as any)}
+              // Nao existe rota de produto isolada no app: o caminho e a pagina
+              // da loja, igual ao resto da vitrine.
+              onPress={() => router.push(`/store/${p.storeId}` as any)}
             >
               <View style={s.imgWrap}>
                 {p.imageUrl

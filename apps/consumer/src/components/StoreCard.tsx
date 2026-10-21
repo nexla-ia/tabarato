@@ -30,12 +30,6 @@ export function StoreCard({ store, onPress }: Props) {
           </View>
         )}
 
-        {!store.isOpen && (
-          <View style={styles.closedOverlay}>
-            <Text style={styles.closedLabel}>Fechado</Text>
-          </View>
-        )}
-
         {store.isOpen && (
           <View style={styles.openBadge}>
             <View style={styles.openDot} />

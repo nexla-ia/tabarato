@@ -317,11 +317,40 @@ export class StoresService {
     })
   }
 
+  /**
+   * Categorias ordenadas pelo que mais vende.
+   *
+   * Conta PEDIDOS ENTREGUES por loja e soma nas categorias dela. Pedido
+   * cancelado nao conta: nao e venda, e deixa-lo pontuar tornaria a ordem
+   * manipulavel por quem pede e cancela.
+   *
+   * O `sortOrder` continua valendo como desempate — e e ele que manda enquanto
+   * nao houver venda nenhuma, entao a vitrine nunca fica em ordem aleatoria.
+   *
+   * Categoria sem venda nao some; vai para o fim.
+   */
   async listCategories() {
-    return this.prisma.category.findMany({
+    const categorias = await this.prisma.category.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
+      include: { stores: { select: { id: true } } },
     })
+
+    const porLoja = await this.prisma.order.groupBy({
+      by: ['storeId'],
+      where: { status: 'DELIVERED' },
+      _count: { _all: true },
+    })
+    const vendasDaLoja = new Map(porLoja.map(r => [r.storeId, r._count._all]))
+
+    return categorias
+      .map((c, posicaoOriginal) => {
+        const vendas = c.stores.reduce((t, loja) => t + (vendasDaLoja.get(loja.id) ?? 0), 0)
+        const { stores, ...semLojas } = c
+        return { ...semLojas, vendas, posicaoOriginal }
+      })
+      .sort((a, b) => b.vendas - a.vendas || a.posicaoOriginal - b.posicaoOriginal)
+      .map(({ posicaoOriginal, ...c }) => c)
   }
 
   async findWallet(userId: string) {
