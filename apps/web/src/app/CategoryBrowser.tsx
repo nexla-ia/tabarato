@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { ScrollRail } from './ScrollRail'
-import { StoreCardsGrid } from './StoreCardsGrid'
+import { StoreStrip } from './StoreStrip'
+import { ProductGrid } from './ProductGrid'
 import { emojiFor, sortCategoriesOutrosLast } from '@/lib/categoryIcons'
 import { Store, StoreCategory } from './storesData'
 import styles from './CategoryRail.module.css'
@@ -49,14 +50,14 @@ export function CategoryBrowser({ categories, stores, initialCat, children }: {
         </section>
       )}
 
+      {/* Ordem portada do app: lojas como faixa secundária, depois os trilhos
+          e, por fim, os ITENS como conteúdo principal. Antes a web terminava
+          numa grade de lojas, que era a diferença mais visível entre os dois. */}
+      <StoreStrip stores={visible} />
+
       {children}
 
-      <StoreCardsGrid
-        heading="Lojas disponíveis"
-        stores={visible}
-        filtering={!!activeCat}
-        onClear={() => setActiveCat(undefined)}
-      />
+      <ProductGrid categoryId={activeCat} />
     </>
   )
 }

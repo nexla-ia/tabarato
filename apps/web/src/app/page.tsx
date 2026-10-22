@@ -2,8 +2,8 @@ import { Suspense } from 'react'
 import Image from 'next/image'
 import { Navbar } from '@/components/Navbar'
 import { CategoryBrowser } from './CategoryBrowser'
-import { PromoStrip } from './PromoStrip'
 import { PopularProducts } from './PopularProducts'
+import { PromoStrip } from './PromoStrip'
 import { ProductRail } from './ProductRail'
 import { Tag, Sparkles } from 'lucide-react'
 import { StoreGrid } from './StoreGrid'
@@ -16,7 +16,6 @@ async function CategoryBrowserSection({ cat }: { cat?: string }) {
   const [categories, stores] = await Promise.all([getCategories(), getStores()])
   return (
     <CategoryBrowser categories={categories} stores={stores} initialCat={cat}>
-      <PromoStrip />
       <Suspense fallback={null}>
         {/* Ofertas primeiro: e a secao com apelo mais forte e sempre tem
             conteudo quando alguma loja cadastrou preco "de". Destaques vem
@@ -63,7 +62,7 @@ export default async function HomePage({
             <div className={styles.heroBlob2} />
             <div className={`container ${styles.heroInner}`}>
               <div className={styles.heroArt}>
-                <Image src="/logo.png" alt="Tá Barato" width={280} height={280} priority className={styles.heroLogo} style={{ objectFit: 'contain' }} />
+                <Image src="/logo.png" alt="Tá Barato" width={150} height={150} priority className={styles.heroLogo} style={{ objectFit: 'contain' }} />
               </div>
             </div>
             <div className={styles.heroWave} />
@@ -81,6 +80,16 @@ export default async function HomePage({
             </Suspense>
           )}
         </div>
+
+        {/* Argumentos de venda ficam DEPOIS do conteudo: a web tambem precisa
+            convencer quem chega sem conhecer o Ta Barato, papel que o app nao
+            tem. Antes estavam no topo, empurrando os itens para fora da
+            primeira tela. */}
+        {!searching && (
+          <div className="container">
+            <PromoStrip />
+          </div>
+        )}
 
         {/* ── Footer ── */}
         <footer className={styles.footer}>

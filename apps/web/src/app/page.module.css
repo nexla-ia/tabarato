@@ -5,8 +5,12 @@
   background:
     radial-gradient(1200px 400px at 80% -10%, rgba(255,180,120,0.35), transparent 60%),
     linear-gradient(150deg, #FF7A00 0%, #FF5500 42%, #CC3300 100%);
-  padding: 40px 0 64px;
-  margin-bottom: 20px;
+  /* Faixa compacta, na proporcao do cabecalho laranja do app. Antes eram
+     104px de respiro em volta de uma logo de 280px — um banner de site
+     institucional, que empurrava o conteudo para fora da primeira tela e era
+     metade da sensacao de "web e app sao produtos diferentes". */
+  padding: 18px 0 30px;
+  margin-bottom: 4px;
 }
 .heroGlow {
   position: absolute; inset: 0;
@@ -34,7 +38,7 @@
 .heroWave {
   position: absolute;
   left: 0; right: 0; bottom: -1px;
-  height: 48px;
+  height: 26px;
   background: var(--bg);
   clip-path: ellipse(75% 100% at 50% 100%);
 }

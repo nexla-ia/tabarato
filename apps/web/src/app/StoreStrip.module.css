@@ -1,0 +1,101 @@
+/* Medidas copiadas do app (apps/consumer/app/(tabs)/index.tsx): logo 60px,
+   raio 18, bolinha 14px, nome 11px. Mudar aqui sem mudar lá volta a separar
+   os dois produtos. */
+
+.strip {
+  padding-top: 18px;
+  padding-bottom: 4px;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 10px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0;
+}
+
+.sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9A8880;
+}
+
+.chip {
+  width: 64px;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-decoration: none;
+  flex: 0 0 auto;
+}
+
+.logoWrap {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  display: block;
+}
+
+.logo {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  object-fit: cover;
+  background: #F0EBE5;
+  transition: transform 0.15s ease;
+}
+
+.chip:hover .logo,
+.chip:hover .logoFallback {
+  transform: translateY(-2px);
+}
+
+.logoFallback {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: var(--orange-light);
+  border: 1px solid #FFD9C2;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--orange);
+  text-transform: uppercase;
+  transition: transform 0.15s ease;
+}
+
+.dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2.5px solid var(--bg);
+}
+
+.name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #4A3828;
+  text-align: center;
+  line-height: 1.25;
+  /* Duas linhas no máximo: nome comprido não pode empurrar a faixa inteira. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo, .logoFallback { transition: none; }
+}

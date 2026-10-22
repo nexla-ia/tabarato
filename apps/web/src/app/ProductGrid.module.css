@@ -1,0 +1,209 @@
+/* Cartão portado do app: raio 18, imagem 1.15:1, etiqueta da loja sobre a foto,
+   nome em 2 linhas, preço laranja. Mantenha em sincronia com
+   apps/consumer/app/(tabs)/index.tsx. */
+
+.section {
+  padding-top: 18px;
+  padding-bottom: 36px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+.titulo {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.4px;
+  color: var(--text);
+  margin: 0;
+}
+
+.sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9A8880;
+  margin: 1px 0 0;
+}
+
+.contador {
+  background: var(--orange);
+  color: #fff;
+  border-radius: 10px;
+  padding: 3px 9px;
+  min-width: 26px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 2 colunas no celular, igual ao app; mais no desktop, que tem largura. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 640px)  { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 900px)  { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1200px) { .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+
+.card {
+  background: var(--card);
+  border-radius: 18px;
+  overflow: hidden;
+  text-decoration: none;
+  box-shadow: 0 3px 8px rgba(26, 10, 0, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  min-width: 0;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(26, 10, 0, 0.12);
+}
+
+.imgWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.15;
+  background: #F5F0EC;
+}
+
+.imgFallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--orange-light);
+  color: var(--orange);
+}
+
+.selo {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  background: #DC2626;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 2.5px 7px;
+  border-radius: 999px;
+}
+
+/* Etiqueta escura sobre a foto, como no app — funciona sobre qualquer imagem. */
+.lojaTag {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  max-width: calc(100% - 12px);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  border-radius: 10px;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lojaDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.corpo { padding: 10px; }
+
+.nome {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 17px;
+  min-height: 34px;
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.precos {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.de {
+  font-size: 11.5px;
+  color: #BBA898;
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+}
+
+.por {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--orange);
+  letter-spacing: -0.3px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Carregando e vazio ── */
+.esqueleto {
+  border-radius: 18px;
+  background: linear-gradient(100deg, #F5F0EC 30%, #FBF7F4 50%, #F5F0EC 70%);
+  background-size: 200% 100%;
+  animation: desliza 1.3s linear infinite;
+  aspect-ratio: 0.74;
+}
+
+@keyframes desliza {
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto { animation: none; }
+  .card { transition: none; }
+}
+
+.vazio {
+  text-align: center;
+  padding: 44px 24px;
+}
+
+.vazioIcone {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--orange-light);
+  color: var(--orange);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 16px;
+}
+
+.vazioTitulo {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.vazioTexto {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+}
