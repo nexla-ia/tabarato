@@ -1,7 +1,7 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus, TriangleAlert, Layers, Ban } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus, TriangleAlert, Layers, Ban, Sparkles } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Product, ProductVariation, Store, Category, money } from '@/lib/types'
 import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
@@ -36,6 +36,17 @@ export default function ProdutosPage() {
   const [variationsProduct, setVariationsProduct] = useState<Product | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imageError, setImageError] = useState('')
+  // Fundo branco automatico (Bria). `fotoOriginal` permite desfazer.
+  const [fundoBrancoAtivo, setFundoBrancoAtivo] = useState(false)
+  const [processandoFundo, setProcessandoFundo] = useState(false)
+  const [fotoOriginal, setFotoOriginal] = useState<string | null>(null)
+
+  // Sem a chave da Bria no servidor, o botao simplesmente nao aparece.
+  useEffect(() => {
+    api.get('/uploads/white-background/status')
+      .then((r) => setFundoBrancoAtivo(!!r.data?.enabled))
+      .catch(() => setFundoBrancoAtivo(false))
+  }, [])
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [uploadingGallery, setUploadingGallery] = useState(false)
   const [galleryError, setGalleryError] = useState('')
@@ -88,11 +99,34 @@ export default function ProdutosPage() {
       formData.append('file', file)
       const { data } = await api.post<{ url: string }>('/uploads/image', formData)
       setForm((f) => f && { ...f, imageUrl: data.url })
+      setFotoOriginal(null)
     } catch {
       setImageError('Não foi possível enviar a imagem. Use JPEG, PNG ou WEBP de até 10MB.')
     } finally {
       setUploadingImage(false)
     }
+  }
+
+  async function aplicarFundoBranco() {
+    if (!form?.imageUrl || processandoFundo) return
+    setImageError('')
+    setProcessandoFundo(true)
+    try {
+      const { data } = await api.post<{ url: string }>('/uploads/image/white-background', { imageUrl: form.imageUrl })
+      setFotoOriginal(form.imageUrl)
+      setForm((f) => f && { ...f, imageUrl: data.url })
+    } catch (e: any) {
+      // A foto original fica no formulario — falhar aqui nao perde nada.
+      setImageError(e?.response?.data?.message ?? 'Nao foi possivel deixar o fundo branco agora.')
+    } finally {
+      setProcessandoFundo(false)
+    }
+  }
+
+  function desfazerFundoBranco() {
+    if (!fotoOriginal) return
+    setForm((f) => f && { ...f, imageUrl: fotoOriginal })
+    setFotoOriginal(null)
   }
 
   async function handleGalleryFile(file: File) {
@@ -380,6 +414,33 @@ export default function ProdutosPage() {
                 <button type="button" className={styles.imgBtn} onClick={() => imageInputRef.current?.click()} disabled={uploadingImage}>
                   {uploadingImage ? <><Loader2 size={14} className={styles.spin} /> Enviando…</> : <><Camera size={14} /> {form.imageUrl ? 'Trocar foto' : 'Enviar foto'}</>}
                 </button>
+                {fundoBrancoAtivo && !!form.imageUrl && !uploadingImage && (
+                  fotoOriginal ? (
+                    <p style={{ fontSize: 12.5, fontWeight: 700, color: '#15803D', margin: '8px 0 0' }}>
+                      Fundo branco aplicado ·{' '}
+                      <button
+                        type="button"
+                        onClick={desfazerFundoBranco}
+                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                          color: 'var(--orange)', fontWeight: 800, textDecoration: 'underline', fontSize: 12.5 }}
+                      >
+                        Desfazer
+                      </button>
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.imgBtn}
+                      onClick={aplicarFundoBranco}
+                      disabled={processandoFundo}
+                      style={{ marginTop: 8 }}
+                    >
+                      {processandoFundo
+                        ? <><Loader2 size={14} className={styles.spin} /> Deixando o fundo branco…</>
+                        : <><Sparkles size={14} /> Deixar fundo branco</>}
+                    </button>
+                  )
+                )}
                 {imageError && <p className={styles.imgErr}>{imageError}</p>}
               </div>
             </div>

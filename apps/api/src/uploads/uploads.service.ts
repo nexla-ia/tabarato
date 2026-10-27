@@ -70,6 +70,28 @@ export class UploadsService {
   }
 
   /**
+   * Sobe uma imagem gerada no PROPRIO servidor (ex.: a foto com fundo branco).
+   *
+   * Diferente de uploadImage, nao vem de um usuario: o buffer saiu do sharp,
+   * entao nao precisa de sniff. Mesmo bucket publico das fotos de produto.
+   */
+  async uploadImageBuffer(buffer: Buffer, mime: 'image/jpeg' | 'image/png'): Promise<string> {
+    const ext = mime === 'image/png' ? 'png' : 'jpg'
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+
+    const { error } = await this.supabase.storage
+      .from(IMAGE_BUCKET)
+      .upload(filename, buffer, { contentType: mime, upsert: false })
+
+    if (error) {
+      this.logger.error(`Supabase upload (buffer) failed: ${error.message}`)
+      throw new InternalServerErrorException('Nao foi possivel salvar a foto. Tente novamente.')
+    }
+
+    return this.supabase.storage.from(IMAGE_BUCKET).getPublicUrl(filename).data.publicUrl
+  }
+
+  /**
    * Sobe um DOCUMENTO do entregador para o bucket PRIVADO e devolve só o PATH
    * (não uma URL pública). O admin vê via signed URL gerada em signDocuments().
    */

@@ -194,6 +194,20 @@ function ProductModal({
   const [form, setForm] = useState<ProductFormState>(initial ?? EMPTY_FORM)
   const [uploading, setUploading] = useState(false)
   const [catSearch, setCatSearch] = useState('')
+  // Fundo branco automatico (Bria). `fotoOriginal` guarda a foto de antes para o
+  // lojista poder desfazer — a IA acerta quase sempre, mas nao sempre.
+  const [fundoBrancoAtivo, setFundoBrancoAtivo] = useState(false)
+  const [processandoFundo, setProcessandoFundo] = useState(false)
+  const [fotoOriginal, setFotoOriginal] = useState<string | null>(null)
+
+  // Pergunta ao servidor se o recurso esta ligado (sem a chave da Bria, o botao
+  // nao aparece). Falha aqui so esconde o botao — nunca atrapalha o cadastro.
+  useEffect(() => {
+    if (!visible) return
+    api.get('/uploads/white-background/status')
+      .then((r) => setFundoBrancoAtivo(!!r.data?.enabled))
+      .catch(() => setFundoBrancoAtivo(false))
+  }, [visible])
 
   const catQuery = stripAccents(catSearch.trim())
   const filteredCats = catQuery
@@ -202,6 +216,7 @@ function ProductModal({
 
   useEffect(() => {
     setForm(initial ?? EMPTY_FORM)
+    setFotoOriginal(null)
   }, [initial, visible])
 
   const isEdit = !!initial?.name
@@ -225,11 +240,33 @@ function ProductModal({
     try {
       const url = await uploadImageAsset(asset.uri, { name: 'product.jpg' })
       setForm((f) => ({ ...f, imageUrl: url }))
+      setFotoOriginal(null)
     } catch (e: any) {
       toast(e?.message ?? 'Não foi possível fazer upload da imagem.', 'error')
     } finally {
       setUploading(false)
     }
+  }
+
+  async function aplicarFundoBranco() {
+    if (!form.imageUrl || processandoFundo) return
+    setProcessandoFundo(true)
+    try {
+      const { data } = await api.post('/uploads/image/white-background', { imageUrl: form.imageUrl })
+      setFotoOriginal(form.imageUrl)
+      setForm((f) => ({ ...f, imageUrl: data.url }))
+    } catch (e: any) {
+      // A foto original continua no formulario: falhar aqui nao perde nada.
+      toast(e?.response?.data?.message ?? 'Nao foi possivel deixar o fundo branco agora.', 'error')
+    } finally {
+      setProcessandoFundo(false)
+    }
+  }
+
+  function desfazerFundoBranco() {
+    if (!fotoOriginal) return
+    setForm((f) => ({ ...f, imageUrl: fotoOriginal }))
+    setFotoOriginal(null)
   }
 
   return (
@@ -262,6 +299,32 @@ function ProductModal({
                 </View>
               )}
             </TouchableOpacity>
+
+            {fundoBrancoAtivo && !!form.imageUrl && !uploading && (
+              fotoOriginal ? (
+                <View style={modal.fundoLinha}>
+                  <Ionicons name="checkmark-circle" size={16} color="#15803D" />
+                  <Text style={modal.fundoOk}>Fundo branco aplicado</Text>
+                  <TouchableOpacity onPress={desfazerFundoBranco} hitSlop={8} activeOpacity={0.7}>
+                    <Text style={modal.fundoDesfazer}>Desfazer</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[modal.fundoBtn, processandoFundo && { opacity: 0.6 }]}
+                  onPress={aplicarFundoBranco}
+                  disabled={processandoFundo}
+                  activeOpacity={0.85}
+                >
+                  {processandoFundo
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <Ionicons name="sparkles" size={15} color={colors.primary} />}
+                  <Text style={modal.fundoBtnTexto}>
+                    {processandoFundo ? 'Deixando o fundo branco...' : 'Deixar fundo branco'}
+                  </Text>
+                </TouchableOpacity>
+              )
+            )}
 
             <View style={modal.fieldWrap}>
               <Text style={modal.fieldLabel}>NOME DO PRODUTO *</Text>
@@ -1294,6 +1357,20 @@ const modal = StyleSheet.create({
     overflow: 'hidden',
   },
   imagePreview: { width: 100, height: 100 },
+  // Fundo branco automatico, logo abaixo da foto.
+  fundoBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+    alignSelf: 'center', marginTop: -6, marginBottom: 14,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
+    backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: '#FFD9C2',
+  },
+  fundoBtnTexto: { fontSize: 13, fontWeight: '800', color: colors.primary },
+  fundoLinha: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginTop: -6, marginBottom: 14,
+  },
+  fundoOk: { fontSize: 13, fontWeight: '700', color: '#15803D' },
+  fundoDesfazer: { fontSize: 13, fontWeight: '800', color: colors.primary, textDecorationLine: 'underline' },
   imageEditBadge: {
     position: 'absolute', bottom: 6, right: 6,
     backgroundColor: colors.primary,
