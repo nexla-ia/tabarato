@@ -325,6 +325,12 @@ function ProductModal({
                 </TouchableOpacity>
               )
             )}
+            {/* O teste real mostrou o erro mais provavel: foto com varios produtos
+                ou cortada na borda. A IA recorta tudo que parece produto, e o que
+                estava cortado continua cortado. */}
+            {fundoBrancoAtivo && !!form.imageUrl && !uploading && !fotoOriginal && !processandoFundo && (
+              <Text style={modal.fundoDica}>Funciona melhor com um produto por foto, inteiro no enquadramento.</Text>
+            )}
 
             <View style={modal.fieldWrap}>
               <Text style={modal.fieldLabel}>NOME DO PRODUTO *</Text>
@@ -1365,6 +1371,7 @@ const modal = StyleSheet.create({
     backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: '#FFD9C2',
   },
   fundoBtnTexto: { fontSize: 13, fontWeight: '800', color: colors.primary },
+  fundoDica: { fontSize: 11.5, color: '#9A8880', textAlign: 'center', marginTop: -8, marginBottom: 14, paddingHorizontal: 24 },
   fundoLinha: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     marginTop: -6, marginBottom: 14,

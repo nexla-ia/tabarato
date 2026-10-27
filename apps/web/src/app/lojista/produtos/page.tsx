@@ -441,6 +441,11 @@ export default function ProdutosPage() {
                     </button>
                   )
                 )}
+                {fundoBrancoAtivo && !!form.imageUrl && !uploadingImage && !fotoOriginal && !processandoFundo && (
+                  <p style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0 0', maxWidth: 260 }}>
+                    Funciona melhor com um produto por foto, inteiro no enquadramento.
+                  </p>
+                )}
                 {imageError && <p className={styles.imgErr}>{imageError}</p>}
               </div>
             </div>
