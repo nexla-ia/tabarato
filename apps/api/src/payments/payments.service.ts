@@ -11,6 +11,9 @@ import { OrderConsumptionService } from '../orders/order-consumption.service'
 import { PlatformSettingsService } from '../settings/platform-settings.service'
 import { PIX_EXPIRATION_MS } from './pix.constants'
 
+/** external_reference das cobranças de anúncio: `ad:<id do anúncio>`. */
+export const AD_REF = 'ad:'
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name)
@@ -71,6 +74,8 @@ export class PaymentsService {
       userId?: string; payerName?: string; payerCpf?: string; payerPhone?: string
       // Split Asaas (subconta): parte de cada loja → subconta dela
       asaasSplit?: Array<{ walletId: string; fixedValue: number }>
+      // Cobrança que não é pedido (anúncio): texto do extrato e cliente Asaas já criado.
+      description?: string; asaasCustomerId?: string
     },
   ): Promise<{ gatewayId: string; pixCode: string | null; pixQrBase64: string | null; splitFellBack: boolean }> {
     // Modo Asaas (entrada centralizada): ignora split — todo o dinheiro entra na
@@ -84,7 +89,7 @@ export class PaymentsService {
 
     const buildBody = (useSplit: boolean) => ({
       transaction_amount: amount,
-      description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
+      description: opts?.description ?? `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
       payment_method_id: 'pix',
       payer: { email: payerEmail },
       notification_url: webhookUrl,
@@ -249,14 +254,18 @@ export class PaymentsService {
 
   private async createAsaasPixPayment(
     paymentId: string, amount: number, orderId: string, payerEmail: string,
-    opts?: { userId?: string; payerName?: string; payerCpf?: string; payerPhone?: string; asaasSplit?: Array<{ walletId: string; fixedValue: number }> },
+    opts?: {
+      userId?: string; payerName?: string; payerCpf?: string; payerPhone?: string
+      asaasSplit?: Array<{ walletId: string; fixedValue: number }>
+      description?: string; asaasCustomerId?: string
+    },
   ) {
     if (!opts?.userId) throw new BadRequestException('Não foi possível identificar o pagador.')
-    const customerId = await this.getOrCreateAsaasCustomer(opts.userId, {
+    const customerId = opts.asaasCustomerId ?? await this.getOrCreateAsaasCustomer(opts.userId, {
       name: opts.payerName, email: payerEmail, cpf: opts.payerCpf, phone: opts.payerPhone,
     })
     const charge = await this.asaas.createPixCharge({
-      customerId, value: amount, orderId, description: `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
+      customerId, value: amount, orderId, description: opts.description ?? `Pedido #${orderId.slice(0, 8)} — Tá Barato`,
       split: opts.asaasSplit,
     })
     const qr = await this.asaas.getPixQrCode(charge.id)
@@ -491,6 +500,10 @@ export class PaymentsService {
       if (!mpPayment || !mpPayment.external_reference) return
 
       const orderId  = mpPayment.external_reference as string
+      if (orderId.startsWith(AD_REF)) {
+        if (localPayment) await this.settleAdPayment(localPayment.id, orderId.slice(AD_REF.length))
+        return
+      }
       const mpStatus = mpPayment.status
 
       const order = await this.prisma.order.findUnique({
@@ -604,6 +617,16 @@ export class PaymentsService {
       }
       if (!orderId) return
 
+      if (orderId.startsWith(AD_REF)) {
+        // O corpo só diz QUAL cobrança olhar; settleAdPayment re-consulta o Asaas.
+        const gatewayId = body?.payment?.id ? String(body.payment.id) : undefined
+        const pay = gatewayId
+          ? await this.prisma.payment.findFirst({ where: { gatewayId, gateway: 'ASAAS' }, select: { id: true } })
+          : null
+        if (pay) await this.settleAdPayment(pay.id, orderId.slice(AD_REF.length))
+        return
+      }
+
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
         include: { payment: true, user: { select: { id: true, pushToken: true } } },
@@ -675,6 +698,98 @@ export class PaymentsService {
     } catch (err) {
       this.logger.error('Asaas webhook (cobrança) processing failed', err as any)
     }
+  }
+
+  // ── Cobrança de anúncio ─────────────────────────────────────────────────────
+  //
+  // O anúncio paga por PIX usando a mesma tabela/QR do pedido, com external
+  // reference `ad:<id>`. Quem decide o que fazer com o anúncio pago é o
+  // AdsService, que se registra aqui (ele depende deste módulo, não o contrário).
+
+  private adPaidHandler?: (adId: string, paymentId: string) => Promise<void>
+
+  onAdPaid(handler: (adId: string, paymentId: string) => Promise<void>) {
+    this.adPaidHandler = handler
+  }
+
+  /** Gera o PIX de um anúncio aprovado. Devolve a linha de Payment já com o QR. */
+  async createAdPix(input: {
+    adId: string; amount: number; userId: string; payerEmail: string
+    companyName: string; document: string
+  }) {
+    const gateway = this.asaas.pixInEnabled ? 'ASAAS' : 'MP'
+    const payment = await this.prisma.payment.create({
+      data: { method: 'PIX', gateway, amount: input.amount },
+    })
+    try {
+      // No Asaas o cliente da cobrança é a EMPRESA anunciante (CPF/CNPJ do pedido),
+      // não o cadastro pessoal do usuário — é o dado que vai para a nota fiscal.
+      const asaasCustomerId = gateway === 'ASAAS'
+        ? (await this.asaas.createCustomer({
+            name: input.companyName, cpfCnpj: input.document,
+            email: input.payerEmail, externalReference: `${AD_REF}${input.adId}`,
+          })).id
+        : undefined
+      await this.createPixPayment(payment.id, input.amount, `${AD_REF}${input.adId}`, input.payerEmail, {
+        userId: input.userId, payerName: input.companyName,
+        description: 'Anúncio na vitrine — Tá Barato', asaasCustomerId,
+      })
+    } catch (err: any) {
+      await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } }).catch(() => {})
+      if (err instanceof BadRequestException) throw err
+      throw new BadRequestException(`Não foi possível gerar o PIX agora: ${err?.message ?? 'tente de novo'}`)
+    }
+    return this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } })
+  }
+
+  /**
+   * Confere no provedor se a cobrança do anúncio foi paga e, se foi, entrega ao
+   * AdsService. Chamado pelo webhook (só como gatilho) e pelo app ao consultar.
+   * Exige status pago REAL, valor igual e a referência apontando para ESTE anúncio.
+   */
+  async settleAdPayment(paymentId: string, adId: string): Promise<'PAID' | 'FAILED' | 'PENDING'> {
+    const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } })
+    if (!payment?.gatewayId) return 'PENDING'
+    if (payment.status === 'PAID') return 'PAID'
+
+    let real: 'PAID' | 'FAILED' | 'PENDING' = 'PENDING'
+    try {
+      if (payment.gateway === 'ASAAS') {
+        const p = await this.asaas.getPayment(payment.gatewayId)
+        if (p.externalReference !== `${AD_REF}${adId}`) return 'PENDING'
+        if ((p.status === 'CONFIRMED' || p.status === 'RECEIVED')) {
+          real = Math.abs(p.value - Number(payment.amount)) < 0.01 ? 'PAID' : 'PENDING'
+        } else if (['OVERDUE', 'DELETED', 'REFUNDED'].includes(p.status)) real = 'FAILED'
+      } else {
+        const p: any = await this.mp.get({ id: payment.gatewayId })
+        if (p?.external_reference !== `${AD_REF}${adId}`) return 'PENDING'
+        if (p.status === 'approved') {
+          real = Math.abs(Number(p.transaction_amount) - Number(payment.amount)) < 0.01 ? 'PAID' : 'PENDING'
+        } else if (p.status === 'rejected' || p.status === 'cancelled') real = 'FAILED'
+      }
+    } catch {
+      this.logger.warn(`Anúncio ${adId.slice(0, 8)}: falha ao consultar a cobrança ${payment.gatewayId}`)
+      return payment.status === 'FAILED' ? 'FAILED' : 'PENDING'
+    }
+
+    if (real === 'PENDING' && payment.status === 'PENDING') return 'PENDING'
+    if (real === 'FAILED') {
+      await this.prisma.payment.updateMany({ where: { id: paymentId, status: 'PENDING' }, data: { status: 'FAILED' } })
+      return 'FAILED'
+    }
+    if (real !== 'PAID') return payment.status === 'FAILED' ? 'FAILED' : 'PENDING'
+
+    // Aceita vindo de FAILED também: o cron de PIX marca FAILED aos 10 min, mas o
+    // banco pode confirmar um pagamento feito no limite do prazo.
+    const claim = await this.prisma.payment.updateMany({
+      where: { id: paymentId, status: { not: 'PAID' } },
+      data: { status: 'PAID', paidAt: new Date() },
+    })
+    if (claim.count > 0) {
+      if (this.adPaidHandler) await this.adPaidHandler(adId, paymentId)
+      else this.logger.error(`Anúncio ${adId.slice(0, 8)} pago sem AdsService registrado`)
+    }
+    return 'PAID'
   }
 
   // ── Poll status (consumer app pulls if webhook misses) ─────────────────────

@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, Max, Min } from 'class-validator'
+import { IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator'
 
 // Todos opcionais: o admin pode ajustar só um campo. Faixas evitam valor absurdo.
 export class UpdatePricingDto {
@@ -25,4 +25,17 @@ export class UpdatePricingDto {
   // na loja. 0 = sem limite. Até R$ 1 milhão.
   @IsOptional() @IsNumber() @Min(0) @Max(1_000_000)
   maxDeliveryValue?: number
+
+  // Anúncios pagos na vitrine.
+  @IsOptional() @IsNumber() @Min(0) @Max(10_000)
+  adPricePerDay?: number
+
+  @IsOptional() @IsInt() @Min(1) @Max(90)
+  adMinDays?: number
+
+  @IsOptional() @IsInt() @Min(1) @Max(20)
+  adSlots?: number
+
+  @IsOptional() @IsInt() @Min(1) @Max(30)
+  adPayDeadlineDays?: number
 }

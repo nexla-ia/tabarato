@@ -5,6 +5,7 @@ import { Power, Pause, Play, ArrowRight, Clock, Hourglass, XCircle, Ban } from '
 import { api } from '@/lib/api'
 import { Store, Order, STATUS_LABEL, STATUS_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL, money, timeAgo } from '@/lib/types'
 import { Spinner } from '@/components/Spinner'
+import { AdPromoCard } from '@/components/AdPromoCard'
 import styles from './page.module.css'
 
 function startOfToday() {
@@ -147,6 +148,9 @@ export default function LojistaDashboard() {
           <div className={styles.statValue} style={{ color: pending > 0 ? '#D97706' : undefined }}>{pending}</div>
         </div>
       </div>
+
+      {/* Vitrine paga — a "janela" pedida pelo dono, logo abaixo dos números do dia */}
+      <AdPromoCard />
 
       <div className={styles.sectionHead}>
         <h2 className={styles.sectionTitle}>Pedidos ativos</h2>

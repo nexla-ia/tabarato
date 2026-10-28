@@ -99,6 +99,15 @@ function BookIcon() {
   )
 }
 
+function MegaphoneIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m3 11 18-5v12L3 14v-3z"/>
+      <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+    </svg>
+  )
+}
+
 function BoxIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -118,6 +127,7 @@ const NAV = [
   { to: '/users',     label: 'Usuários',     Icon: PeopleIcon },
   { to: '/saques',    label: 'Saques',       Icon: CashIcon },
   { to: '/biblias',   label: 'Bíblias',      Icon: BookIcon },
+  { to: '/anuncios',  label: 'Anúncios',     Icon: MegaphoneIcon },
   { to: '/precos',    label: 'Preços',       Icon: TagIcon },
 ]
 

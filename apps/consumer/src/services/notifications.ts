@@ -39,6 +39,10 @@ export async function setupNotificationTapHandler() {
       router.push('/(courier-tabs)' as any)
       return
     }
+    if (data?.screen === 'meus-anuncios') {
+      router.push('/meus-anuncios' as any)
+      return
+    }
     if (data?.orderId) router.push(`/order/${data.orderId}` as any)
   }
   try {

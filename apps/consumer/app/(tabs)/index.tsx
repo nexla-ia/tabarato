@@ -16,6 +16,7 @@ import { Store, Category } from '../../src/types'
 import { useAuthStore } from '../../src/stores/auth.store'
 import { useFavoritesStore } from '../../src/stores/favorites.store'
 import { ProductRail } from '../../src/components/ProductRail'
+import { AdCarousel } from '../../src/components/AdCarousel'
 
 const SLOGAN = 'Entrega na sua casa'
 
@@ -162,6 +163,9 @@ export default function HomeScreen() {
 
   const ListHeader = (
     <View>
+      {/* Anúncios pagos — topo da home, fora da busca. Some quando não há nada. */}
+      {!isSearching && !selectedCategory && <AdCarousel />}
+
       {/* Faixa de LOJAS — secundária (o foco é item). Some na busca. */}
       {!isSearching && stores.length > 0 && (
         <View style={styles.storesStrip}>

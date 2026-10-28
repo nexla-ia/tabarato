@@ -9,6 +9,11 @@ export interface Pricing {
   courierPerKm: number
   platformCommissionPct: number // em % (10 = 10%)
   maxDeliveryValue: number // acima disso (subtotal), só retirada. 0 = sem limite.
+  // Anúncios pagos na vitrine
+  adPricePerDay: number
+  adMinDays: number
+  adSlots: number            // quantos anúncios giram ao mesmo tempo
+  adPayDeadlineDays: number  // prazo para pagar depois de aprovado
 }
 
 // Padrões = comportamento atual (nada muda até o admin editar).
@@ -20,6 +25,10 @@ export const DEFAULT_PRICING: Pricing = {
   courierPerKm: 2,
   platformCommissionPct: 10,
   maxDeliveryValue: 1000,
+  adPricePerDay: 10,
+  adMinDays: 7,
+  adSlots: 5,
+  adPayDeadlineDays: 3,
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100
@@ -45,6 +54,10 @@ export class PlatformSettingsService {
           courierPerKm: Number(row.courierPerKm),
           platformCommissionPct: Number(row.platformCommissionPct),
           maxDeliveryValue: Number((row as any).maxDeliveryValue ?? DEFAULT_PRICING.maxDeliveryValue),
+          adPricePerDay: Number(row.adPricePerDay ?? DEFAULT_PRICING.adPricePerDay),
+          adMinDays: row.adMinDays ?? DEFAULT_PRICING.adMinDays,
+          adSlots: row.adSlots ?? DEFAULT_PRICING.adSlots,
+          adPayDeadlineDays: row.adPayDeadlineDays ?? DEFAULT_PRICING.adPayDeadlineDays,
         }
       : { ...DEFAULT_PRICING }
     this.cache = { data, at: Date.now() }

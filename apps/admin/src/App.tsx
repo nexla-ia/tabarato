@@ -7,6 +7,7 @@ import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Operacoes } from './pages/Operacoes'
 import { Precos } from './pages/Precos'
+import { Anuncios } from './pages/Anuncios'
 import { Couriers } from './pages/Couriers'
 import { Stores } from './pages/Stores'
 import { Users } from './pages/Users'
@@ -64,6 +65,7 @@ export default function App() {
                 <Route path="/users" element={<Users />} />
                 <Route path="/saques" element={<Saques />} />
                 <Route path="/biblias" element={<Biblias />} />
+                <Route path="/anuncios" element={<Anuncios />} />
                 <Route path="/precos" element={<Precos />} />
               </Route>
             </Route>

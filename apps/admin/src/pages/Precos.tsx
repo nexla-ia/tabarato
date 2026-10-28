@@ -120,6 +120,25 @@ export function Precos() {
             />
           </Section>
 
+          <Section title="Anúncios na vitrine">
+            <Field label="Preço por dia" value={p.adPricePerDay} onChange={set('adPricePerDay')} suffix="R$ / dia" />
+            <Field label="Mínimo de dias" value={p.adMinDays} onChange={set('adMinDays')} suffix="dias" />
+            <Field
+              label="Anúncios ao mesmo tempo"
+              hint="Quantos giram juntos no carrossel. Com a vitrine cheia, o próximo pago entra quando abrir vaga."
+              value={p.adSlots} onChange={set('adSlots')} suffix="vagas"
+            />
+            <Field
+              label="Prazo para pagar"
+              hint="Depois da aprovação. Passou do prazo, o pedido encerra sozinho."
+              value={p.adPayDeadlineDays} onChange={set('adPayDeadlineDays')} suffix="dias"
+            />
+            <div style={{ fontSize: 11.5, color: MUTED, marginTop: -4, lineHeight: 1.5 }}>
+              Mudar o preço não altera pedidos já feitos — cada anúncio guarda o preço do dia em que foi pedido.
+              Anúncio de {p.adMinDays} dias hoje: <strong>{money(p.adPricePerDay * p.adMinDays)}</strong>.
+            </div>
+          </Section>
+
           <button
             onClick={save} disabled={saving}
             style={{ background: O, color: '#fff', border: 'none', borderRadius: 11, padding: '12px 24px', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: SANS, opacity: saving ? 0.7 : 1 }}

@@ -171,6 +171,14 @@ export const api = {
       body: JSON.stringify({ courierId }),
     }),
 
+  ads: (status?: string) =>
+    request<AdminAd[]>(`/admin/ads${status ? `?status=${status}` : ''}`),
+  approveAd: (id: string) => request<any>(`/admin/ads/${id}/approve`, { method: 'POST' }),
+  rejectAd: (id: string, reason: string) =>
+    request<any>(`/admin/ads/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  cancelAd: (id: string) =>
+    request<{ ok: boolean; refundNeeded: boolean }>(`/admin/ads/${id}/cancel`, { method: 'POST' }),
+
   getSettings: () => request<Pricing>('/admin/settings'),
   updateSettings: (patch: Partial<Pricing>) =>
     request<Pricing>('/admin/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
@@ -223,6 +231,37 @@ export interface Pricing {
   platformCommissionPct: number
   // Acima deste valor de produtos, só retirada na loja (0 = sem limite).
   maxDeliveryValue: number
+  // Anúncios pagos na vitrine
+  adPricePerDay: number
+  adMinDays: number
+  adSlots: number
+  adPayDeadlineDays: number
+}
+
+export type AdStatus = 'PENDING_REVIEW' | 'REJECTED' | 'AWAITING_PAYMENT' | 'EXPIRED_UNPAID' | 'PAID' | 'CANCELLED'
+
+export interface AdminAd {
+  id: string
+  companyName: string
+  document: string
+  imageUrl: string
+  linkType: 'NONE' | 'STORE' | 'WHATSAPP' | 'URL'
+  linkTarget: string | null
+  days: number
+  pricePerDay: number
+  totalPrice: number
+  status: AdStatus
+  rejectReason: string | null
+  reviewedAt: string | null
+  payDeadline: string | null
+  paidAt: string | null
+  startsAt: string | null
+  endsAt: string | null
+  impressions: number
+  clicks: number
+  createdAt: string
+  user: { name: string; email: string; phone: string | null }
+  payment: { status: string; gateway: string | null; paidAt: string | null } | null
 }
 
 export interface OpWaiting {

@@ -118,7 +118,9 @@ export default function NotificationsScreen() {
       await api.patch(`/notifications/${n.id}/read`).catch(() => {})
       setNotifications((prev) => prev.map((item) => item.id === n.id ? { ...item, isRead: true } : item))
     }
-    if (n.data?.orderId) {
+    if (n.data?.screen === 'meus-anuncios') {
+      router.push('/meus-anuncios' as any)
+    } else if (n.data?.orderId) {
       router.push(`/order/${n.data.orderId}`)
     }
   }

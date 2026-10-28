@@ -127,6 +127,7 @@ model User {
   chatMessages    ChatMessage[]
   passwordResets  PasswordReset[]
   bibleRequest    BibleRequest?
+  ads             Ad[]
 
   @@map("users")
 }
@@ -459,6 +460,9 @@ model Payment {
   updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at")
 
   orders Order[]
+  // Cobranca de anuncio usa a mesma tabela: herda QR, expiracao e status, que ja
+  // sao testados no fluxo de pedido.
+  ads    Ad[]
 
   @@index([gatewayId])
   @@index([status])
@@ -523,6 +527,11 @@ model PlatformSettings {
   // Acima deste valor de produtos (subtotal), a ENTREGA por motoboy é bloqueada e o
   // cliente precisa RETIRAR na loja (segurança — motoboy não carrega item caro). 0 = sem limite.
   maxDeliveryValue      Decimal  @default(1000) @map("max_delivery_value")
+  // Anuncios pagos na vitrine. Editaveis no admin > Precos.
+  adPricePerDay         Decimal  @default(10) @map("ad_price_per_day")
+  adMinDays             Int      @default(7) @map("ad_min_days")
+  adSlots               Int      @default(5) @map("ad_slots")          // quantos giram ao mesmo tempo
+  adPayDeadlineDays     Int      @default(3) @map("ad_pay_deadline_days") // prazo p/ pagar depois de aprovado
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("platform_settings")
@@ -731,4 +740,63 @@ enum BibleRequestStatus {
   PENDING
   SENT
   CANCELLED
+}
+
+/// Anuncio pago na vitrine (carrossel da tela inicial).
+///
+/// Fluxo: PENDING_REVIEW -> (admin) AWAITING_PAYMENT | REJECTED
+///        AWAITING_PAYMENT -> (PIX confirmado) PAID | (prazo vencido) EXPIRED_UNPAID
+/// "No ar" nao e status: e PAID com startsAt <= agora < endsAt. As datas so sao
+/// fixadas no pagamento, quando a agenda de vagas e calculada de verdade.
+model Ad {
+  id              String     @id @default(uuid())
+  userId          String     @map("user_id")
+  // Quem anuncia, para a nota fiscal do servico de anuncio.
+  companyName     String     @map("company_name")
+  document        String     // CPF ou CNPJ, so digitos
+  imageUrl        String     @map("image_url")
+  linkType        AdLinkType @default(NONE) @map("link_type")
+  linkTarget      String?    @map("link_target")
+  days            Int
+  // Congelado no pedido: mudar o preco no admin nao altera pedido ja feito.
+  pricePerDay     Decimal    @map("price_per_day")
+  totalPrice      Decimal    @map("total_price")
+  status          AdStatus   @default(PENDING_REVIEW)
+  rejectReason    String?    @map("reject_reason")
+  reviewedAt      DateTime?  @map("reviewed_at")
+  payDeadline     DateTime?  @map("pay_deadline")
+  paymentId       String?    @map("payment_id")
+  paidAt          DateTime?  @map("paid_at")
+  startsAt        DateTime?  @map("starts_at")
+  endsAt          DateTime?  @map("ends_at")
+  impressions     Int        @default(0)
+  clicks          Int        @default(0)
+  liveNotified    Boolean    @default(false) @map("live_notified")
+  renewalNotified Boolean    @default(false) @map("renewal_notified")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  user    User     @relation(fields: [userId], references: [id])
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([status])
+  @@index([userId])
+  @@index([startsAt, endsAt])
+  @@map("ads")
+}
+
+enum AdStatus {
+  PENDING_REVIEW
+  REJECTED
+  AWAITING_PAYMENT
+  EXPIRED_UNPAID
+  PAID
+  CANCELLED
+}
+
+enum AdLinkType {
+  NONE
+  STORE
+  WHATSAPP
+  URL
 }

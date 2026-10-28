@@ -4,6 +4,7 @@ import { Navbar } from '@/components/Navbar'
 import { CategoryBrowser } from './CategoryBrowser'
 import { PopularProducts } from './PopularProducts'
 import { PromoStrip } from './PromoStrip'
+import { AdCarousel } from './AdCarousel'
 import { ProductRail } from './ProductRail'
 import { Tag, Sparkles } from 'lucide-react'
 import { StoreGrid } from './StoreGrid'
@@ -71,9 +72,13 @@ export default async function HomePage({
 
         <div className="container">
           {!searching ? (
-            <Suspense fallback={<div className={styles.loading}>Carregando lojas…</div>}>
-              <CategoryBrowserSection cat={cat} />
-            </Suspense>
+            <>
+              {/* Anúncios pagos: topo do conteúdo, igual ao app. */}
+              <AdCarousel />
+              <Suspense fallback={<div className={styles.loading}>Carregando lojas…</div>}>
+                <CategoryBrowserSection cat={cat} />
+              </Suspense>
+            </>
           ) : (
             <Suspense fallback={<div className={styles.loading}>Carregando lojas…</div>}>
               <StoreGrid q={q} />

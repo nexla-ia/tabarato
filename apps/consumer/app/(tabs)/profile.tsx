@@ -176,6 +176,13 @@ export default function ProfileScreen() {
       ],
     },
     {
+      title: 'Para empresas',
+      items: [
+        { icon: 'megaphone-outline', label: 'Anunciar na vitrine', desc: 'Sua empresa no topo da tela inicial', onPress: () => router.push('/anunciar' as any) },
+        { icon: 'albums-outline', label: 'Meus anúncios', desc: 'Aprovação, pagamento e resultados', onPress: () => router.push('/meus-anuncios' as any) },
+      ],
+    },
+    {
       title: 'Suporte',
       items: [
         { icon: 'logo-whatsapp', label: 'Falar com o suporte', desc: 'Tire suas dúvidas no WhatsApp', onPress: () => Linking.openURL(SUPPORT_WHATSAPP).catch(() => toast('Não foi possível abrir o WhatsApp.', 'error')) },

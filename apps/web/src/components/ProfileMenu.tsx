@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { User, Heart, MessagesSquare, ShoppingBag, LogOut, ChevronDown } from 'lucide-react'
+import { User, Heart, MessagesSquare, ShoppingBag, LogOut, ChevronDown, Megaphone } from 'lucide-react'
 import styles from './ProfileMenu.module.css'
 
 const LINKS = [
@@ -9,6 +9,7 @@ const LINKS = [
   { href: '/favorites', label: 'Favoritos', Icon: Heart },
   { href: '/mensagens', label: 'Mensagens', Icon: MessagesSquare },
   { href: '/orders', label: 'Meus pedidos', Icon: ShoppingBag },
+  { href: '/meus-anuncios', label: 'Meus anúncios', Icon: Megaphone },
 ]
 
 /**

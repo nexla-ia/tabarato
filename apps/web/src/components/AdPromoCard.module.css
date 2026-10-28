@@ -1,0 +1,44 @@
+.card {
+  position: relative; display: block; overflow: hidden;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px 18px; margin: 4px 0 24px; box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.card:hover { box-shadow: var(--shadow-md); }
+.card:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+
+.topo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.vivo {
+  display: inline-flex; align-items: center; gap: 7px; background: var(--green-bg); color: #15803D;
+  border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 800;
+}
+.ponto { width: 7px; height: 7px; border-radius: 50%; background: #22C55E; }
+.ate { color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.numeros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.numeros div { background: var(--orange-light); border-radius: 12px; padding: 10px; text-align: center; display: flex; flex-direction: column-reverse; }
+.numeros dd { font-size: 20px; font-weight: 800; color: var(--orange); font-variant-numeric: tabular-nums; }
+.numeros dt { font-size: 11.5px; color: var(--muted); font-weight: 700; }
+
+.linha { display: flex; align-items: center; gap: 14px; }
+.icone { width: 44px; height: 44px; border-radius: 12px; background: var(--orange-light); color: var(--orange); display: grid; place-items: center; flex: 0 0 auto; }
+.textos { flex: 1; display: flex; flex-direction: column; gap: 2px; position: relative; min-width: 0; }
+.textos strong { font-size: 15px; }
+.textos span { font-size: 13px; color: var(--muted); }
+.seta { color: var(--orange); }
+
+.convite {
+  display: flex; align-items: center; gap: 16px; border: none;
+  background: linear-gradient(120deg, var(--orange) 0%, var(--orange-2) 100%); color: #fff;
+}
+.convite .textos strong { font-family: var(--display); font-size: 18px; line-height: 1.2; }
+.convite .textos span { color: rgba(255, 255, 255, 0.9); }
+.convite .textos .kicker { font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.85); }
+.bola { position: absolute; width: 200px; height: 200px; border-radius: 50%; background: rgba(255, 255, 255, 0.10); top: -90px; right: 60px; }
+.conviteBtn {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; background: #fff; color: var(--orange);
+  border-radius: 999px; padding: 10px 16px; font-weight: 800; font-size: 14px; white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .convite { flex-direction: column; align-items: flex-start; }
+}

@@ -20,6 +20,7 @@ import { CourierReviewsModule } from './courier-reviews/courier-reviews.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { PaymentsModule } from './payments/payments.module'
 import { LoyaltyModule } from './loyalty/loyalty.module'
+import { AdsModule } from './ads/ads.module'
 import { PlatformSettingsModule } from './settings/platform-settings.module'
 import { CryptoModule } from './common/crypto.service'
 
@@ -48,6 +49,7 @@ import { CryptoModule } from './common/crypto.service'
     NotificationsModule,
     PaymentsModule,
     LoyaltyModule,
+    AdsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

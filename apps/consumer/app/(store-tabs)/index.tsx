@@ -9,6 +9,7 @@ import { api } from '../../src/api/client'
 import { colors } from '../../src/theme/colors'
 import { useToast } from '../../src/components/Toast'
 import { STORE_TERMS_URL, STORE_TERMS_VERSION } from '../../src/links'
+import { AdPromoCard } from '../../src/components/AdPromoCard'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED'
@@ -572,6 +573,11 @@ export default function StoreDashboard() {
           )}
         </View>
       )}
+
+      {/* Vitrine paga — janela pedida pelo dono, logo abaixo dos números da semana */}
+      <View style={styles.section}>
+        <AdPromoCard />
+      </View>
 
       {/* Pedidos recentes */}
       <View style={styles.section}>
