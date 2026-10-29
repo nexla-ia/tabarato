@@ -135,11 +135,26 @@ export class AdsService implements OnModuleInit {
   async getMine(userId: string, id: string) {
     let ad = await this.doDono(userId, id)
     // Webhook atrasou? Consultar aqui confirma na hora em que a pessoa olha.
-    if (ad.status === 'AWAITING_PAYMENT' && ad.payment?.status === 'PENDING') {
-      const st = await this.payments.settleAdPayment(ad.payment.id, ad.id)
-      if (st !== 'PENDING') ad = await this.doDono(userId, id)
+    // Vale também para PIX já marcado FAILED pelo cron dos 10 min: o banco pode
+    // confirmar um pagamento feito no limite.
+    if (ad.status === 'AWAITING_PAYMENT' && (await this.jaFoiPago(ad))) {
+      ad = await this.doDono(userId, id)
     }
     return this.comPrevisao(ad)
+  }
+
+  /**
+   * O PIX atual do anúncio foi pago? Cobre também o pagamento gravado como PAID
+   * cuja ativação falhou no meio (erro de banco): sem isto o anúncio ficaria
+   * "aguardando PIX" com o dinheiro já recebido — e o app geraria outro PIX.
+   */
+  private async jaFoiPago(ad: { id: string; payment: { id: string; status: string } | null }): Promise<boolean> {
+    if (!ad.payment) return false
+    if (ad.payment.status === 'PAID') {
+      await this.ativarPago(ad.id, ad.payment.id)
+      return true
+    }
+    return (await this.payments.settleAdPayment(ad.payment.id, ad.id)) === 'PAID'
   }
 
   /** Para quem ainda vai pagar: quando entraria no ar se pagasse agora. */
@@ -170,9 +185,7 @@ export class AdsService implements OnModuleInit {
     }
     // O PIX anterior venceu, mas pode ter sido pago no limite: confere antes de
     // gerar outro, para não cobrar duas vezes.
-    if (atual && atual.status !== 'PAID') {
-      if ((await this.payments.settleAdPayment(atual.id, ad.id)) === 'PAID') return this.getMine(userId, id)
-    }
+    if (await this.jaFoiPago(ad)) return this.getMine(userId, id)
 
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
     const payment = await this.payments.createAdPix({
@@ -193,6 +206,10 @@ export class AdsService implements OnModuleInit {
 
   async cancel(userId: string, id: string) {
     const ad = await this.doDono(userId, id)
+    // Quem já pagou o PIX e cancela em seguida perderia o anúncio com o dinheiro dentro.
+    if (ad.status === 'AWAITING_PAYMENT' && (await this.jaFoiPago(ad))) {
+      throw new BadRequestException('Este anúncio já foi pago e não pode mais ser cancelado.')
+    }
     const r = await this.prisma.ad.updateMany({
       where: { id: ad.id, status: { in: ['PENDING_REVIEW', 'AWAITING_PAYMENT'] } },
       data: { status: 'CANCELLED' },
@@ -253,11 +270,12 @@ export class AdsService implements OnModuleInit {
    * decide (estorno no painel do provedor), por isso a resposta avisa.
    */
   async adminCancel(id: string) {
-    const ad = await this.prisma.ad.findUnique({ where: { id } })
+    const ad = await this.prisma.ad.findUnique({ where: { id }, include: { payment: true } })
     if (!ad) throw new NotFoundException('Anúncio não encontrado.')
     if (ad.status === 'CANCELLED' || ad.status === 'REJECTED') return { ok: true, refundNeeded: false }
+    // "Aguardando PIX" pode já ter sido pago sem o webhook chegar: aí precisa estorno.
+    const pago = ad.status === 'PAID' || (ad.status === 'AWAITING_PAYMENT' && (await this.jaFoiPago(ad)))
     await this.prisma.ad.update({ where: { id }, data: { status: 'CANCELLED' } })
-    const pago = ad.status === 'PAID'
     await this.avisar(ad.userId, ad.id, 'Anúncio cancelado',
       pago ? 'Seu anúncio foi retirado da vitrine. Nossa equipe vai falar com você sobre o valor pago.'
            : 'Seu pedido de anúncio foi cancelado pela nossa equipe.')
@@ -274,7 +292,9 @@ export class AdsService implements OnModuleInit {
   async ativarPago(adId: string, paymentId: string) {
     const p = await this.settings.get()
     const ad = await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LOCK_AGENDA})`
+      // Constante no texto (sem parâmetro): evita ambiguidade de tipo na sobrecarga
+      // pg_advisory_xact_lock(bigint) / (int, int).
+      await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${LOCK_AGENDA})`)
       const atual = await tx.ad.findUnique({ where: { id: adId } })
       // EXPIRED_UNPAID também vale: o PIX pode ter sido pago no último minuto do prazo.
       if (!atual || !['AWAITING_PAYMENT', 'EXPIRED_UNPAID'].includes(atual.status)) return { atual, ativado: false }
@@ -296,6 +316,8 @@ export class AdsService implements OnModuleInit {
     })
 
     if (!ad.ativado) {
+      // Mesmo pagamento chegando de novo (webhook + consulta do app): já tratado.
+      if (ad.atual?.status === 'PAID' && ad.atual.paymentId === paymentId) return
       // Pagou um anúncio cancelado/recusado/já pago: o dinheiro entrou e alguém
       // precisa devolver. Fica no log de erro para o admin achar.
       this.logger.error(`PIX ${paymentId} pago para o anúncio ${adId} em estado ${ad.atual?.status ?? 'inexistente'} — ESTORNAR manualmente`)
@@ -326,9 +348,7 @@ export class AdsService implements OnModuleInit {
     })
     for (const ad of vencidos) {
       // Última conferida: pode ter pago e o webhook se perdido.
-      if (ad.payment && ad.payment.status !== 'PAID') {
-        if ((await this.payments.settleAdPayment(ad.payment.id, ad.id)) === 'PAID') continue
-      }
+      if (await this.jaFoiPago(ad)) continue
       const r = await this.prisma.ad.updateMany({
         where: { id: ad.id, status: 'AWAITING_PAYMENT' },
         data: { status: 'EXPIRED_UNPAID' },
@@ -427,8 +447,9 @@ export class AdsService implements OnModuleInit {
         return { linkType, linkTarget: null }
       case 'STORE': {
         // Só a própria loja: ninguém compra anúncio apontando para o concorrente.
-        const store = await this.prisma.store.findFirst({ where: { userId }, select: { id: true } })
-        if (!store) throw new BadRequestException('Você não tem loja no Tá Barato. Escolha outro destino para o anúncio.')
+        // E aprovada: loja em análise/suspensa não abre para o cliente.
+        const store = await this.prisma.store.findFirst({ where: { userId, status: 'APPROVED' }, select: { id: true } })
+        if (!store) throw new BadRequestException('Sua loja ainda não está aprovada no Tá Barato. Escolha outro destino para o anúncio.')
         return { linkType, linkTarget: store.id }
       }
       case 'WHATSAPP': {

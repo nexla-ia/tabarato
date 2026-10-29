@@ -26,8 +26,9 @@ export class UpdatePricingDto {
   @IsOptional() @IsNumber() @Min(0) @Max(1_000_000)
   maxDeliveryValue?: number
 
-  // Anúncios pagos na vitrine.
-  @IsOptional() @IsNumber() @Min(0) @Max(10_000)
+  // Anúncios pagos na vitrine. Mínimo R$ 1/dia: valor zero não gera PIX e o
+  // anúncio ficaria preso em "aguardando pagamento".
+  @IsOptional() @IsNumber() @Min(1) @Max(10_000)
   adPricePerDay?: number
 
   @IsOptional() @IsInt() @Min(1) @Max(90)

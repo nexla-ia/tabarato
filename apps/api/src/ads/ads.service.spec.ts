@@ -6,7 +6,7 @@ const ARTE = `${SUPA}/storage/v1/object/public/product-images/arte.png`
 
 function makeService(over: any = {}) {
   const tx = {
-    $executeRaw: jest.fn().mockResolvedValue(1),
+    $executeRawUnsafe: jest.fn().mockResolvedValue(1),
     ad: {
       findUnique: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
@@ -61,9 +61,10 @@ describe('AdsService.create', () => {
     await expect(svc.create('u1', pedido({ imageUrl: 'https://evil.com/a.png' }))).rejects.toBeInstanceOf(BadRequestException)
   })
 
-  it('link para loja só se a pessoa tiver loja', async () => {
-    const { svc } = makeService()
-    await expect(svc.create('u1', pedido({ linkType: 'STORE' }))).rejects.toThrow(/não tem loja/)
+  it('link para loja só se a pessoa tiver loja aprovada', async () => {
+    const { svc, prisma } = makeService()
+    await expect(svc.create('u1', pedido({ linkType: 'STORE' }))).rejects.toThrow(/não está aprovada/)
+    expect(prisma.store.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'u1', status: 'APPROVED' } }))
   })
 
   it('WhatsApp e link exigem formato válido', async () => {
@@ -82,7 +83,7 @@ describe('AdsService.ativarPago', () => {
     expect(data.status).toBe('PAID')
     expect(data.endsAt.getTime() - data.startsAt.getTime()).toBe(7 * 24 * 3600 * 1000)
     expect(data.liveNotified).toBe(true)
-    expect(tx.$executeRaw).toHaveBeenCalled() // trava de agenda
+    expect(tx.$executeRawUnsafe).toHaveBeenCalled() // trava de agenda
   })
 
   it('vitrine lotada: agenda para quando abrir vaga e não marca "no ar"', async () => {
@@ -137,5 +138,46 @@ describe('AdsService.approve / pay', () => {
     const { svc, prisma } = makeService()
     prisma.ad.findUnique.mockResolvedValue({ id: 'a1', userId: 'outro', status: 'AWAITING_PAYMENT' })
     await expect(svc.pay('u1', 'a1')).rejects.toThrow(/Acesso negado/)
+  })
+})
+
+describe('AdsService — PIX pago sem o anúncio ativar', () => {
+  const aguardando = (payment: any) => ({
+    id: 'a1', userId: 'u1', status: 'AWAITING_PAYMENT', days: 7, totalPrice: 70, pricePerDay: 10,
+    payDeadline: new Date(Date.now() + 86400000), payment,
+  })
+
+  it('não deixa cancelar quem já pagou (webhook atrasado)', async () => {
+    const { svc, prisma, payments } = makeService()
+    prisma.ad.findUnique.mockResolvedValue(aguardando({ id: 'p1', status: 'PENDING' }))
+    payments.settleAdPayment.mockResolvedValue('PAID')
+    await expect(svc.cancel('u1', 'a1')).rejects.toThrow(/já foi pago/)
+    expect(prisma.ad.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('pagamento PAID com ativação interrompida: não gera outro PIX, ativa o anúncio', async () => {
+    const { svc, prisma, payments, tx } = makeService()
+    prisma.ad.findUnique.mockResolvedValue(aguardando({ id: 'p1', status: 'PAID' }))
+    tx.ad.findUnique.mockResolvedValue({ id: 'a1', userId: 'u1', status: 'AWAITING_PAYMENT', days: 7 })
+    await svc.pay('u1', 'a1')
+    expect(payments.createAdPix).not.toHaveBeenCalled()
+    expect(tx.ad.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'PAID', paymentId: 'p1' }) }))
+  })
+
+  it('PIX marcado FAILED pelo cron mas pago no limite: a consulta do app confirma', async () => {
+    const { svc, prisma, payments } = makeService()
+    prisma.ad.findUnique.mockResolvedValue(aguardando({ id: 'p1', status: 'FAILED' }))
+    payments.settleAdPayment.mockResolvedValue('PAID')
+    await svc.getMine('u1', 'a1')
+    expect(payments.settleAdPayment).toHaveBeenCalledWith('p1', 'a1')
+  })
+
+  it('mesmo pagamento chegando duas vezes não vira alerta de estorno', async () => {
+    const { svc, tx, notifications } = makeService()
+    const erro = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {})
+    tx.ad.findUnique.mockResolvedValue({ id: 'a1', userId: 'u1', status: 'PAID', paymentId: 'p1', days: 7 })
+    await svc.ativarPago('a1', 'p1')
+    expect(erro).not.toHaveBeenCalled()
+    expect(notifications.create).not.toHaveBeenCalled()
   })
 })

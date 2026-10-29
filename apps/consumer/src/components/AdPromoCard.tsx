@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { router } from 'expo-router'
+import { useCallback } from 'react'
+import { router, useFocusEffect } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { colors } from '../theme/colors'
@@ -12,12 +13,15 @@ import { AdConfig, MyAd, brl, ctr, dataCurta } from '../utils/ads'
  * aprovado mostra que falta pagar; sem anúncio, convida a anunciar.
  */
 export function AdPromoCard() {
-  const { data: ads } = useQuery<MyAd[]>({
+  const { data: ads, refetch } = useQuery<MyAd[]>({
     queryKey: ['ads', 'mine'],
     queryFn: async () => (await api.get('/ads/mine')).data,
     staleTime: 60_000,
     retry: 1,
   })
+  // O painel fica montado nas abas: ao voltar de "Meus anúncios" (pagou, cancelou),
+  // o card tem que refletir na hora.
+  useFocusEffect(useCallback(() => { refetch() }, [refetch]))
   const { data: config } = useQuery<AdConfig>({
     queryKey: ['ads', 'config'],
     queryFn: async () => (await api.get('/ads/config')).data,
