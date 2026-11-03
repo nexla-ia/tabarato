@@ -7,8 +7,8 @@ export default function Index() {
   const { user, isLoading } = useAuthStore()
 
   if (isLoading) return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.primary }}>
-      <ActivityIndicator color="#fff" size="large" />
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+      <ActivityIndicator color={colors.primary} size="large" />
     </View>
   )
 
