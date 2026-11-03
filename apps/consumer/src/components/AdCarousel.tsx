@@ -83,6 +83,23 @@ export function AdCarousel() {
 
   if (slides.length === 0) return null
 
+  // Sem anúncio pago no ar, o convite vira uma faixa fina em vez de banner 3:1 —
+  // sozinho ele tomava o topo da home (reclamação do cliente na versão web).
+  if (slides.length === 1 && slides[0].kind === 'house') {
+    return (
+      <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/anunciar' as any)} style={s.faixa}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.casaKicker}>SUA EMPRESA AQUI</Text>
+          <Text style={s.faixaTitulo} numberOfLines={1}>Apareça na tela inicial do app</Text>
+        </View>
+        <View style={s.casaBtn}>
+          <Text style={s.casaBtnTxt}>Anunciar</Text>
+          <Ionicons name="arrow-forward" size={14} color={colors.primary} />
+        </View>
+      </TouchableOpacity>
+    )
+  }
+
   function aoRolar(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const i = Math.round(e.nativeEvent.contentOffset.x / (SLIDE_W + 10))
     if (i !== atual && i >= 0 && i < slides.length) setAtual(i)
@@ -173,6 +190,14 @@ const s = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8,
   },
   casaBtnTxt: { color: colors.primary, fontSize: 12.5, fontWeight: '900' },
+
+  faixa: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: H_PAD, marginTop: 14, marginBottom: 2,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14,
+    backgroundColor: colors.primary,
+  },
+  faixaTitulo: { color: '#fff', fontSize: 14, fontWeight: '900' },
 
   pontos: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 8 },
   ponto: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#E8D9CE' },

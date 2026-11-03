@@ -65,6 +65,21 @@ export function AdCarousel() {
   }, [slides.length])
 
   if (slides.length === 0) return null
+
+  // Sem nenhum anúncio pago, o convite vira uma faixa fina: no formato 3:1 ele
+  // ocupava a primeira dobra inteira da home (reclamação do cliente).
+  if (slides.length === 1 && slides[0].kind === 'house') {
+    return (
+      <Link href="/anunciar" className={styles.faixa}>
+        <span className={styles.faixaTexto}>
+          <span className={styles.casaKicker}>Sua empresa aqui</span>
+          <span className={styles.faixaTitulo}>Apareça para toda Vilhena na tela inicial do Tá Barato</span>
+        </span>
+        <span className={styles.casaBtn}>Anunciar <ArrowRight size={15} /></span>
+      </Link>
+    )
+  }
+
   const i = Math.min(atual, slides.length - 1)
 
   function clicar(ad: LiveAd) {

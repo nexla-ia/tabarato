@@ -1,4 +1,25 @@
-.wrap { margin: 20px auto 4px; max-width: 960px; }
+/* 760px de largura = 253px de altura em 3:1: cabe na primeira dobra de um
+   notebook 1366×768 sem empurrar as lojas e os produtos para fora da tela. */
+.wrap { margin: 20px auto 4px; max-width: 760px; }
+
+/* Convite sozinho (nenhum anúncio pago no ar): faixa fina em vez de banner. */
+.faixa {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  max-width: 760px; margin: 20px auto 4px; padding: 14px 20px;
+  border-radius: 14px;
+  background: linear-gradient(120deg, var(--orange) 0%, var(--orange-2) 100%);
+  color: #fff; box-shadow: var(--shadow-sm);
+}
+.faixa:focus-visible { outline: 3px solid var(--orange-dark); outline-offset: 2px; }
+.faixaTexto { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.faixaTitulo { font-family: var(--display); font-weight: 800; font-size: 16px; line-height: 1.25; }
+.faixa .casaBtn { padding: 8px 14px; font-size: 13px; }
+
+@media (max-width: 560px) {
+  .faixa { padding: 12px 14px; }
+  .faixaTitulo { font-size: 14px; }
+}
 
 .janela {
   position: relative;
