@@ -21,11 +21,10 @@ const GIRO_MS = 5000
 // Uma exibição por anúncio por visita — voltar o carrossel não infla a métrica.
 const exibidos = new Set<string>()
 
+// Anúncio só leva para a loja do anunciante dentro do Tá Barato — nunca para
+// fora (WhatsApp, site), por decisão do cliente.
 function hrefDo(ad: LiveAd): string | null {
-  if (ad.linkType === 'STORE' && ad.linkTarget) return `/store/${ad.linkTarget}`
-  if (ad.linkType === 'WHATSAPP' && ad.linkTarget) return `https://wa.me/${ad.linkTarget}`
-  if (ad.linkType === 'URL' && ad.linkTarget) return ad.linkTarget
-  return null
+  return ad.linkType === 'STORE' && ad.linkTarget ? `/store/${ad.linkTarget}` : null
 }
 
 /**
@@ -85,9 +84,7 @@ export function AdCarousel() {
   function clicar(ad: LiveAd) {
     api.post(`/ads/${ad.id}/click`).catch(() => {})
     const href = hrefDo(ad)
-    if (!href) return
-    if (href.startsWith('/')) router.push(href)
-    else window.open(href, '_blank', 'noopener,noreferrer')
+    if (href) router.push(href)
   }
 
   return (
@@ -107,7 +104,7 @@ export function AdCarousel() {
                 type="button"
                 className={styles.slide}
                 onClick={() => clicar(s.ad)}
-                disabled={s.ad.linkType === 'NONE'}
+                disabled={!hrefDo(s.ad)}
                 aria-hidden={idx !== i}
                 tabIndex={idx === i ? 0 : -1}
                 aria-label={`Anúncio de ${s.ad.companyName}`}

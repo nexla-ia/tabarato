@@ -2,13 +2,12 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ImagePlus, Store, MessageCircle, Globe, Eye, Clock, QrCode, Rocket, Minus, Plus, Loader2, RefreshCw } from 'lucide-react'
+import { ImagePlus, Store, Eye, Clock, QrCode, Rocket, Minus, Plus, Loader2, RefreshCw } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { LoadError } from '@/components/LoadError'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
-import { formatPhone } from '@/lib/masks'
-import { AdConfig, AdLinkType, MyAd, brl, dataCurta } from '@/lib/ads'
+import { AdConfig, MyAd, brl, dataCurta } from '@/lib/ads'
 import styles from './anunciar.module.css'
 
 function mascaraDocumento(v: string) {
@@ -45,8 +44,6 @@ function Anunciar() {
   const [enviandoArte, setEnviandoArte] = useState(false)
   const [erroArte, setErroArte] = useState('')
   const [dias, setDias] = useState(7)
-  const [destino, setDestino] = useState<AdLinkType>('WHATSAPP')
-  const [alvo, setAlvo] = useState('')
   const [empresa, setEmpresa] = useState('')
   const [documento, setDocumento] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -60,13 +57,11 @@ function Anunciar() {
   }
   useEffect(() => { carregar() }, [])
 
-  useEffect(() => { if (temLoja) setDestino('STORE') }, [temLoja])
-
   useEffect(() => {
     if (ready && !user) router.push(`/login?redirect=${encodeURIComponent(de ? `/anunciar?de=${de}` : '/anunciar')}`)
   }, [ready, user, router, de])
 
-  // "Anunciar de novo": reaproveita arte, destino e dados do anúncio anterior.
+  // "Anunciar de novo": reaproveita arte e dados do anúncio anterior.
   useEffect(() => {
     if (!de || !user) return
     api.get<MyAd>(`/ads/mine/${de}`).then(({ data: a }) => {
@@ -74,8 +69,6 @@ function Anunciar() {
       setEmpresa(a.companyName)
       setDocumento(mascaraDocumento(a.document))
       setDias(a.days)
-      setDestino(a.linkType === 'STORE' && !temLoja ? 'NONE' : a.linkType)
-      setAlvo(a.linkType === 'WHATSAPP' && a.linkTarget ? formatPhone(a.linkTarget.replace(/^55/, '')) : a.linkTarget ?? '')
     }).catch(() => {})
   }, [de, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -102,12 +95,11 @@ function Anunciar() {
 
   const faltando = useMemo(() => {
     if (!arte) return 'Escolha a arte do anúncio'
-    if ((destino === 'WHATSAPP' || destino === 'URL') && !alvo.trim()) return destino === 'WHATSAPP' ? 'Informe o WhatsApp' : 'Informe o link'
     if (empresa.trim().length < 2) return 'Informe o nome da empresa'
     const d = documento.replace(/\D/g, '')
     if (d.length !== 11 && d.length !== 14) return 'Informe o CPF ou CNPJ'
     return null
-  }, [arte, destino, alvo, empresa, documento])
+  }, [arte, empresa, documento])
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
@@ -120,8 +112,6 @@ function Anunciar() {
         document: documento,
         imageUrl: arte.url,
         days: dias,
-        linkType: destino,
-        linkTarget: destino === 'URL' || destino === 'WHATSAPP' ? alvo.trim() : undefined,
       })
       router.push('/meus-anuncios?enviado=1')
     } catch (err: any) {
@@ -137,12 +127,6 @@ function Anunciar() {
   }
 
   const preenche = arte ? arte.proporcao >= 2.2 && arte.proporcao <= 4 : true
-  const destinos: [AdLinkType, React.ReactNode, string][] = [
-    ...(temLoja ? [['STORE', <Store key="s" size={16} />, 'Minha loja'] as [AdLinkType, React.ReactNode, string]] : []),
-    ['WHATSAPP', <MessageCircle key="w" size={16} />, 'WhatsApp'],
-    ['URL', <Globe key="u" size={16} />, 'Site'],
-    ['NONE', <Eye key="n" size={16} />, 'Só exibir'],
-  ]
 
   return (
     <div className={`container ${styles.pagina}`}>
@@ -192,30 +176,14 @@ function Anunciar() {
               )}
               {erroArte && <p className={styles.erro}>{erroArte}</p>}
               <p className={styles.dica}>Pouco texto e letra grande: no celular o card aparece pequeno. Imagem quadrada também serve — ela vai inteira no meio.</p>
+              {/* O anúncio nunca leva para fora do app: só para a loja do anunciante. */}
+              <p className={styles.destino}>
+                {temLoja
+                  ? <><Store size={15} /> Quem clicar no anúncio vai direto para a sua loja no Tá Barato.</>
+                  : <><Eye size={15} /> Anúncio de exibição: mostra sua marca na vitrine, sem link.</>}
+              </p>
             </section>
 
-            <section className={styles.bloco}>
-              <h2 className={styles.rotulo}>Quem clicar no anúncio vai para</h2>
-              <div className={styles.opcoes} role="radiogroup" aria-label="Destino do anúncio">
-                {destinos.map(([v, icone, label]) => (
-                  <button
-                    key={v} type="button" role="radio" aria-checked={destino === v}
-                    className={`${styles.opcao} ${destino === v ? styles.opcaoOn : ''}`}
-                    onClick={() => { setDestino(v); setAlvo('') }}
-                  >
-                    {icone} {label}
-                  </button>
-                ))}
-              </div>
-              {destino === 'WHATSAPP' && (
-                <input id="ad-whatsapp" className={styles.input} placeholder="(69) 99999-9999" inputMode="tel"
-                  value={alvo} onChange={(e) => setAlvo(formatPhone(e.target.value))} aria-label="WhatsApp" />
-              )}
-              {destino === 'URL' && (
-                <input id="ad-url" className={styles.input} placeholder="https://seusite.com.br" inputMode="url"
-                  value={alvo} onChange={(e) => setAlvo(e.target.value)} aria-label="Link do site" />
-              )}
-            </section>
 
             <section className={styles.bloco}>
               <h2 className={styles.rotulo}>Dados para a nota fiscal</h2>

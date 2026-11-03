@@ -61,16 +61,21 @@ describe('AdsService.create', () => {
     await expect(svc.create('u1', pedido({ imageUrl: 'https://evil.com/a.png' }))).rejects.toBeInstanceOf(BadRequestException)
   })
 
-  it('link para loja só se a pessoa tiver loja aprovada', async () => {
+  it('anúncio leva para a loja aprovada do anunciante e nunca para fora do app', async () => {
     const { svc, prisma } = makeService()
-    await expect(svc.create('u1', pedido({ linkType: 'STORE' }))).rejects.toThrow(/não está aprovada/)
+    ;(svc as any).prepararArte = jest.fn().mockResolvedValue(ARTE)
+    prisma.store.findFirst.mockResolvedValue({ id: 'loja1' })
+    // Mesmo que um app antigo mande WhatsApp, o destino é decidido no servidor.
+    await svc.create('u1', pedido({ linkType: 'WHATSAPP', linkTarget: '69999999999' }))
     expect(prisma.store.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'u1', status: 'APPROVED' } }))
+    expect(prisma.ad.create.mock.calls[0][0].data).toMatchObject({ linkType: 'STORE', linkTarget: 'loja1' })
   })
 
-  it('WhatsApp e link exigem formato válido', async () => {
-    const { svc } = makeService()
-    await expect(svc.create('u1', pedido({ linkType: 'WHATSAPP', linkTarget: '1234' }))).rejects.toThrow(/WhatsApp/)
-    await expect(svc.create('u1', pedido({ linkType: 'URL', linkTarget: 'http://site.com' }))).rejects.toThrow(/https/)
+  it('sem loja aprovada, o anúncio é só de exibição', async () => {
+    const { svc, prisma } = makeService()
+    ;(svc as any).prepararArte = jest.fn().mockResolvedValue(ARTE)
+    await svc.create('u1', pedido())
+    expect(prisma.ad.create.mock.calls[0][0].data).toMatchObject({ linkType: 'NONE', linkTarget: null })
   })
 })
 

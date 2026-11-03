@@ -102,7 +102,7 @@ export class AdsService implements OnModuleInit {
     if (!(document.length === 11 ? isValidCpf(document) : isValidCnpj(document))) {
       throw new BadRequestException('CPF ou CNPJ inválido. Ele vai na nota fiscal do anúncio.')
     }
-    const { linkType, linkTarget } = await this.validarLink(userId, dto.linkType ?? 'NONE', dto.linkTarget)
+    const { linkType, linkTarget } = await this.destinoDoAnuncio(userId)
     const imageUrl = await this.prepararArte(dto.imageUrl)
 
     const ad = await this.prisma.ad.create({
@@ -440,34 +440,19 @@ export class AdsService implements OnModuleInit {
     }
   }
 
-  private async validarLink(userId: string, linkType: CreateAdDto['linkType'] & string, alvo?: string) {
-    const t = (alvo ?? '').trim()
-    switch (linkType) {
-      case 'NONE':
-        return { linkType, linkTarget: null }
-      case 'STORE': {
-        // Só a própria loja: ninguém compra anúncio apontando para o concorrente.
-        // E aprovada: loja em análise/suspensa não abre para o cliente.
-        const store = await this.prisma.store.findFirst({ where: { userId, status: 'APPROVED' }, select: { id: true } })
-        if (!store) throw new BadRequestException('Sua loja ainda não está aprovada no Tá Barato. Escolha outro destino para o anúncio.')
-        return { linkType, linkTarget: store.id }
-      }
-      case 'WHATSAPP': {
-        let d = t.replace(/\D/g, '')
-        if (d.length === 10 || d.length === 11) d = `55${d}`
-        if (!/^55\d{10,11}$/.test(d)) throw new BadRequestException('WhatsApp inválido. Use DDD + número.')
-        return { linkType, linkTarget: d }
-      }
-      case 'URL': {
-        let url: URL
-        try { url = new URL(t) } catch { throw new BadRequestException('Link inválido. Comece com https://') }
-        if (url.protocol !== 'https:') throw new BadRequestException('O link precisa começar com https://')
-        return { linkType, linkTarget: url.toString() }
-      }
-      default:
-        throw new BadRequestException('Destino do anúncio inválido.')
-    }
+  /**
+   * Para onde o anúncio leva. Decisão do cliente: o anúncio NÃO pode tirar o
+   * usuário do app (WhatsApp, site) — só leva para a loja do anunciante dentro
+   * do Tá Barato. Quem não tem loja aprovada anuncia só para exibição.
+   * O servidor decide; o app não escolhe.
+   */
+  private async destinoDoAnuncio(userId: string) {
+    const store = await this.prisma.store.findFirst({ where: { userId, status: 'APPROVED' }, select: { id: true } })
+    return store
+      ? { linkType: 'STORE' as const, linkTarget: store.id }
+      : { linkType: 'NONE' as const, linkTarget: null }
   }
+
 
   /** Baixa a arte do NOSSO bucket, confere o formato e grava a versão 1200 × 400. */
   private async prepararArte(url: string): Promise<string> {

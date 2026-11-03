@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator'
+import { IsInt, IsString, Length, Max, Min } from 'class-validator'
 
 export class CreateAdDto {
   @IsString() @Length(2, 80)
@@ -15,11 +15,9 @@ export class CreateAdDto {
   @IsInt() @Min(1) @Max(90)
   days: number
 
-  @IsOptional() @IsIn(['NONE', 'STORE', 'WHATSAPP', 'URL'])
-  linkType?: 'NONE' | 'STORE' | 'WHATSAPP' | 'URL'
-
-  @IsOptional() @IsString() @Length(1, 300)
-  linkTarget?: string
+  // Sem destino escolhível: o servidor liga o anúncio à loja do anunciante (ou a
+  // nada). Versões antigas do app que mandem linkType/linkTarget têm o campo
+  // descartado pelo whitelist do ValidationPipe.
 }
 
 export class RejectAdDto {

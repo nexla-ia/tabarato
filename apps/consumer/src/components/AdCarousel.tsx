@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  View, Text, Image, TouchableOpacity, StyleSheet, FlatList, Dimensions, Linking,
+  View, Text, Image, TouchableOpacity, StyleSheet, FlatList, Dimensions,
   NativeScrollEvent, NativeSyntheticEvent,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
@@ -36,11 +36,14 @@ function registrarExibicao(id: string) {
   api.post(`/ads/${id}/view`).catch(() => {})
 }
 
+// Anúncio só leva para a loja do anunciante dentro do app — nunca para fora
+// (WhatsApp, site), por decisão do cliente.
+const temLink = (ad: LiveAd) => ad.linkType === 'STORE' && !!ad.linkTarget
+
 function abrir(ad: LiveAd) {
+  if (!temLink(ad)) return
   api.post(`/ads/${ad.id}/click`).catch(() => {})
-  if (ad.linkType === 'STORE' && ad.linkTarget) router.push(`/store/${ad.linkTarget}`)
-  else if (ad.linkType === 'WHATSAPP' && ad.linkTarget) Linking.openURL(`https://wa.me/${ad.linkTarget}`).catch(() => {})
-  else if (ad.linkType === 'URL' && ad.linkTarget) Linking.openURL(ad.linkTarget).catch(() => {})
+  router.push(`/store/${ad.linkTarget}`)
 }
 
 /**
@@ -122,9 +125,9 @@ export function AdCarousel() {
         renderItem={({ item }) =>
           item.kind === 'ad' ? (
             <TouchableOpacity
-              activeOpacity={item.ad.linkType === 'NONE' ? 1 : 0.9}
+              activeOpacity={temLink(item.ad) ? 0.9 : 1}
               onPress={() => abrir(item.ad)}
-              disabled={item.ad.linkType === 'NONE'}
+              disabled={!temLink(item.ad)}
               style={s.slide}
               accessibilityLabel={`Anúncio de ${item.ad.companyName}`}
             >

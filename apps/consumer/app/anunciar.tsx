@@ -13,8 +13,7 @@ import { colors } from '../src/theme/colors'
 import { useAuthStore } from '../src/stores/auth.store'
 import { useToast } from '../src/components/Toast'
 import { LoadError } from '../src/components/LoadError'
-import { formatPhoneBR } from '../src/utils/phone'
-import { AdConfig, AdLinkType, MyAd, brl, dataCurta } from '../src/utils/ads'
+import { AdConfig, MyAd, brl, dataCurta } from '../src/utils/ads'
 
 const TEXT = '#1A0A00'
 const MUTED = '#7A5C4A'
@@ -46,8 +45,6 @@ export default function AnunciarScreen() {
   const [arte, setArte] = useState<{ url: string; proporcao: number } | null>(null)
   const [enviandoArte, setEnviandoArte] = useState(false)
   const [dias, setDias] = useState(7)
-  const [destino, setDestino] = useState<AdLinkType>(temLoja ? 'STORE' : 'WHATSAPP')
-  const [alvo, setAlvo] = useState('')
   const [empresa, setEmpresa] = useState('')
   const [documento, setDocumento] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -60,7 +57,7 @@ export default function AnunciarScreen() {
   }
   useEffect(() => { carregar() }, [])
 
-  // Renovação: reaproveita arte, destino e dados do anúncio anterior.
+  // Renovação: reaproveita arte e dados do anúncio anterior.
   useEffect(() => {
     if (!de || !user) return
     api.get<MyAd>(`/ads/mine/${de}`).then(({ data: a }) => {
@@ -68,8 +65,6 @@ export default function AnunciarScreen() {
       setEmpresa(a.companyName)
       setDocumento(mascaraDocumento(a.document))
       setDias(a.days)
-      setDestino(a.linkType === 'STORE' && !temLoja ? 'NONE' : a.linkType)
-      setAlvo(a.linkType === 'WHATSAPP' && a.linkTarget ? formatPhoneBR(a.linkTarget.replace(/^55/, '')) : a.linkTarget ?? '')
     }).catch(() => {})
   }, [de, user?.id])
 
@@ -98,14 +93,11 @@ export default function AnunciarScreen() {
 
   const faltando = useMemo(() => {
     if (!arte) return 'Escolha a arte do anúncio'
-    if ((destino === 'WHATSAPP' || destino === 'URL') && !alvo.trim()) {
-      return destino === 'WHATSAPP' ? 'Informe o WhatsApp' : 'Informe o link'
-    }
     if (empresa.trim().length < 2) return 'Informe o nome da empresa'
     const d = documento.replace(/\D/g, '')
     if (d.length !== 11 && d.length !== 14) return 'Informe o CPF ou CNPJ'
     return null
-  }, [arte, destino, alvo, empresa, documento])
+  }, [arte, empresa, documento])
 
   async function enviar() {
     if (faltando || !arte || enviando) return
@@ -116,8 +108,6 @@ export default function AnunciarScreen() {
         document: documento,
         imageUrl: arte.url,
         days: dias,
-        linkType: destino,
-        linkTarget: destino === 'URL' ? alvo.trim() : destino === 'WHATSAPP' ? alvo : undefined,
       })
       toast('Recebemos seu anúncio! Avisamos assim que for aprovado.', 'success')
       router.replace('/meus-anuncios' as any)
@@ -183,6 +173,15 @@ export default function AnunciarScreen() {
           <Text style={s.dica}>
             Pouco texto e letra grande: o card aparece pequeno no celular. Imagem quadrada também serve — ela vai inteira no meio.
           </Text>
+          {/* O anúncio nunca leva para fora do app: só para a loja do anunciante. */}
+          <View style={s.destino}>
+            <Ionicons name={temLoja ? 'storefront-outline' : 'eye-outline'} size={15} color={colors.primary} />
+            <Text style={s.destinoTxt}>
+              {temLoja
+                ? 'Quem tocar no anúncio vai direto para a sua loja no Tá Barato.'
+                : 'Anúncio de exibição: mostra sua marca na vitrine, sem link.'}
+            </Text>
+          </View>
 
           {/* Dias */}
           <Text style={s.rotulo}>QUANTOS DIAS</Text>
@@ -219,34 +218,6 @@ export default function AnunciarScreen() {
               <Text style={s.contaTotal}>{brl(total)}</Text>
             </View>
           </View>
-
-          {/* Destino */}
-          <Text style={s.rotulo}>QUEM TOCAR NO ANÚNCIO VAI PARA</Text>
-          <View style={s.opcoes}>
-            {([
-              ...(temLoja ? [['STORE', 'storefront-outline', 'Minha loja']] : []),
-              ['WHATSAPP', 'logo-whatsapp', 'WhatsApp'],
-              ['URL', 'globe-outline', 'Site'],
-              ['NONE', 'eye-outline', 'Só exibir'],
-            ] as [AdLinkType, any, string][]).map(([v, icone, label]) => (
-              <TouchableOpacity key={v} style={[s.opcao, destino === v && s.opcaoOn]} onPress={() => { setDestino(v); setAlvo('') }}>
-                <Ionicons name={icone} size={16} color={destino === v ? '#fff' : MUTED} />
-                <Text style={[s.opcaoTxt, destino === v && s.opcaoTxtOn]}>{label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {destino === 'WHATSAPP' && (
-            <TextInput
-              style={s.input} placeholder="(69) 99999-9999" placeholderTextColor="#BBA898"
-              keyboardType="phone-pad" value={alvo} onChangeText={(t) => setAlvo(formatPhoneBR(t))}
-            />
-          )}
-          {destino === 'URL' && (
-            <TextInput
-              style={s.input} placeholder="https://seusite.com.br" placeholderTextColor="#BBA898"
-              autoCapitalize="none" keyboardType="url" value={alvo} onChangeText={setAlvo}
-            />
-          )}
 
           {/* Nota fiscal */}
           <Text style={s.rotulo}>DADOS PARA A NOTA FISCAL</Text>
@@ -384,15 +355,11 @@ const s = StyleSheet.create({
   contaTxt: { fontSize: 13, color: MUTED, fontWeight: '600' },
   contaTotal: { fontSize: 18, fontWeight: '900', color: colors.primary },
 
-  opcoes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  opcao: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12,
-    backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER,
+  destino: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
+    backgroundColor: colors.primaryLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9,
   },
-  opcaoOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  opcaoTxt: { fontSize: 13, fontWeight: '700', color: MUTED },
-  opcaoTxtOn: { color: '#fff' },
+  destinoTxt: { flex: 1, fontSize: 12.5, fontWeight: '600', color: TEXT, lineHeight: 17 },
   input: {
     backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: TEXT, marginTop: 10,
