@@ -90,6 +90,7 @@ export default function CourierProfileScreen() {
       title: '',
       items: [
         { icon: 'log-out-outline', label: 'Sair da conta', onPress: handleLogout, danger: true },
+        { icon: 'trash-outline', label: 'Excluir conta', onPress: () => router.push('/excluir-conta' as any), danger: true },
       ],
     },
   ]

@@ -53,6 +53,7 @@ export default function RootLayout() {
         <Stack.Screen name="chat" options={{ headerShown: false }} />
         <Stack.Screen name="anunciar" options={{ headerShown: false }} />
         <Stack.Screen name="meus-anuncios" options={{ headerShown: false }} />
+        <Stack.Screen name="excluir-conta" options={{ headerShown: false }} />
       </Stack>
       </ToastProvider>
     </QueryClientProvider>

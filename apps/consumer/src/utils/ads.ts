@@ -1,3 +1,5 @@
+import { Platform } from 'react-native'
+
 // Tipos e textos dos anúncios, compartilhados entre Anunciar, Meus anúncios e o
 // card do painel da loja.
 
@@ -37,6 +39,16 @@ export interface AdConfig {
   payDeadlineDays: number
   nextStart: string
 }
+
+/**
+ * Compra de anúncio dentro do app só no Android. Na App Store, vender espaço de
+ * anúncio exibido no próprio app conta como "funcionalidade digital" e a Apple
+ * exige a compra dela (In-App Purchase, com taxa de 15–30%) — foi o que fez a Meta
+ * passar a cobrar o impulsionamento pelo iPhone com IAP. No iOS o anúncio só é
+ * EXIBIDO; quem anuncia compra pelo Android ou pelo site. Sem botão nem texto
+ * mandando para fora: isso também é vetado pela Apple.
+ */
+export const VENDE_ANUNCIO_NO_APP = Platform.OS !== 'ios'
 
 export const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 

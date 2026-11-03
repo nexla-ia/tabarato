@@ -7,6 +7,7 @@ import { api } from '../../src/api/client'
 import { colors } from '../../src/theme/colors'
 import { useTheme } from '../../src/theme/theme'
 import { useToast } from '../../src/components/Toast'
+import { VENDE_ANUNCIO_NO_APP } from '../../src/utils/ads'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -175,13 +176,13 @@ export default function ProfileScreen() {
         { icon: 'shield-checkmark-outline', label: 'Segurança', desc: 'Alterar sua senha', onPress: () => router.push('/change-password' as any) },
       ],
     },
-    {
+    ...(!VENDE_ANUNCIO_NO_APP ? [] : [{
       title: 'Para empresas',
       items: [
         { icon: 'megaphone-outline', label: 'Anunciar na vitrine', desc: 'Sua empresa no topo da tela inicial', onPress: () => router.push('/anunciar' as any) },
         { icon: 'albums-outline', label: 'Meus anúncios', desc: 'Aprovação, pagamento e resultados', onPress: () => router.push('/meus-anuncios' as any) },
-      ],
-    },
+      ] as MenuItem[],
+    }]),
     {
       title: 'Suporte',
       items: [
@@ -192,6 +193,7 @@ export default function ProfileScreen() {
       title: '',
       items: [
         { icon: 'log-out-outline', label: 'Sair da conta', onPress: handleLogout, danger: true },
+        { icon: 'trash-outline', label: 'Excluir conta', desc: 'Apaga seus dados do Tá Barato', onPress: () => router.push('/excluir-conta' as any), danger: true },
       ],
     },
   ]

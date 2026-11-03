@@ -209,9 +209,13 @@ export class AdminService {
 
     const alvo = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, role: true, isActive: true },
+      select: { id: true, role: true, isActive: true, deletedAt: true },
     })
     if (!alvo) throw new NotFoundException('Usuário não encontrado.')
+    // Conta excluída pelo dono foi anonimizada: reativar daria uma conta sem dono.
+    if (isActive && alvo.deletedAt) {
+      throw new BadRequestException('Esta conta foi excluída pelo próprio usuário e não pode ser reativada.')
+    }
 
     if (!isActive && alvo.role === 'ADMIN') {
       const outrosAdmins = await this.prisma.user.count({

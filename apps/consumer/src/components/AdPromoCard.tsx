@@ -5,7 +5,7 @@ import { router, useFocusEffect } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { colors } from '../theme/colors'
-import { AdConfig, MyAd, brl, ctr, dataCurta } from '../utils/ads'
+import { AdConfig, MyAd, VENDE_ANUNCIO_NO_APP, brl, ctr, dataCurta } from '../utils/ads'
 
 /**
  * Janela de anúncio no painel do lojista (pedido do Ricardo, ao lado de
@@ -13,6 +13,12 @@ import { AdConfig, MyAd, brl, ctr, dataCurta } from '../utils/ads'
  * aprovado mostra que falta pagar; sem anúncio, convida a anunciar.
  */
 export function AdPromoCard() {
+  // No iPhone a compra de anúncio não existe no app (ver VENDE_ANUNCIO_NO_APP).
+  if (!VENDE_ANUNCIO_NO_APP) return null
+  return <AdPromoCardConteudo />
+}
+
+function AdPromoCardConteudo() {
   const { data: ads, refetch } = useQuery<MyAd[]>({
     queryKey: ['ads', 'mine'],
     queryFn: async () => (await api.get('/ads/mine')).data,

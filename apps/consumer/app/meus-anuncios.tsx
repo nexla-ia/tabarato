@@ -11,7 +11,7 @@ import { api } from '../src/api/client'
 import { colors } from '../src/theme/colors'
 import { useToast } from '../src/components/Toast'
 import { LoadError } from '../src/components/LoadError'
-import { MyAd, brl, ctr, dataCurta, faseDoAnuncio } from '../src/utils/ads'
+import { MyAd, VENDE_ANUNCIO_NO_APP, brl, ctr, dataCurta, faseDoAnuncio } from '../src/utils/ads'
 
 const TEXT = '#1A0A00'
 const MUTED = '#7A5C4A'
@@ -47,9 +47,11 @@ export default function MeusAnunciosScreen() {
           <Ionicons name="arrow-back" size={22} color={TEXT} />
         </TouchableOpacity>
         <Text style={s.titulo}>Meus anúncios</Text>
-        <TouchableOpacity onPress={() => router.push('/anunciar' as any)} style={s.icone}>
-          <Ionicons name="add" size={26} color={colors.primary} />
-        </TouchableOpacity>
+        {VENDE_ANUNCIO_NO_APP ? (
+          <TouchableOpacity onPress={() => router.push('/anunciar' as any)} style={s.icone}>
+            <Ionicons name="add" size={26} color={colors.primary} />
+          </TouchableOpacity>
+        ) : <View style={{ width: 38 }} />}
       </View>
 
       {erro ? (
@@ -60,10 +62,14 @@ export default function MeusAnunciosScreen() {
         <View style={s.vazio}>
           <View style={s.vazioIcone}><Ionicons name="megaphone" size={30} color={colors.primary} /></View>
           <Text style={s.vazioTitulo}>Nenhum anúncio ainda</Text>
-          <Text style={s.vazioTexto}>Coloque sua empresa no topo da tela inicial do Tá Barato. Você só paga depois que aprovarmos a arte.</Text>
-          <TouchableOpacity style={s.cta} onPress={() => router.push('/anunciar' as any)} activeOpacity={0.85}>
-            <Text style={s.ctaTxt}>Criar meu anúncio</Text>
-          </TouchableOpacity>
+          {VENDE_ANUNCIO_NO_APP && (
+            <>
+              <Text style={s.vazioTexto}>Coloque sua empresa no topo da tela inicial do Tá Barato. Você só paga depois que aprovarmos a arte.</Text>
+              <TouchableOpacity style={s.cta} onPress={() => router.push('/anunciar' as any)} activeOpacity={0.85}>
+                <Text style={s.ctaTxt}>Criar meu anúncio</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       ) : (
         <ScrollView
@@ -120,8 +126,9 @@ function CartaoAnuncio({ ad, onPagar, onMudou }: { ad: MyAd; onPagar: () => void
         )}
         {ad.status === 'AWAITING_PAYMENT' && (
           <Text style={s.texto}>
-            Pague até <Text style={s.forte}>{ad.payDeadline ? dataCurta(ad.payDeadline) : '—'}</Text>.
-            {' '}Depois do PIX, o anúncio entra no ar sozinho.
+            {VENDE_ANUNCIO_NO_APP ? 'Pague até ' : 'Aguardando pagamento até '}
+            <Text style={s.forte}>{ad.payDeadline ? dataCurta(ad.payDeadline) : '—'}</Text>.
+            {VENDE_ANUNCIO_NO_APP ? ' Depois do PIX, o anúncio entra no ar sozinho.' : ''}
           </Text>
         )}
         {ad.status === 'REJECTED' && (
@@ -150,7 +157,7 @@ function CartaoAnuncio({ ad, onPagar, onMudou }: { ad: MyAd; onPagar: () => void
         )}
 
         <View style={s.acoes}>
-          {ad.status === 'AWAITING_PAYMENT' && (
+          {ad.status === 'AWAITING_PAYMENT' && VENDE_ANUNCIO_NO_APP && (
             <TouchableOpacity style={[s.cta, { flex: 1 }]} onPress={onPagar} activeOpacity={0.85}>
               <Ionicons name="qr-code" size={16} color="#fff" />
               <Text style={s.ctaTxt}>Pagar com PIX</Text>
@@ -161,7 +168,7 @@ function CartaoAnuncio({ ad, onPagar, onMudou }: { ad: MyAd; onPagar: () => void
               <Text style={s.secundarioTxt}>Cancelar</Text>
             </TouchableOpacity>
           )}
-          {(ad.status === 'REJECTED' || ad.status === 'EXPIRED_UNPAID' || terminou || (ad.status === 'PAID' && ad.live)) && (
+          {VENDE_ANUNCIO_NO_APP && (ad.status === 'REJECTED' || ad.status === 'EXPIRED_UNPAID' || terminou || (ad.status === 'PAID' && ad.live)) && (
             <TouchableOpacity
               style={[s.secundario, { flex: 1 }]}
               onPress={() => router.push({ pathname: '/anunciar', params: { de: ad.id } } as any)}

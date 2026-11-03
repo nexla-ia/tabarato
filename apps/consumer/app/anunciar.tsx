@@ -13,7 +13,7 @@ import { colors } from '../src/theme/colors'
 import { useAuthStore } from '../src/stores/auth.store'
 import { useToast } from '../src/components/Toast'
 import { LoadError } from '../src/components/LoadError'
-import { AdConfig, MyAd, brl, dataCurta } from '../src/utils/ads'
+import { AdConfig, MyAd, VENDE_ANUNCIO_NO_APP, brl, dataCurta } from '../src/utils/ads'
 
 const TEXT = '#1A0A00'
 const MUTED = '#7A5C4A'
@@ -67,6 +67,9 @@ export default function AnunciarScreen() {
       setDias(a.days)
     }).catch(() => {})
   }, [de, user?.id])
+
+  // Link direto/notificação antiga no iPhone: a tela não existe lá.
+  useEffect(() => { if (!VENDE_ANUNCIO_NO_APP) router.replace('/meus-anuncios' as any) }, [])
 
   const total = config ? Math.round(config.pricePerDay * dias * 100) / 100 : 0
   const vitrineCheia = config ? new Date(config.nextStart).getTime() - Date.now() > 60 * 60 * 1000 : false

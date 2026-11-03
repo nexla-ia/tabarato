@@ -368,6 +368,9 @@ export default function ProfilePage() {
               <button className={styles.logoutBtn} onClick={handleLogout}>
                 Sair da conta
               </button>
+              <Link href="/excluir-conta" style={{ display: 'block', textAlign: 'center', marginTop: 12, fontSize: 13.5, fontWeight: 700, color: 'var(--muted)', textDecoration: 'underline' }}>
+                Excluir conta
+              </Link>
             </div>
 
           </div>

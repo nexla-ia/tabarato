@@ -4,6 +4,7 @@ import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
 import { GoogleAuthDto } from './dto/google-auth.dto'
+import { AppleAuthDto } from './dto/apple-auth.dto'
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto'
 import { RefreshTokenDto } from './dto/refresh-token.dto'
 
@@ -29,6 +30,13 @@ export class AuthController {
   @Post('google')
   google(@Body() dto: GoogleAuthDto) {
     return this.auth.authGoogle(dto.idToken, dto.referralCode)
+  }
+
+  // Login social — Apple (obrigatório no iOS junto com o Google).
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @Post('apple')
+  apple(@Body() dto: AppleAuthDto) {
+    return this.auth.authApple(dto.identityToken, dto.fullName, dto.referralCode)
   }
 
   // Renovação de sessão. O app chama isto sozinho quando o token de acesso expira —

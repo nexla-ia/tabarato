@@ -8,11 +8,31 @@ import { CreateAddressDto } from './dto/create-address.dto'
 import { PushTokenDto } from './dto/push-token.dto'
 import { ChangePasswordDto } from './dto/change-password.dto'
 import { BibleOfferDto } from './dto/bible-offer.dto'
+import { DeleteAccountDto } from './dto/delete-account.dto'
+import { AccountDeletionService } from './account-deletion.service'
 
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly exclusao: AccountDeletionService,
+  ) {}
+
+  /** O app mostra isto ANTES do botão final: o que impede excluir agora. */
+  @Get('me/deletion-check')
+  deletionCheck(@CurrentUser() user: any) {
+    return this.exclusao.impedimentos(user.sub).then((motivos) => ({ canDelete: motivos.length === 0, motivos }))
+  }
+
+  // Exclusão da própria conta (App Store 5.1.1(v) / Google Play). Pede a palavra
+  // EXCLUIR digitada: confirmação explícita sem depender de senha, que quem
+  // entrou com Google ou Apple não tem.
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @Delete('me')
+  deleteMe(@CurrentUser() user: any, @Body() _dto: DeleteAccountDto) {
+    return this.exclusao.excluir(user.sub)
+  }
 
   @Get('me')
   getMe(@CurrentUser() user: any) {

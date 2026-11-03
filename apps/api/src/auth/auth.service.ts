@@ -138,6 +138,85 @@ export class AuthService {
     return { user: this.sanitizeUser(user), ...tokens }
   }
 
+  // ── Login social: Apple ───────────────────────────────────────────────────
+  // Obrigatório na App Store para quem oferece login com Google (diretriz 4.8).
+  // O token é um JWT assinado pela Apple: confere assinatura com as chaves públicas
+  // dela, emissor e audiência (nosso bundle id). Casa primeiro pelo `sub` (estável);
+  // na 1ª vez, pelo e-mail verificado — assim quem já tinha conta entra nela.
+  async authApple(identityToken: string, fullName?: string, referralCode?: string) {
+    const invalido = new UnauthorizedException('Não foi possível validar o login com a Apple.')
+    if (!identityToken) throw invalido
+
+    let payload: any
+    try {
+      const header = JSON.parse(Buffer.from(identityToken.split('.')[0], 'base64url').toString('utf8'))
+      const jwk = await this.chaveApple(header.kid)
+      if (!jwk) throw new Error('kid')
+      const publicKey = crypto.createPublicKey({ key: jwk, format: 'jwk' }).export({ type: 'spki', format: 'pem' }).toString()
+      const audiencias = (this.config.get<string>('APPLE_CLIENT_IDS') || 'com.tabarato.consumer')
+        .split(',').map((s) => s.trim()).filter(Boolean)
+      payload = await this.jwt.verifyAsync(identityToken, {
+        publicKey,
+        algorithms: ['RS256'],
+        issuer: 'https://appleid.apple.com',
+        audience: audiencias as [string, ...string[]],
+      })
+    } catch {
+      throw invalido
+    }
+
+    const sub = payload.sub as string | undefined
+    if (!sub) throw invalido
+    const email = (payload.email as string | undefined)?.toLowerCase()
+    const emailVerificado = payload.email_verified === true || payload.email_verified === 'true'
+
+    let user = await this.prisma.user.findUnique({ where: { appleSub: sub } })
+    if (!user && email && emailVerificado) {
+      user = await this.prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } })
+      if (user) user = await this.prisma.user.update({ where: { id: user.id }, data: { appleSub: sub } })
+    }
+    if (!user) {
+      if (!email) {
+        // Acontece se a pessoa já autorizou o app antes e a Apple não reenvia o e-mail.
+        throw new UnauthorizedException(
+          'A Apple não enviou seu e-mail. Em Ajustes > seu nome > Iniciar Sessão com a Apple, remova o Tá Barato e tente de novo.',
+        )
+      }
+      let referrerId: string | undefined
+      if (referralCode) {
+        const referrer = await this.prisma.user.findUnique({ where: { referralCode: referralCode.toUpperCase() } })
+        if (referrer) referrerId = referrer.id
+      }
+      const randomHash = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10)
+      user = await this.prisma.user.create({
+        data: {
+          name: fullName?.trim() || email.split('@')[0],
+          email,
+          appleSub: sub,
+          passwordHash: randomHash,
+          role: 'CONSUMER',
+          referralCode: generateReferralCode(),
+          referredBy: referrerId,
+        },
+      })
+    }
+    if (!user.isActive) throw new UnauthorizedException('Conta desativada')
+
+    const tokens = this.generateTokens(user.id, user.email, user.role)
+    return { user: this.sanitizeUser(user), ...tokens }
+  }
+
+  // Chaves públicas da Apple mudam raramente; cache de 1h evita buscar a cada login.
+  private chavesApple: { keys: any[]; em: number } | null = null
+  private async chaveApple(kid: string): Promise<any | undefined> {
+    const achar = () => this.chavesApple?.keys.find((k) => k.kid === kid)
+    if (this.chavesApple && Date.now() - this.chavesApple.em < 60 * 60 * 1000 && achar()) return achar()
+    const res = await fetch('https://appleid.apple.com/auth/keys')
+    if (!res.ok) throw new Error('keys')
+    this.chavesApple = { keys: (await res.json()).keys ?? [], em: Date.now() }
+    return achar()
+  }
+
   /**
    * Renova a sessão a partir do refresh token.
    *

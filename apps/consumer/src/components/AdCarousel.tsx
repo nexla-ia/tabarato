@@ -8,6 +8,7 @@ import { router } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { colors } from '../theme/colors'
+import { VENDE_ANUNCIO_NO_APP } from '../utils/ads'
 
 interface LiveAd {
   id: string
@@ -59,7 +60,7 @@ export function AdCarousel() {
   })
   const slides: Slide[] = [
     ...(data?.ads ?? []).map((ad) => ({ kind: 'ad' as const, ad })),
-    ...(data?.showHouseAd ? [{ kind: 'house' as const }] : []),
+    ...(data?.showHouseAd && VENDE_ANUNCIO_NO_APP ? [{ kind: 'house' as const }] : []),
   ]
 
   const listRef = useRef<FlatList<Slide>>(null)

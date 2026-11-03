@@ -8,12 +8,17 @@ import { Ionicons } from '@expo/vector-icons'
 import { Link, router, useNavigation } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin'
+import * as AppleAuthentication from 'expo-apple-authentication'
 import { api } from '../../src/api/client'
 import { useAuthStore } from '../../src/stores/auth.store'
 import { colors } from '../../src/theme/colors'
 import { useToast } from '../../src/components/Toast'
 
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+// No iPhone o Google exige um client id próprio do iOS (criado no Google Cloud com
+// o bundle id). Sem ele, o botão do Google não aparece no iOS.
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+const GOOGLE_ATIVO = !!GOOGLE_WEB_CLIENT_ID && (Platform.OS !== 'ios' || !!GOOGLE_IOS_CLIENT_ID)
 
 type ProfileMode = 'consumer' | 'store' | 'courier'
 
@@ -28,16 +33,56 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [appleDisponivel, setAppleDisponivel] = useState(false)
   const setAuth = useAuthStore((s) => s.setAuth)
 
   useEffect(() => {
-    if (GOOGLE_WEB_CLIENT_ID) {
-      GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID })
+    if (GOOGLE_ATIVO) {
+      GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID, iosClientId: GOOGLE_IOS_CLIENT_ID })
+    }
+    // Entrar com Apple: obrigatório na App Store para app com login do Google.
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync().then(setAppleDisponivel).catch(() => setAppleDisponivel(false))
     }
   }, [])
 
+  /** Depois do login social: manda cada papel para o seu painel. */
+  async function entrarCom(data: any) {
+    await setAuth(data.user, data.accessToken, data.refreshToken)
+    if (data.user.role === 'STORE_OWNER') {
+      router.replace('/(store-tabs)')
+    } else if (data.user.role === 'COURIER') {
+      router.replace('/(courier-tabs)')
+    } else if (!data.user.city) {
+      // Cliente novo via login social: sem cidade/estado (obrigatórios p/ mostrar
+      // lojas próximas). Coleta antes de entrar.
+      router.replace('/(auth)/complete-profile')
+    } else {
+      router.replace('/(tabs)')
+    }
+  }
+
+  async function handleApple() {
+    try {
+      const cred = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      })
+      if (!cred.identityToken) throw new Error('Sem token da Apple')
+      // O nome só vem no 1º login, e só aqui no app — o servidor não o recebe da Apple.
+      const fullName = [cred.fullName?.givenName, cred.fullName?.familyName].filter(Boolean).join(' ') || undefined
+      const { data } = await api.post('/auth/apple', { identityToken: cred.identityToken, fullName })
+      await entrarCom(data)
+    } catch (err: any) {
+      if (err?.code === 'ERR_REQUEST_CANCELED') return
+      toast(err.response?.data?.message ?? 'Não foi possível entrar com a Apple.', 'error')
+    }
+  }
+
   async function handleGoogle() {
-    if (!GOOGLE_WEB_CLIENT_ID) {
+    if (!GOOGLE_ATIVO) {
       toast('Login com Google não está configurado neste app.', 'error')
       return
     }
@@ -50,19 +95,8 @@ export default function LoginScreen() {
       if (!idToken) throw new Error('Sem token do Google')
 
       const { data } = await api.post('/auth/google', { idToken })
-      await setAuth(data.user, data.accessToken, data.refreshToken)
       // Se o e-mail já for de uma conta lojista/entregador, vai pro painel certo.
-      if (data.user.role === 'STORE_OWNER') {
-        router.replace('/(store-tabs)')
-      } else if (data.user.role === 'COURIER') {
-        router.replace('/(courier-tabs)')
-      } else if (!data.user.city) {
-        // Cliente novo via Google: Google não fornece cidade/estado (obrigatórios
-        // p/ mostrar lojas próximas). Coleta antes de entrar.
-        router.replace('/(auth)/complete-profile')
-      } else {
-        router.replace('/(tabs)')
-      }
+      await entrarCom(data)
     } catch (err: any) {
       if (err?.code === statusCodes.SIGN_IN_CANCELLED || err?.code === statusCodes.IN_PROGRESS) return
       toast(err.response?.data?.message ?? 'Não foi possível entrar com o Google.', 'error')
@@ -223,29 +257,41 @@ export default function LoginScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Login social — Google (só cliente) */}
-          {mode === 'consumer' && GOOGLE_WEB_CLIENT_ID && (
+          {/* Login social — Google e Apple (só cliente) */}
+          {mode === 'consumer' && (GOOGLE_ATIVO || appleDisponivel) && (
             <>
               <View style={styles.divider}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>ou continue com</Text>
                 <View style={styles.dividerLine} />
               </View>
-              <TouchableOpacity
-                style={styles.googleBtn}
-                onPress={handleGoogle}
-                disabled={googleLoading}
-                activeOpacity={0.85}
-              >
-                {googleLoading ? (
-                  <ActivityIndicator color={colors.primary} />
-                ) : (
-                  <>
-                    <Ionicons name="logo-google" size={19} color="#EA4335" />
-                    <Text style={styles.googleText}>Continuar com Google</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              {/* Apple primeiro no iPhone, com o botão oficial (exigência da Apple). */}
+              {appleDisponivel && (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                  cornerRadius={14}
+                  style={styles.appleBtn}
+                  onPress={handleApple}
+                />
+              )}
+              {GOOGLE_ATIVO && (
+                <TouchableOpacity
+                  style={styles.googleBtn}
+                  onPress={handleGoogle}
+                  disabled={googleLoading}
+                  activeOpacity={0.85}
+                >
+                  {googleLoading ? (
+                    <ActivityIndicator color={colors.primary} />
+                  ) : (
+                    <>
+                      <Ionicons name="logo-google" size={19} color="#EA4335" />
+                      <Text style={styles.googleText}>Continuar com Google</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
             </>
           )}
 
@@ -420,6 +466,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  appleBtn: { height: 52, width: '100%', marginBottom: 10 },
   googleText: { color: '#3C2A22', fontSize: 15, fontWeight: '700' },
 
   registerBtn: {

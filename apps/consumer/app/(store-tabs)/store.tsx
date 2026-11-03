@@ -897,6 +897,11 @@ export default function StoreSettingsScreen() {
         <Text style={styles.logoutBtnText}>Sair da conta</Text>
       </TouchableOpacity>
 
+      {/* Exigência das lojas de apps: excluir a conta de dentro do app. */}
+      <TouchableOpacity onPress={() => router.push('/excluir-conta' as any)} activeOpacity={0.7} style={{ alignSelf: 'center', paddingVertical: 10 }}>
+        <Text style={{ color: '#9A8880', fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' }}>Excluir conta</Text>
+      </TouchableOpacity>
+
       <Text style={styles.version}>Tá Barato · Lojista · v1.0.0</Text>
 
     </ScrollView>
