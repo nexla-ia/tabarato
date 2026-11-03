@@ -14,8 +14,9 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "http://SEU_IP_LOCAL:3000/api",
         "EXPO_PUBLIC_MP_PUBLIC_KEY": "APP_USR-eef006ec-5cb1-4640-9822-285141534fce",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "721316096829-1cf2dg6rn1n0vlfp2v44h1uvt6na04hr.apps.googleusercontent.com",
-        "EXPO_PUBLIC_WEB_URL": "https://tabaratoapp.com.br"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "487138629855-i0nk561pvj3banvdv681ibeb0o4et075.apps.googleusercontent.com",
+        "EXPO_PUBLIC_WEB_URL": "https://tabaratoapp.com.br",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "487138629855-686tsvp977qs20kla9cicgtr1r1iqi77.apps.googleusercontent.com"
       }
     },
     "preview": {
@@ -27,8 +28,9 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api-production-b730d.up.railway.app/api",
         "EXPO_PUBLIC_MP_PUBLIC_KEY": "APP_USR-eef006ec-5cb1-4640-9822-285141534fce",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "721316096829-1cf2dg6rn1n0vlfp2v44h1uvt6na04hr.apps.googleusercontent.com",
-        "EXPO_PUBLIC_WEB_URL": "https://tabaratoapp.com.br"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "487138629855-i0nk561pvj3banvdv681ibeb0o4et075.apps.googleusercontent.com",
+        "EXPO_PUBLIC_WEB_URL": "https://tabaratoapp.com.br",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "487138629855-686tsvp977qs20kla9cicgtr1r1iqi77.apps.googleusercontent.com"
       }
     },
     "production": {
@@ -36,8 +38,9 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api-production-b730d.up.railway.app/api",
         "EXPO_PUBLIC_MP_PUBLIC_KEY": "APP_USR-eef006ec-5cb1-4640-9822-285141534fce",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "721316096829-1cf2dg6rn1n0vlfp2v44h1uvt6na04hr.apps.googleusercontent.com",
-        "EXPO_PUBLIC_WEB_URL": "https://tabaratoapp.com.br"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "487138629855-i0nk561pvj3banvdv681ibeb0o4et075.apps.googleusercontent.com",
+        "EXPO_PUBLIC_WEB_URL": "https://tabaratoapp.com.br",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "487138629855-686tsvp977qs20kla9cicgtr1r1iqi77.apps.googleusercontent.com"
       }
     }
   },

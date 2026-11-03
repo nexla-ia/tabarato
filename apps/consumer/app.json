@@ -104,7 +104,12 @@
           "defaultChannel": "default"
         }
       ],
-      "@react-native-google-signin/google-signin",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.487138629855-686tsvp977qs20kla9cicgtr1r1iqi77"
+        }
+      ],
       "expo-apple-authentication",
       [
         "expo-image-picker",

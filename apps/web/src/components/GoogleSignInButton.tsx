@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 // Client ID Web do Google (público). Pode ser sobrescrito por env no build.
 const GOOGLE_CLIENT_ID =
   process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-  '721316096829-1cf2dg6rn1n0vlfp2v44h1uvt6na04hr.apps.googleusercontent.com'
+  '487138629855-i0nk561pvj3banvdv681ibeb0o4et075.apps.googleusercontent.com'
 const GSI_SRC = 'https://accounts.google.com/gsi/client'
 
 // Carrega o script do Google Identity Services uma única vez.
