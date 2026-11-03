@@ -13,6 +13,8 @@ import { api } from '../../src/api/client'
 import { useAuthStore } from '../../src/stores/auth.store'
 import { colors } from '../../src/theme/colors'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
 // No iPhone o Google exige um client id próprio do iOS (criado no Google Cloud com
@@ -245,7 +247,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           {/* CTA */}
-          <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading} activeOpacity={0.85}>
+          <Relevo style={styles.btn} onPress={handleLogin} disabled={loading}>
             <View style={styles.btnInner}>
               {loading
                 ? <ActivityIndicator color="#fff" />
@@ -255,7 +257,7 @@ export default function LoginScreen() {
                   </>
               }
             </View>
-          </TouchableOpacity>
+          </Relevo>
 
           {/* Login social — Google e Apple (só cliente) */}
           {mode === 'consumer' && (GOOGLE_ATIVO || appleDisponivel) && (
@@ -276,11 +278,10 @@ export default function LoginScreen() {
                 />
               )}
               {GOOGLE_ATIVO && (
-                <TouchableOpacity
+                <Relevo
                   style={styles.googleBtn}
                   onPress={handleGoogle}
                   disabled={googleLoading}
-                  activeOpacity={0.85}
                 >
                   {googleLoading ? (
                     <ActivityIndicator color={colors.primary} />
@@ -290,7 +291,7 @@ export default function LoginScreen() {
                       <Text style={styles.googleText}>Continuar com Google</Text>
                     </>
                   )}
-                </TouchableOpacity>
+                </Relevo>
               )}
             </>
           )}
@@ -307,12 +308,12 @@ export default function LoginScreen() {
             href={isStore ? '/(auth)/register-store' : isCourier ? { pathname: '/(auth)/register', params: { role: 'courier' } } : '/(auth)/register'}
             asChild
           >
-            <TouchableOpacity style={styles.registerBtn} activeOpacity={0.8}>
+            <Relevo style={styles.registerBtn}>
               <Text style={styles.registerText}>
                 {isStore ? 'Cadastrar minha loja' : isCourier ? 'Cadastrar como entregador' : 'Criar uma conta grátis'}
               </Text>
               <Ionicons name="chevron-forward" size={15} color={colors.primary} />
-            </TouchableOpacity>
+            </Relevo>
           </Link>
 
         </View>
@@ -391,13 +392,16 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
     borderRadius: 9,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
   },
   modeBtnActive: {
     backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
+    borderBottomColor: LABIO_NEUTRO,
+    shadowColor: '#7A3A10',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
     elevation: 2,
   },
   modeBtnText: { fontSize: 12, fontWeight: '700', color: '#9A8880' },
@@ -426,23 +430,15 @@ const styles = StyleSheet.create({
   forgotText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
 
   btn: {
+    ...relevo.botao,
     borderRadius: 14,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
   },
   btnInner: {
-    backgroundColor: colors.primary,
     paddingVertical: 17,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
-    borderRadius: 14,
-    borderBottomWidth: 3,
-    borderBottomColor: colors.primaryDark,
   },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
 
@@ -451,20 +447,13 @@ const styles = StyleSheet.create({
   dividerText: { color: '#B0A098', fontSize: 13 },
 
   googleBtn: {
+    ...relevo.neutro,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#fff',
     paddingVertical: 15,
     borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#EDE5DF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   appleBtn: { height: 52, width: '100%', marginBottom: 10 },
   googleText: { color: '#3C2A22', fontSize: 15, fontWeight: '700' },
@@ -474,10 +463,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+    ...relevo.contorno,
     paddingVertical: 14,
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.primary,
   },
   registerText: { color: colors.primary, fontWeight: '800', fontSize: 15 },
 })

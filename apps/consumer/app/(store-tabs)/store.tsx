@@ -11,6 +11,8 @@ import { useAuthStore } from '../../src/stores/auth.store'
 import { api } from '../../src/api/client'
 import { uploadImageAsset } from '../../src/api/upload'
 import { colors } from '../../src/theme/colors'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
+import { Relevo } from '../../src/components/Relevo'
 import { useToast } from '../../src/components/Toast'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
@@ -659,9 +661,9 @@ export default function StoreSettingsScreen() {
                 <Ionicons name="alert-circle-outline" size={15} color="#B45309" />
                 <Text style={styles.mpWarnText}>Enquanto não configurar, sua loja pode não conseguir receber pedidos.</Text>
               </View>
-              <TouchableOpacity style={styles.mpBtn} onPress={() => setAsaasFormOpen(true)} activeOpacity={0.85}>
+              <Relevo style={styles.mpBtn} onPress={() => setAsaasFormOpen(true)}>
                 <Ionicons name="wallet-outline" size={18} color="#fff" /><Text style={styles.mpBtnText}>Configurar recebimentos</Text>
-              </TouchableOpacity>
+              </Relevo>
             </>
           ) : (
             <>
@@ -677,9 +679,9 @@ export default function StoreSettingsScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-              <TouchableOpacity style={styles.mpBtn} onPress={submitAsaasOnboard} disabled={asaasSubmitting} activeOpacity={0.85}>
+              <Relevo style={styles.mpBtn} onPress={submitAsaasOnboard} disabled={asaasSubmitting}>
                 {asaasSubmitting ? <ActivityIndicator color="#fff" /> : <><Ionicons name="checkmark" size={18} color="#fff" /><Text style={styles.mpBtnText}>Salvar recebimentos</Text></>}
-              </TouchableOpacity>
+              </Relevo>
               <TouchableOpacity onPress={() => setAsaasFormOpen(false)} style={styles.mpRefresh}>
                 <Text style={styles.mpRefreshText}>Cancelar</Text>
               </TouchableOpacity>
@@ -718,11 +720,11 @@ export default function StoreSettingsScreen() {
                 <Ionicons name="alert-circle-outline" size={15} color="#B45309" />
                 <Text style={styles.mpWarnText}>Sua loja só abre e recebe pedidos após conectar o Mercado Pago. Tenha uma chave PIX cadastrada na conta para receber por PIX.</Text>
               </View>
-              <TouchableOpacity style={styles.mpBtn} onPress={connectMp} disabled={mpLoading} activeOpacity={0.85}>
+              <Relevo style={styles.mpBtn} onPress={connectMp} disabled={mpLoading}>
                 {mpLoading
                   ? <ActivityIndicator color="#fff" />
                   : <><Ionicons name="open-outline" size={18} color="#fff" /><Text style={styles.mpBtnText}>Conectar Mercado Pago</Text></>}
-              </TouchableOpacity>
+              </Relevo>
             </>
           )}
           <TouchableOpacity onPress={fetchMpStatus} style={styles.mpRefresh}>
@@ -881,7 +883,7 @@ export default function StoreSettingsScreen() {
       </View>
 
       {/* Salvar */}
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving} activeOpacity={0.85}>
+      <Relevo style={styles.saveBtn} onPress={handleSave} disabled={saving}>
         {saving
           ? <ActivityIndicator color="#fff" />
           : <>
@@ -889,7 +891,7 @@ export default function StoreSettingsScreen() {
               <Text style={styles.saveBtnText}>Salvar alterações</Text>
             </>
         }
-      </TouchableOpacity>
+      </Relevo>
 
       {/* Sair */}
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
@@ -912,8 +914,8 @@ export default function StoreSettingsScreen() {
 const section = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
   iconWrap: {
-    width: 32, height: 32, borderRadius: 8,
-    backgroundColor: '#FFF0EB',
+    ...relevo.icone,
+    width: 32, height: 32, borderRadius: 9,
     alignItems: 'center', justifyContent: 'center',
   },
   title: { fontSize: 15, fontWeight: '800', color: '#1A0A00' },
@@ -988,16 +990,11 @@ const styles = StyleSheet.create({
   ownerBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
   card: {
-    backgroundColor: '#fff',
+    ...relevo.card,
     borderRadius: 16,
     padding: 18,
     marginHorizontal: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
 
   twoCol: { flexDirection: 'row', gap: 12 },
@@ -1010,10 +1007,11 @@ const styles = StyleSheet.create({
   companyChip: {
     flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 10,
     borderWidth: 1.5, borderColor: '#EADFD6', backgroundColor: '#FFF',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  companyChipActive: { borderColor: colors.primary, backgroundColor: '#FFF3EB' },
+  companyChipActive: { ...relevo.chipAtivo },
   companyChipText: { fontSize: 13, fontWeight: '700', color: '#7A5C4A' },
-  companyChipTextActive: { color: colors.primary },
+  companyChipTextActive: { color: '#fff' },
 
   locDesc: { fontSize: 12, color: '#7A5C4A', lineHeight: 18, marginBottom: 12 },
   locBtn: {
@@ -1056,6 +1054,9 @@ const styles = StyleSheet.create({
   mpBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: '#009EE3', borderRadius: 12, paddingVertical: 14,
+    borderBottomWidth: 4, borderBottomColor: '#0074A8',
+    shadowColor: '#009EE3', shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25, shadowRadius: 8, elevation: 5,
   },
   mpBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   mpConnectedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -1077,9 +1078,10 @@ const styles = StyleSheet.create({
   dayToggle: {
     width: 46, height: 32, borderRadius: 8,
     backgroundColor: '#F0EBE5',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
     alignItems: 'center', justifyContent: 'center',
   },
-  dayToggleActive: { backgroundColor: colors.primary },
+  dayToggleActive: { ...relevo.chipAtivo },
   dayLabel: { fontSize: 12, fontWeight: '800', color: '#9A8880' },
   dayLabelActive: { color: '#fff' },
   dayHours: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -1095,17 +1097,11 @@ const styles = StyleSheet.create({
   dayClosed: { fontSize: 13, color: '#C0B0A8', fontWeight: '600' },
 
   saveBtn: {
+    ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: colors.primary,
     marginHorizontal: 16, marginBottom: 12,
     paddingVertical: 16,
     borderRadius: 14,
-    borderBottomWidth: 3, borderBottomColor: colors.primaryDark,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
     minHeight: 56,
   },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
@@ -1136,8 +1132,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 9,
     borderRadius: 999, backgroundColor: '#F5F0EC',
     borderWidth: 1.5, borderColor: '#EDE5DF',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  catChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  catChipActive: { ...relevo.chipAtivo },
   catChipText: { fontSize: 13, fontWeight: '700', color: '#7A5C4A' },
   catChipTextActive: { color: '#fff' },
   photosRow: { gap: 10, paddingBottom: 4 },

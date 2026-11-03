@@ -11,6 +11,8 @@ import { uploadDocumentImage } from '../src/api/upload'
 import { colors } from '../src/theme/colors'
 import { useToast } from '../src/components/Toast'
 import { LoadError } from '../src/components/LoadError'
+import { Relevo } from '../src/components/Relevo'
+import { relevo } from '../src/theme/relevo'
 
 const TEXT = '#1A0A00'
 const MUTED = '#9A8880'
@@ -133,11 +135,10 @@ export default function CourierDocumentsScreen() {
                 </View>
 
                 {rejected && (
-                  <TouchableOpacity
+                  <Relevo
                     style={[styles.resendBtn, sending === d.key && { opacity: 0.6 }]}
                     onPress={() => resend(d.key, d.label)}
                     disabled={sending !== null}
-                    activeOpacity={0.85}
                   >
                     {sending === d.key ? (
                       <ActivityIndicator size="small" color="#fff" />
@@ -147,7 +148,7 @@ export default function CourierDocumentsScreen() {
                         <Text style={styles.resendText}>Enviar outro documento</Text>
                       </>
                     )}
-                  </TouchableOpacity>
+                  </Relevo>
                 )}
               </View>
             )
@@ -179,10 +180,10 @@ const styles = StyleSheet.create({
   intro: { fontSize: 13.5, color: MUTED, lineHeight: 19, marginBottom: 18 },
 
   card: {
-    backgroundColor: CARD, borderRadius: 14, padding: 14, marginBottom: 10,
-    borderWidth: 1, borderColor: BORDER,
+    ...relevo.card,
+    borderRadius: 14, padding: 14, marginBottom: 10,
   },
-  cardRejected: { borderColor: '#FECACA' },
+  cardRejected: { borderColor: '#FECACA', borderBottomColor: '#FCA5A5' },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   thumb: { width: 46, height: 46, borderRadius: 10, backgroundColor: '#F5F0EC' },
   thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
@@ -195,8 +196,9 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '800' },
 
   resendBtn: {
+    ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-    backgroundColor: colors.primary, borderRadius: 11, paddingVertical: 12, marginTop: 12,
+    borderRadius: 11, paddingVertical: 12, marginTop: 12,
   },
   resendText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 

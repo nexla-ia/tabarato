@@ -12,12 +12,13 @@ import { api } from '../../src/api/client'
 import { ProductCard } from '../../src/components/ProductCard'
 import { promoLabel } from '../../src/utils/promo'
 import { colors } from '../../src/theme/colors'
+import { relevo } from '../../src/theme/relevo'
 import { useCartStore } from '../../src/stores/cart.store'
 import { Store, Product, ProductVariation } from '../../src/types'
 import { AppAlert } from '../../src/components/AppAlert'
+import { Relevo } from '../../src/components/Relevo'
 
 const PRIMARY = '#FF5500'
-const PRIMARY_DARK = '#CC3300'
 const PRIMARY_LIGHT = '#FFF0EB'
 const TEXT = '#1A0A00'
 const MUTED = '#9A8880'
@@ -103,7 +104,7 @@ function ReviewCard({ review }: { review: Review }) {
 }
 
 const rStyles = StyleSheet.create({
-  card: { backgroundColor: CARD, borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: BORDER },
+  card: { ...relevo.card, borderRadius: 14, padding: 14, marginBottom: 10 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   avatar: {
     width: 36, height: 36, borderRadius: 18,
@@ -317,11 +318,10 @@ function ProductDetailModal({
 
         {/* Fixed bottom CTA */}
         <View style={[det.footer, { paddingBottom: insets.bottom + 16 }]}>
-          <TouchableOpacity
+          <Relevo
             style={[det.addBtn, !canAdd && { opacity: 0.55 }]}
             onPress={handleAdd}
             disabled={!canAdd}
-            activeOpacity={0.85}
           >
             <View style={det.addBtnInner}>
               <Ionicons name="cart-outline" size={20} color="#fff" />
@@ -335,7 +335,7 @@ function ProductDetailModal({
                   : 'Selecione uma opção'}
               </Text>
             </View>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -403,18 +403,11 @@ const det = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: BORDER,
   },
   addBtn: {
-    borderRadius: 14,
-    shadowColor: PRIMARY_DARK,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
+    ...relevo.botao,
+    borderRadius: 14, paddingVertical: 17,
   },
   addBtnInner: {
-    backgroundColor: PRIMARY,
-    borderRadius: 14, paddingVertical: 17,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    borderBottomWidth: 3, borderBottomColor: PRIMARY_DARK,
   },
   addBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 
@@ -628,13 +621,13 @@ export default function StoreScreen() {
 
       {itemCount > 0 && (
         <View style={[styles.cartBar, { paddingBottom: insets.bottom + 16 }]}>
-          <TouchableOpacity style={styles.cartBtn} onPress={() => router.push('/cart')}>
+          <Relevo style={styles.cartBtn} onPress={() => router.push('/cart')}>
             <View style={styles.cartCount}>
               <Text style={styles.cartCountText}>{itemCount}</Text>
             </View>
             <Text style={styles.cartBtnText}>Ver carrinho</Text>
             <Text style={styles.cartBtnText}>›</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       )}
 
@@ -705,9 +698,9 @@ const styles = StyleSheet.create({
 
   reviewsSection: { paddingHorizontal: 16, paddingBottom: 8 },
   reviewsSummary: {
+    ...relevo.card,
     flexDirection: 'row', gap: 16, alignItems: 'flex-start',
-    backgroundColor: CARD, borderRadius: 16, padding: 16, marginBottom: 16,
-    borderWidth: 1, borderColor: BORDER,
+    borderRadius: 16, padding: 16, marginBottom: 16,
   },
   avgBlock: { alignItems: 'center', gap: 4, minWidth: 70 },
   avgNumber: { fontSize: 36, fontWeight: '900', color: TEXT, letterSpacing: -1 },
@@ -748,10 +741,8 @@ const styles = StyleSheet.create({
 
   cartBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16 },
   cartBtn: {
-    backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 20,
+    ...relevo.botao, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 20,
     flexDirection: 'row', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
   },
   cartCount: {
     backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10,

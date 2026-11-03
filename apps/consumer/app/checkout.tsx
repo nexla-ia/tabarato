@@ -17,6 +17,8 @@ import { Address } from '../src/types'
 import { validateCardForm, validateCpf } from '../src/utils/cardValidation'
 import { loadCardMeta, saveCardMeta, cardLabel, SavedCardMeta } from '../src/utils/savedCard'
 import { MpDeviceWebView } from '../src/components/MpDeviceWebView'
+import { Relevo } from '../src/components/Relevo'
+import { relevo, LABIO_LARANJA, LABIO_NEUTRO } from '../src/theme/relevo'
 
 const PRIMARY = '#FF5500'
 const PRIMARY_LIGHT = '#FFF0EB'
@@ -681,13 +683,13 @@ export default function CheckoutScreen() {
           <Text style={styles.guestSub}>
             Faça login ou crie uma conta para confirmar seu pedido. Seu carrinho será mantido.
           </Text>
-          <TouchableOpacity style={styles.guestLoginBtn} onPress={() => router.push('/(auth)/login')} activeOpacity={0.85}>
+          <Relevo style={styles.guestLoginBtn} onPress={() => router.push('/(auth)/login')}>
             <Ionicons name="log-in-outline" size={20} color="#fff" />
             <Text style={styles.guestLoginText}>Entrar na conta</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.guestRegisterBtn} onPress={() => router.push('/(auth)/register')} activeOpacity={0.85}>
+          </Relevo>
+          <Relevo style={styles.guestRegisterBtn} onPress={() => router.push('/(auth)/register')}>
             <Text style={styles.guestRegisterText}>Criar conta grátis</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       </View>
     )
@@ -1113,17 +1115,16 @@ export default function CheckoutScreen() {
                       onChangeText={(t) => { setCouponInputs((i) => ({ ...i, [g.storeId]: t.toUpperCase() })); setCouponErrors((e) => ({ ...e, [g.storeId]: '' })) }}
                       autoCapitalize="characters"
                     />
-                    <TouchableOpacity
+                    <Relevo
                       style={[styles.couponBtn, (!input.trim() || checking) && styles.couponBtnDisabled]}
                       onPress={() => applyCoupon(g.storeId)}
                       disabled={!input.trim() || checking}
-                      activeOpacity={0.85}
                     >
                       {checking
                         ? <ActivityIndicator size="small" color="#fff" />
                         : <Text style={styles.couponBtnText}>Aplicar</Text>
                       }
-                    </TouchableOpacity>
+                    </Relevo>
                   </View>
                 ) : (
                   <View style={styles.couponApplied}>
@@ -1209,11 +1210,10 @@ export default function CheckoutScreen() {
           <Text style={styles.bottomTotal}>R$ {orderTotal.toFixed(2)}</Text>
           <Text style={styles.bottomTotalSub}>{isPickup ? 'Total (retirada na loja)' : (deliveryKnown ? 'Total com entrega' : 'Calculando entrega…')}</Text>
         </View>
-        <TouchableOpacity
+        <Relevo
           style={[styles.confirmBtn, (isPending || orderTotal <= 0 || !deliveryKnown) && styles.confirmBtnLoading]}
           onPress={handleConfirm}
           disabled={isPending || orderTotal <= 0 || !deliveryKnown}
-          activeOpacity={0.88}
         >
           {isPending ? (
             <ActivityIndicator color="#fff" size="small" />
@@ -1228,7 +1228,7 @@ export default function CheckoutScreen() {
               <Ionicons name="arrow-forward" size={18} color="#fff" />
             </>
           )}
-        </TouchableOpacity>
+        </Relevo>
       </View>
 
       {/* ── Custom Alert ── */}
@@ -1383,11 +1383,10 @@ export default function CheckoutScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity
+              <Relevo
                 style={[styles.saveAddrBtn, savingAddr && styles.saveAddrBtnLoading]}
                 onPress={handleSaveAddress}
                 disabled={savingAddr}
-                activeOpacity={0.88}
               >
                 {savingAddr ? (
                   <ActivityIndicator color="#fff" size="small" />
@@ -1397,7 +1396,7 @@ export default function CheckoutScreen() {
                     <Text style={styles.saveAddrBtnText}>Salvar e usar este endereço</Text>
                   </>
                 )}
-              </TouchableOpacity>
+              </Relevo>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -1449,8 +1448,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: BORDER, borderStyle: 'dashed',
   },
   emptyAddressIcon: {
+    ...relevo.icone,
     width: 44, height: 44, borderRadius: 12,
-    backgroundColor: PRIMARY_LIGHT,
     alignItems: 'center', justifyContent: 'center',
   },
   emptyAddressTitle: { fontSize: 14, fontWeight: '700', color: TEXT },
@@ -1464,13 +1463,12 @@ const styles = StyleSheet.create({
 
   // Address cards
   addrCard: {
-    backgroundColor: CARD, borderRadius: 14, padding: 14,
+    ...relevo.card, borderWidth: 2, borderBottomWidth: 3,
+    borderRadius: 14, padding: 14,
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    marginBottom: 8, borderWidth: 2, borderColor: 'transparent',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    marginBottom: 8,
   },
-  addrCardSelected: { borderColor: PRIMARY, backgroundColor: PRIMARY_LIGHT },
+  addrCardSelected: { borderColor: PRIMARY, borderBottomColor: LABIO_LARANJA, backgroundColor: PRIMARY_LIGHT },
   addrIconWrap: {
     width: 36, height: 36, borderRadius: 10,
     backgroundColor: '#F0E8E2',
@@ -1502,8 +1500,9 @@ const styles = StyleSheet.create({
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 12, borderRadius: 12,
     backgroundColor: CARD, borderWidth: 2, borderColor: BORDER,
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  fulfillOptionActive: { borderColor: PRIMARY, backgroundColor: PRIMARY_LIGHT },
+  fulfillOptionActive: { borderColor: PRIMARY, borderBottomColor: LABIO_LARANJA, backgroundColor: PRIMARY_LIGHT },
   fulfillOptionOff: { opacity: 0.4 },
   fulfillLabel: { fontSize: 14, fontWeight: '700', color: MUTED },
   fulfillLabelActive: { color: PRIMARY },
@@ -1513,12 +1512,12 @@ const styles = StyleSheet.create({
   },
   pickupNoticeText: { flex: 1, fontSize: 12.5, color: TEXT, lineHeight: 18 },
   pickupCard: {
-    backgroundColor: CARD, borderRadius: 14, padding: 14, marginBottom: 8,
+    ...relevo.card, borderRadius: 14, padding: 14, marginBottom: 8,
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    borderWidth: 1.5, borderColor: BORDER,
   },
   pickupIconWrap: {
-    width: 36, height: 36, borderRadius: 10, backgroundColor: PRIMARY_LIGHT,
+    ...relevo.icone,
+    width: 36, height: 36, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center', marginTop: 2,
   },
   pickupStoreName: { fontSize: 14, fontWeight: '700', color: TEXT, marginBottom: 3 },
@@ -1532,10 +1531,8 @@ const styles = StyleSheet.create({
 
   // Card form
   cardForm: {
-    backgroundColor: CARD, borderRadius: 16, padding: 16,
-    marginTop: 12, borderWidth: 1.5, borderColor: '#DBEAFE',
-    shadowColor: '#2563EB', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    ...relevo.card, borderRadius: 16, padding: 16,
+    marginTop: 12,
   },
   cardFormHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   cardFormTitle: { fontSize: 14, fontWeight: '800', color: TEXT },
@@ -1577,20 +1574,20 @@ const styles = StyleSheet.create({
   installmentChip: {
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10,
     borderWidth: 1.5, borderColor: BORDER, backgroundColor: CARD,
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  installmentChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  installmentChipActive: { ...relevo.chipAtivo },
   installmentText: { fontSize: 13, fontWeight: '700', color: MUTED },
   installmentTextActive: { color: '#fff' },
 
   // Payment grid
   pmGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   pmCard: {
-    width: '47.5%', backgroundColor: CARD, borderRadius: 16, padding: 14,
-    borderWidth: 2, borderColor: 'transparent', position: 'relative',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    ...relevo.card, borderWidth: 2, borderBottomWidth: 3,
+    width: '47.5%', borderRadius: 16, padding: 14,
+    position: 'relative',
   },
-  pmCardSelected: { borderColor: PRIMARY, backgroundColor: PRIMARY_LIGHT },
+  pmCardSelected: { borderColor: PRIMARY, borderBottomColor: LABIO_LARANJA, backgroundColor: PRIMARY_LIGHT },
   pmCheckmark: {
     position: 'absolute', top: 10, right: 10,
     width: 18, height: 18, borderRadius: 9, backgroundColor: PRIMARY,
@@ -1606,9 +1603,7 @@ const styles = StyleSheet.create({
 
   // Summary
   summaryCard: {
-    backgroundColor: CARD, borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 8, elevation: 3, marginBottom: 8,
+    ...relevo.card, borderRadius: 16, padding: 16, marginBottom: 8,
   },
   summaryItemRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   summaryQtyBadge: {
@@ -1641,11 +1636,10 @@ const styles = StyleSheet.create({
   bottomTotal: { fontSize: 18, fontWeight: '900', color: TEXT, letterSpacing: -0.4 },
   bottomTotalSub: { fontSize: 11, color: MUTED, marginTop: 1 },
   confirmBtn: {
-    flex: 1, flexDirection: 'row', backgroundColor: PRIMARY,
+    ...relevo.botao,
+    flex: 1, flexDirection: 'row',
     borderRadius: 14, paddingVertical: 15,
     alignItems: 'center', justifyContent: 'center', gap: 8,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
   },
   confirmBtnLoading: { opacity: 0.75 },
   confirmBtnText: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
@@ -1675,8 +1669,8 @@ const styles = StyleSheet.create({
   },
   sheetHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   sheetHeaderIcon: {
+    ...relevo.icone,
     width: 38, height: 38, borderRadius: 10,
-    backgroundColor: PRIMARY_LIGHT,
     alignItems: 'center', justifyContent: 'center',
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: TEXT },
@@ -1706,17 +1700,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 7,
     borderRadius: 20, borderWidth: 1.5, borderColor: BORDER,
     backgroundColor: CARD, marginRight: 8,
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  labelChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  labelChipActive: { ...relevo.chipAtivo },
   labelChipText: { fontSize: 13, fontWeight: '600', color: MUTED },
   labelChipTextActive: { color: '#fff' },
 
   saveAddrBtn: {
+    ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: PRIMARY, borderRadius: 14,
+    borderRadius: 14,
     paddingVertical: 15, marginTop: 24, marginBottom: 8,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
   },
   saveAddrBtnLoading: { opacity: 0.75 },
   saveAddrBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
@@ -1729,7 +1723,7 @@ const styles = StyleSheet.create({
     fontSize: 14, fontWeight: '700', color: TEXT, letterSpacing: 1,
   },
   couponBtn: {
-    backgroundColor: PRIMARY, borderRadius: 10,
+    ...relevo.botao, borderBottomWidth: 3, borderRadius: 10,
     paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', height: 40,
   },
   couponBtnDisabled: { opacity: 0.5 },
@@ -1757,23 +1751,21 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32,
   },
   guestIconWrap: {
+    ...relevo.icone,
     width: 88, height: 88, borderRadius: 44,
-    backgroundColor: PRIMARY_LIGHT,
     alignItems: 'center', justifyContent: 'center', marginBottom: 20,
   },
   guestTitle: { fontSize: 22, fontWeight: '900', color: TEXT, marginBottom: 10, textAlign: 'center' },
   guestSub: { fontSize: 14, color: MUTED, textAlign: 'center', lineHeight: 21, marginBottom: 32 },
   guestLoginBtn: {
-    backgroundColor: PRIMARY, borderRadius: 14,
+    ...relevo.botao, borderRadius: 14,
     paddingVertical: 15, width: '100%', alignItems: 'center',
     flexDirection: 'row', justifyContent: 'center', gap: 8,
     marginBottom: 12,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   guestLoginText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   guestRegisterBtn: {
-    borderWidth: 2, borderColor: PRIMARY, borderRadius: 14,
+    ...relevo.contorno, borderRadius: 14,
     paddingVertical: 14, width: '100%', alignItems: 'center',
   },
   guestRegisterText: { color: PRIMARY, fontSize: 16, fontWeight: '700' },

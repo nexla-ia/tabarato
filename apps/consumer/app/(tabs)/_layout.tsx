@@ -1,6 +1,7 @@
 import { Tabs, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../src/theme/colors'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 import { useCartStore } from '../../src/stores/cart.store'
 import { useConsumerStore } from '../../src/stores/consumer.store'
 import { useAuthStore } from '../../src/stores/auth.store'
@@ -10,13 +11,14 @@ import {
 } from 'react-native'
 import { useEffect, useState } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Relevo } from '../../src/components/Relevo'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
 function TabIcon({ name, focused }: { name: IoniconName; focused: boolean }) {
   return (
-    <View style={tab.iconWrap}>
-      <Ionicons name={name} size={22} color={focused ? colors.primary : '#AAAAAA'} />
+    <View style={[tab.iconWrap, focused && tab.iconWrapAtivo]}>
+      <Ionicons name={name} size={21} color={focused ? colors.primary : '#AAAAAA'} />
     </View>
   )
 }
@@ -24,8 +26,8 @@ function TabIcon({ name, focused }: { name: IoniconName; focused: boolean }) {
 function OrdersTabIcon({ focused }: { focused: boolean }) {
   const count = useConsumerStore((s) => s.activeOrderCount)
   return (
-    <View style={tab.iconWrap}>
-      <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={22} color={focused ? colors.primary : '#AAAAAA'} />
+    <View style={[tab.iconWrap, focused && tab.iconWrapAtivo]}>
+      <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={21} color={focused ? colors.primary : '#AAAAAA'} />
       {count > 0 && (
         <View style={badge.dot}>
           <Text style={badge.text}>{count > 9 ? '9+' : count}</Text>
@@ -38,8 +40,8 @@ function OrdersTabIcon({ focused }: { focused: boolean }) {
 function CartTabIcon({ focused }: { focused: boolean }) {
   const count = useCartStore((s) => s.itemCount())
   return (
-    <View style={tab.iconWrap}>
-      <Ionicons name={focused ? 'cart' : 'cart-outline'} size={22} color={focused ? colors.primary : '#AAAAAA'} />
+    <View style={[tab.iconWrap, focused && tab.iconWrapAtivo]}>
+      <Ionicons name={focused ? 'cart' : 'cart-outline'} size={21} color={focused ? colors.primary : '#AAAAAA'} />
       {count > 0 && (
         <View style={badge.dot}>
           <Text style={badge.text}>{count > 9 ? '9+' : count}</Text>
@@ -90,9 +92,8 @@ function LoginPrompt() {
             Faça login para fazer pedidos, acompanhar entregas e muito mais.
           </Text>
 
-          <TouchableOpacity
+          <Relevo
             style={prompt.btn}
-            activeOpacity={0.88}
             onPress={() => {
               setVisible(false)
               router.push('/(auth)/login')
@@ -100,7 +101,7 @@ function LoginPrompt() {
           >
             <Text style={prompt.btnText}>Entrar ou criar conta</Text>
             <Ionicons name="arrow-forward" size={18} color="#fff" />
-          </TouchableOpacity>
+          </Relevo>
 
           <TouchableOpacity
             style={prompt.skipBtn}
@@ -116,11 +117,16 @@ function LoginPrompt() {
 }
 
 const tab = StyleSheet.create({
+  // Cada ícone fica num quadradinho em relevo; o da aba atual fica laranja claro.
   iconWrap: {
     alignItems: 'center', justifyContent: 'center',
-    width: 40, height: 28,
+    width: 46, height: 32, borderRadius: 11,
     position: 'relative', overflow: 'visible',
+    backgroundColor: '#FBF7F3',
+    borderWidth: 1, borderColor: '#F1E7DD',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
+  iconWrapAtivo: { ...relevo.icone },
 })
 
 const badge = StyleSheet.create({
@@ -161,12 +167,11 @@ const prompt = StyleSheet.create({
     lineHeight: 20, marginBottom: 28, maxWidth: 280,
   },
   btn: {
-    width: '100%', backgroundColor: colors.primary,
+    ...relevo.botao,
+    width: '100%',
     borderRadius: 14, paddingVertical: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8,
-    elevation: 6, marginBottom: 12,
+    marginBottom: 12,
   },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   skipBtn: { paddingVertical: 10 },
@@ -185,12 +190,12 @@ export default function TabsLayout() {
           tabBarStyle: {
             borderTopColor: '#F0F0F0', borderTopWidth: 1,
             // Soma a área segura inferior (barra de gestos) pra não cortar os rótulos.
-            height: 62 + insets.bottom, paddingBottom: 8 + insets.bottom, paddingTop: 10,
+            height: 70 + insets.bottom, paddingBottom: 8 + insets.bottom, paddingTop: 10,
             backgroundColor: '#fff',
             shadowColor: '#000', shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.06, shadowRadius: 8, elevation: 12,
           },
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: 1 },
+          tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: 4 },
           headerStyle: { backgroundColor: colors.primary },
           headerTintColor: '#fff',
           headerTitleStyle: { fontWeight: '800', fontSize: 17 },

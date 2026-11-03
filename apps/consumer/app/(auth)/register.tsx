@@ -10,6 +10,8 @@ import { useAuthStore } from '../../src/stores/auth.store'
 import { colors } from '../../src/theme/colors'
 import { formatPhoneBR } from '../../src/utils/phone'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
+import { relevo, LABIO_LARANJA } from '../../src/theme/relevo'
 import { TERMS_URL, PRIVACY_URL } from '../../src/links'
 import { BibleOfferModal } from '../../src/components/BibleOfferModal'
 
@@ -156,7 +158,7 @@ export default function RegisterScreen() {
           {/* Role selector */}
           <Text style={styles.section}>Tipo de conta</Text>
           <View style={styles.roleRow}>
-            <TouchableOpacity
+            <Relevo
               style={[styles.roleCard, role === 'CONSUMER' && styles.roleCardActive]}
               onPress={() => setRole('CONSUMER')}
               activeOpacity={0.8}
@@ -166,9 +168,9 @@ export default function RegisterScreen() {
               </View>
               <Text style={[styles.roleLabel, role === 'CONSUMER' && styles.roleLabelActive]}>Cliente</Text>
               <Text style={styles.roleSub}>Compras e pedidos</Text>
-            </TouchableOpacity>
+            </Relevo>
 
-            <TouchableOpacity
+            <Relevo
               style={[styles.roleCard, role === 'COURIER' && styles.roleCardActive]}
               onPress={() => setRole('COURIER')}
               activeOpacity={0.8}
@@ -178,10 +180,10 @@ export default function RegisterScreen() {
               </View>
               <Text style={[styles.roleLabel, role === 'COURIER' && styles.roleLabelCourier]}>Entregador</Text>
               <Text style={styles.roleSub}>Faça entregas</Text>
-            </TouchableOpacity>
+            </Relevo>
 
             {/* Lojista tem fluxo próprio (wizard 3 passos com dados da loja) */}
-            <TouchableOpacity
+            <Relevo
               style={styles.roleCard}
               onPress={() => router.push('/(auth)/register-store')}
               activeOpacity={0.8}
@@ -191,7 +193,7 @@ export default function RegisterScreen() {
               </View>
               <Text style={styles.roleLabel}>Lojista</Text>
               <Text style={styles.roleSub}>Vender produtos</Text>
-            </TouchableOpacity>
+            </Relevo>
           </View>
 
           <Text style={styles.section}>Dados pessoais</Text>
@@ -299,7 +301,7 @@ export default function RegisterScreen() {
           )}
 
           {/* CTA */}
-          <TouchableOpacity style={styles.btn} onPress={handleRegister} disabled={loading} activeOpacity={0.85}>
+          <Relevo style={styles.btn} onPress={handleRegister} disabled={loading}>
             <View style={styles.btnInner}>
               {loading
                 ? <ActivityIndicator color="#fff" />
@@ -309,7 +311,7 @@ export default function RegisterScreen() {
                   </>
               }
             </View>
-          </TouchableOpacity>
+          </Relevo>
 
           <Text style={styles.terms}>
             Ao continuar, você concorda com os{' '}
@@ -443,24 +445,16 @@ const styles = StyleSheet.create({
   stateOptionTextActive: { color: colors.primary, fontWeight: '700' },
 
   btn: {
+    ...relevo.botao,
     marginTop: 12,
     borderRadius: 14,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
   },
   btnInner: {
-    backgroundColor: colors.primary,
     paddingVertical: 17,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
-    borderRadius: 14,
-    borderBottomWidth: 3,
-    borderBottomColor: colors.primaryDark,
   },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
 
@@ -469,12 +463,13 @@ const styles = StyleSheet.create({
 
   roleRow: { flexDirection: 'row', gap: 9, marginBottom: 8 },
   roleCard: {
+    ...relevo.card,
     flex: 1, alignItems: 'center', paddingVertical: 15, paddingHorizontal: 5,
-    backgroundColor: '#fff', borderRadius: 14,
-    borderWidth: 2, borderColor: '#EDE5DF',
+    borderRadius: 14,
+    borderWidth: 2, borderColor: '#EDE5DF', borderBottomWidth: 4,
     gap: 6,
   },
-  roleCardActive: { borderColor: colors.primary, backgroundColor: '#FFF3EB' },
+  roleCardActive: { borderColor: colors.primary, borderBottomColor: LABIO_LARANJA, backgroundColor: '#FFF3EB' },
   roleIcon: {
     width: 44, height: 44, borderRadius: 12,
     backgroundColor: '#F0E8E2', alignItems: 'center', justifyContent: 'center',

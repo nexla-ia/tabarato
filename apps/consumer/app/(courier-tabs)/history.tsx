@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from 'expo-router'
 import { api } from '../../src/api/client'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 
 const PRIMARY       = '#FF5500'
 const PRIMARY_LIGHT = '#FFF3EB'
@@ -180,7 +181,7 @@ export default function CourierHistoryScreen() {
 
         {/* Stats row */}
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, { borderColor: GREEN_LIGHT }]}>
+          <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: GREEN_LIGHT }]}>
               <Ionicons name="cash-outline" size={18} color={GREEN} />
             </View>
@@ -190,7 +191,7 @@ export default function CourierHistoryScreen() {
             <Text style={styles.statLabel}>No período</Text>
           </View>
 
-          <View style={[styles.statCard, { borderColor: PRIMARY_LIGHT }]}>
+          <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: PRIMARY_LIGHT }]}>
               <Ionicons name="bicycle-outline" size={18} color={PRIMARY} />
             </View>
@@ -198,7 +199,7 @@ export default function CourierHistoryScreen() {
             <Text style={styles.statLabel}>Entregas</Text>
           </View>
 
-          <View style={[styles.statCard, { borderColor: '#EDE9FE' }]}>
+          <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: '#EDE9FE' }]}>
               <Ionicons name="map-outline" size={18} color="#7C3AED" />
             </View>
@@ -330,11 +331,10 @@ const styles = StyleSheet.create({
   filterChip: {
     flex: 1, paddingVertical: 8, borderRadius: 12,
     backgroundColor: CARD, borderWidth: 1.5, borderColor: BORDER,
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
     alignItems: 'center',
   },
-  filterChipActive: {
-    backgroundColor: PRIMARY, borderColor: PRIMARY,
-  },
+  filterChipActive: { ...relevo.chipAtivo },
   filterChipText: { fontSize: 12, fontWeight: '700', color: MUTED },
   filterChipTextActive: { color: '#fff' },
 
@@ -342,8 +342,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4', borderRadius: 18, padding: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderWidth: 1.5, borderColor: '#BBF7D0', marginBottom: 12,
-    shadowColor: GREEN, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 6, elevation: 2,
+    borderBottomWidth: 4, borderBottomColor: '#86EFAC',
+    shadowColor: '#15803D', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12, shadowRadius: 14, elevation: 5,
   },
   walletLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   walletIconWrap: {
@@ -361,10 +362,9 @@ const styles = StyleSheet.create({
 
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: {
-    flex: 1, backgroundColor: CARD, borderRadius: 16, padding: 14,
-    alignItems: 'center', gap: 6, borderWidth: 1.5,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    ...relevo.card,
+    flex: 1, borderRadius: 16, padding: 14,
+    alignItems: 'center', gap: 6,
   },
   statIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   statValue: { fontSize: 16, fontWeight: '900' },
@@ -379,14 +379,14 @@ const styles = StyleSheet.create({
   errorText: { flex: 1, fontSize: 13, color: MUTED, lineHeight: 18 },
 
   emptyCard: {
-    backgroundColor: CARD, borderRadius: 20, padding: 32,
+    ...relevo.card,
+    borderRadius: 20, padding: 32,
     alignItems: 'center', gap: 8,
-    borderWidth: 1, borderColor: BORDER,
     marginTop: 8,
   },
   emptyIconWrap: {
+    ...relevo.icone,
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: PRIMARY_LIGHT,
     alignItems: 'center', justifyContent: 'center', marginBottom: 8,
   },
   emptyTitle: { fontSize: 16, fontWeight: '800', color: TEXT, textAlign: 'center' },
@@ -399,13 +399,11 @@ const styles = StyleSheet.create({
   },
 
   deliveryCard: {
-    backgroundColor: CARD, borderRadius: 14, marginBottom: 10,
-    flexDirection: 'row', overflow: 'hidden',
-    borderWidth: 1, borderColor: BORDER,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    ...relevo.card,
+    borderRadius: 14, marginBottom: 10,
+    flexDirection: 'row',
   },
-  cardAccent: { width: 4, backgroundColor: GREEN },
+  cardAccent: { width: 4, backgroundColor: GREEN, borderTopLeftRadius: 13, borderBottomLeftRadius: 11 },
   cardBody: { flex: 1, padding: 13, gap: 6 },
 
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },

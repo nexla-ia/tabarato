@@ -8,7 +8,9 @@ import { useCartStore } from '../../src/stores/cart.store'
 import { promoLabel, promoDiscountFor } from '../../src/utils/promo'
 import { api } from '../../src/api/client'
 import { colors } from '../../src/theme/colors'
+import { relevo } from '../../src/theme/relevo'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
 
 // A taxa de entrega é calculada por loja no checkout (por distância).
 
@@ -82,10 +84,10 @@ export default function CartScreen() {
         </View>
         <Text style={styles.emptyTitle}>Carrinho vazio</Text>
         <Text style={styles.emptySub}>Adicione itens de uma ou mais lojas para{'\n'}começar seu pedido</Text>
-        <TouchableOpacity style={styles.emptyBtn} onPress={() => router.replace('/(tabs)')} activeOpacity={0.85}>
+        <Relevo style={styles.emptyBtn} onPress={() => router.replace('/(tabs)')}>
           <Ionicons name="storefront-outline" size={16} color="#fff" />
           <Text style={styles.emptyBtnText}>Ver lojas</Text>
-        </TouchableOpacity>
+        </Relevo>
       </View>
     )
   }
@@ -206,11 +208,11 @@ export default function CartScreen() {
 
       {/* CTA fixo */}
       <View style={styles.ctaWrap}>
-        <TouchableOpacity style={styles.cta} activeOpacity={0.88} onPress={() => router.push('/checkout' as any)}>
+        <Relevo style={styles.cta} onPress={() => router.push('/checkout' as any)}>
           <View style={styles.ctaLeft}><View style={styles.ctaBadge}><Text style={styles.ctaBadgeText}>{count}</Text></View></View>
           <Text style={styles.ctaText}>Ir para o checkout</Text>
           <Text style={styles.ctaPrice}>R$ {netTotal.toFixed(2)}</Text>
-        </TouchableOpacity>
+        </Relevo>
       </View>
     </View>
   )
@@ -221,11 +223,11 @@ const styles = StyleSheet.create({
   scroll: { padding: 16, paddingBottom: 24 },
 
   emptyContainer: { flex: 1, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyIconOuter: { width: 120, height: 120, borderRadius: 60, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  emptyIconOuter: { ...relevo.icone, width: 120, height: 120, borderRadius: 60, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
   emptyIconInner: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#FFE0CC', alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 22, fontWeight: '800', color: colors.text, marginBottom: 8 },
   emptySub: { fontSize: 14, color: colors.textMuted, textAlign: 'center', lineHeight: 21, marginBottom: 32 },
-  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primary, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14, shadowColor: colors.primaryDark, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  emptyBtn: { ...relevo.botao, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14 },
   emptyBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 2 },
@@ -233,9 +235,9 @@ const styles = StyleSheet.create({
   clearAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 6 },
   clearAllText: { fontSize: 13, fontWeight: '700', color: colors.danger },
 
-  storeCard: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  storeCard: { ...relevo.card, borderRadius: 16, marginBottom: 12 },
   storeHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F5EEE9' },
-  storeLogoWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  storeLogoWrap: { ...relevo.icone, width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   storeName: { flex: 1, fontSize: 15, fontWeight: '800', color: colors.text },
   storeClear: { padding: 4 },
 
@@ -255,18 +257,18 @@ const styles = StyleSheet.create({
   storePromoLabel: { fontSize: 12, color: '#15803D', fontWeight: '700' },
   storePromoValue: { fontSize: 13, color: '#15803D', fontWeight: '800' },
 
-  storeSubtotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#FCFAF8' },
+  storeSubtotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#FCFAF8', borderBottomLeftRadius: 15, borderBottomRightRadius: 15 },
   storeSubtotalLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
   storeSubtotalValue: { fontSize: 14, color: colors.text, fontWeight: '800' },
 
-  totalsCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  totalsCard: { ...relevo.card, borderRadius: 16, padding: 16 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   totalLabel: { fontSize: 14, color: colors.textMuted },
   totalValue: { fontSize: 14, color: colors.text, fontWeight: '700' },
   multiHint: { fontSize: 11.5, color: colors.textMuted, marginTop: 4, lineHeight: 16 },
 
   ctaWrap: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F0F0F0', padding: 16, paddingBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 16 },
-  cta: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 3, borderBottomColor: colors.primaryDark },
+  cta: { ...relevo.botao, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center' },
   ctaLeft: { width: 32 },
   ctaBadge: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
   ctaBadgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },

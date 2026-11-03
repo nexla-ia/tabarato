@@ -2,6 +2,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Store } from '../types'
 import { colors } from '../theme/colors'
+import { relevo } from '../theme/relevo'
 import { useFavoritesStore } from '../stores/favorites.store'
 import { useAuthStore } from '../stores/auth.store'
 
@@ -101,20 +102,15 @@ export function StoreCard({ store, onPress }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.card,
+    ...relevo.card,
     borderRadius: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.09,
-    shadowRadius: 8,
-    elevation: 3,
   },
 
   banner: {
     height: 130,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
     overflow: 'hidden',
     position: 'relative',
   },

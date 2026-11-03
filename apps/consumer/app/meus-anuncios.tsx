@@ -11,6 +11,8 @@ import { api } from '../src/api/client'
 import { colors } from '../src/theme/colors'
 import { useToast } from '../src/components/Toast'
 import { LoadError } from '../src/components/LoadError'
+import { Relevo } from '../src/components/Relevo'
+import { relevo } from '../src/theme/relevo'
 import { MyAd, VENDE_ANUNCIO_NO_APP, brl, ctr, dataCurta, faseDoAnuncio } from '../src/utils/ads'
 
 const TEXT = '#1A0A00'
@@ -65,9 +67,9 @@ export default function MeusAnunciosScreen() {
           {VENDE_ANUNCIO_NO_APP && (
             <>
               <Text style={s.vazioTexto}>Coloque sua empresa no topo da tela inicial do Tá Barato. Você só paga depois que aprovarmos a arte.</Text>
-              <TouchableOpacity style={s.cta} onPress={() => router.push('/anunciar' as any)} activeOpacity={0.85}>
+              <Relevo style={s.cta} onPress={() => router.push('/anunciar' as any)}>
                 <Text style={s.ctaTxt}>Criar meu anúncio</Text>
-              </TouchableOpacity>
+              </Relevo>
             </>
           )}
         </View>
@@ -158,24 +160,24 @@ function CartaoAnuncio({ ad, onPagar, onMudou }: { ad: MyAd; onPagar: () => void
 
         <View style={s.acoes}>
           {ad.status === 'AWAITING_PAYMENT' && VENDE_ANUNCIO_NO_APP && (
-            <TouchableOpacity style={[s.cta, { flex: 1 }]} onPress={onPagar} activeOpacity={0.85}>
+            <Relevo style={[s.cta, { flex: 1 }]} onPress={onPagar}>
               <Ionicons name="qr-code" size={16} color="#fff" />
               <Text style={s.ctaTxt}>Pagar com PIX</Text>
-            </TouchableOpacity>
+            </Relevo>
           )}
           {(ad.status === 'PENDING_REVIEW' || ad.status === 'AWAITING_PAYMENT') && (
-            <TouchableOpacity style={s.secundario} onPress={cancelar}>
+            <Relevo style={s.secundario} onPress={cancelar}>
               <Text style={s.secundarioTxt}>Cancelar</Text>
-            </TouchableOpacity>
+            </Relevo>
           )}
           {VENDE_ANUNCIO_NO_APP && (ad.status === 'REJECTED' || ad.status === 'EXPIRED_UNPAID' || terminou || (ad.status === 'PAID' && ad.live)) && (
-            <TouchableOpacity
+            <Relevo
               style={[s.secundario, { flex: 1 }]}
               onPress={() => router.push({ pathname: '/anunciar', params: { de: ad.id } } as any)}
             >
               <Ionicons name="refresh" size={15} color={colors.primary} />
               <Text style={s.secundarioTxt}>{ad.status === 'REJECTED' ? 'Enviar nova arte' : ad.live ? 'Renovar' : 'Anunciar de novo'}</Text>
-            </TouchableOpacity>
+            </Relevo>
           )}
         </View>
       </View>
@@ -257,17 +259,17 @@ function PagamentoPix({ ad, onFechar }: { ad: MyAd; onFechar: () => void }) {
                   ? `Ele entra no ar em ${dataCurta(dados.startsAt)} e fica até ${dataCurta(dados.endsAt)}.`
                   : 'Já registramos o pagamento.'}
             </Text>
-            <TouchableOpacity style={[s.cta, { alignSelf: 'stretch' }]} onPress={onFechar}>
+            <Relevo style={[s.cta, { alignSelf: 'stretch' }]} onPress={onFechar}>
               <Text style={s.ctaTxt}>Ver meus anúncios</Text>
-            </TouchableOpacity>
+            </Relevo>
           </View>
         ) : erro ? (
           <View style={s.pagoBox}>
             <Ionicons name="alert-circle-outline" size={40} color="#DC2626" />
             <Text style={s.pagoTexto}>{erro}</Text>
-            <TouchableOpacity style={[s.cta, { alignSelf: 'stretch' }]} onPress={gerar}>
+            <Relevo style={[s.cta, { alignSelf: 'stretch' }]} onPress={gerar}>
               <Text style={s.ctaTxt}>Tentar de novo</Text>
-            </TouchableOpacity>
+            </Relevo>
           </View>
         ) : !dados?.pix ? (
           <ActivityIndicator color={colors.primary} size="large" style={{ marginTop: 60 }} />
@@ -278,10 +280,10 @@ function PagamentoPix({ ad, onFechar }: { ad: MyAd; onFechar: () => void }) {
             {dados.pix.qrBase64 ? (
               <Image source={{ uri: `data:image/png;base64,${dados.pix.qrBase64}` }} style={s.qr} />
             ) : null}
-            <TouchableOpacity style={s.copiar} onPress={copiar} activeOpacity={0.85}>
+            <Relevo style={s.copiar} onPress={copiar}>
               <Ionicons name="copy-outline" size={17} color={colors.primary} />
               <Text style={s.copiarTxt}>Copiar código PIX</Text>
-            </TouchableOpacity>
+            </Relevo>
             <Text style={s.pixValidade}>Código válido até {new Date(dados.pix.expiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Venceu? Feche e toque em pagar de novo.</Text>
 
             {previsto && (
@@ -314,8 +316,8 @@ const s = StyleSheet.create({
   icone: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   titulo: { fontSize: 17, fontWeight: '900', color: TEXT },
 
-  cartao: { backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
-  arte: { width: '100%', aspectRatio: 3, backgroundColor: colors.primaryLight },
+  cartao: { ...relevo.card, borderRadius: 18 },
+  arte: { width: '100%', aspectRatio: 3, backgroundColor: colors.primaryLight, borderTopLeftRadius: 17, borderTopRightRadius: 17 },
   corpo: { padding: 14, gap: 10 },
   linhaTopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pilula: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999 },
@@ -331,18 +333,18 @@ const s = StyleSheet.create({
 
   acoes: { flexDirection: 'row', gap: 8 },
   cta: {
-    flexDirection: 'row', gap: 7, backgroundColor: colors.primary, borderRadius: 12,
+    flexDirection: 'row', gap: 7, ...relevo.botao, borderRadius: 12,
     paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
   },
   ctaTxt: { color: '#fff', fontSize: 14, fontWeight: '900' },
   secundario: {
-    flexDirection: 'row', gap: 6, borderRadius: 12, borderWidth: 1.5, borderColor: '#FFD9C2',
+    flexDirection: 'row', gap: 6, ...relevo.contorno, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 11, alignItems: 'center', justifyContent: 'center',
   },
   secundarioTxt: { color: colors.primary, fontSize: 13.5, fontWeight: '800' },
 
   vazio: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  vazioIcone: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  vazioIcone: { ...relevo.icone, width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   vazioTitulo: { fontSize: 18, fontWeight: '900', color: TEXT },
   vazioTexto: { fontSize: 13.5, color: MUTED, textAlign: 'center', lineHeight: 19, marginBottom: 8 },
 
@@ -354,7 +356,7 @@ const s = StyleSheet.create({
   qr: { width: 210, height: 210, marginBottom: 14, borderRadius: 8, backgroundColor: '#fff' },
   copiar: {
     flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch', justifyContent: 'center',
-    backgroundColor: colors.primaryLight, borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: '#FFD9C2',
+    ...relevo.icone, borderRadius: 14, paddingVertical: 14,
   },
   copiarTxt: { fontSize: 15, fontWeight: '900', color: colors.primary },
   pixValidade: { fontSize: 12, color: MUTED, textAlign: 'center', marginTop: 10, lineHeight: 17 },

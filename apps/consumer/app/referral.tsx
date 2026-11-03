@@ -7,6 +7,8 @@ import * as Clipboard from 'expo-clipboard'
 import { api } from '../src/api/client'
 import { colors } from '../src/theme/colors'
 import { useToast } from '../src/components/Toast'
+import { Relevo } from '../src/components/Relevo'
+import { relevo, LABIO_LARANJA } from '../src/theme/relevo'
 
 const PRIMARY = colors.primary
 const TEXT = '#1A0A00'
@@ -78,10 +80,10 @@ export default function ReferralScreen() {
             ) : (
               <>
                 <Text style={styles.code}>{referralCode ?? '------'}</Text>
-                <TouchableOpacity style={styles.copyBtn} onPress={handleCopy} activeOpacity={0.8} disabled={!referralCode}>
+                <Relevo style={styles.copyBtn} onPress={handleCopy} disabled={!referralCode}>
                   <Ionicons name="copy-outline" size={16} color={PRIMARY} />
                   <Text style={styles.copyBtnText}>Copiar código</Text>
-                </TouchableOpacity>
+                </Relevo>
               </>
             )}
           </View>
@@ -100,10 +102,10 @@ export default function ReferralScreen() {
             ))}
           </View>
 
-          <TouchableOpacity style={styles.shareBtn} onPress={handleShare} activeOpacity={0.88}>
+          <Relevo style={styles.shareBtn} onPress={handleShare}>
             <Ionicons name="share-social-outline" size={20} color="#fff" />
             <Text style={styles.shareBtnText}>Compartilhar convite</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       )}
     </View>
@@ -123,6 +125,7 @@ const styles = StyleSheet.create({
 
   hero: {
     backgroundColor: PRIMARY, borderRadius: 20, padding: 28,
+    borderBottomWidth: 4, borderBottomColor: LABIO_LARANJA,
     alignItems: 'center', overflow: 'hidden', position: 'relative',
   },
   heroDecor: {
@@ -133,20 +136,22 @@ const styles = StyleSheet.create({
   heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', textAlign: 'center' },
 
   codeCard: {
-    backgroundColor: CARD, borderRadius: 16, padding: 20,
-    alignItems: 'center', borderWidth: 2, borderColor: PRIMARY, gap: 12,
+    ...relevo.card, borderRadius: 16, padding: 20,
+    alignItems: 'center', borderWidth: 2, borderColor: PRIMARY,
+    borderBottomWidth: 4, borderBottomColor: LABIO_LARANJA, gap: 12,
   },
   codeLabel: { fontSize: 11, fontWeight: '800', color: MUTED, letterSpacing: 1 },
   code: { fontSize: 36, fontWeight: '900', color: PRIMARY, letterSpacing: 6 },
   copyBtn: {
+    ...relevo.icone,
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#FFF0EB', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8,
+    borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8,
   },
   copyBtnText: { fontSize: 13, fontWeight: '700', color: PRIMARY },
 
   stepsCard: {
-    backgroundColor: CARD, borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: BORDER, gap: 14,
+    ...relevo.card, borderRadius: 16, padding: 16,
+    gap: 14,
   },
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stepNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center' },
@@ -155,8 +160,7 @@ const styles = StyleSheet.create({
 
   shareBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 16,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, elevation: 6,
+    ...relevo.botao, borderRadius: 14, paddingVertical: 16,
   },
   shareBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 })

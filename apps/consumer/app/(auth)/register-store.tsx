@@ -10,6 +10,8 @@ import { api } from '../../src/api/client'
 import { useAuthStore } from '../../src/stores/auth.store'
 import { colors } from '../../src/theme/colors'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
+import { relevo } from '../../src/theme/relevo'
 import { TERMS_URL, PRIVACY_URL, STORE_TERMS_URL, STORE_TERMS_VERSION } from '../../src/links'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
@@ -393,7 +395,7 @@ export default function RegisterStoreScreen() {
                 }
               />
 
-              <TouchableOpacity style={styles.cta} onPress={handleStep0} disabled={loading} activeOpacity={0.85}>
+              <Relevo style={styles.cta} onPress={handleStep0} disabled={loading}>
                 {loading
                   ? <ActivityIndicator color="#fff" />
                   : <>
@@ -401,7 +403,7 @@ export default function RegisterStoreScreen() {
                       <Ionicons name="arrow-forward" size={18} color="#fff" />
                     </>
                 }
-              </TouchableOpacity>
+              </Relevo>
             </>
           )}
 
@@ -492,7 +494,7 @@ export default function RegisterStoreScreen() {
                 </TouchableOpacity>
               )}
 
-              <TouchableOpacity style={styles.cta} onPress={handleStep1} disabled={validatingStep1} activeOpacity={0.85}>
+              <Relevo style={styles.cta} onPress={handleStep1} disabled={validatingStep1}>
                 {validatingStep1
                   ? <ActivityIndicator color="#fff" />
                   : <>
@@ -500,7 +502,7 @@ export default function RegisterStoreScreen() {
                       <Ionicons name="arrow-forward" size={18} color="#fff" />
                     </>
                 }
-              </TouchableOpacity>
+              </Relevo>
             </>
           )}
 
@@ -582,11 +584,10 @@ export default function RegisterStoreScreen() {
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              <Relevo
                 style={[styles.cta, !acceptedTerms && styles.ctaOff]}
                 onPress={handleStep2}
                 disabled={loading || !acceptedTerms}
-                activeOpacity={0.85}
               >
                 {loading
                   ? <ActivityIndicator color="#fff" />
@@ -595,7 +596,7 @@ export default function RegisterStoreScreen() {
                       <Text style={styles.ctaText}>Criar minha loja</Text>
                     </>
                 }
-              </TouchableOpacity>
+              </Relevo>
             </>
           )}
 
@@ -736,8 +737,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   stepIconWrap: {
+    ...relevo.icone,
     width: 44, height: 44, borderRadius: 12,
-    backgroundColor: '#FFF0EB',
     alignItems: 'center', justifyContent: 'center',
   },
   stepTitle: { fontSize: 18, fontWeight: '900', color: '#1A0A00', letterSpacing: -0.2 },
@@ -773,12 +774,10 @@ const styles = StyleSheet.create({
   locationRetry: { fontSize: 12, color: colors.primary, fontWeight: '700', marginTop: 1 },
 
   summaryBox: {
-    backgroundColor: '#fff',
+    ...relevo.card,
     borderRadius: 12,
     padding: 14,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#EDE5DF',
   },
   summaryTitle: { fontSize: 12, fontWeight: '800', color: '#9A8880', marginBottom: 10, letterSpacing: 0.5 },
 
@@ -787,16 +786,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: colors.primary,
+    ...relevo.botao,
     paddingVertical: 17,
     borderRadius: 14,
-    borderBottomWidth: 3,
-    borderBottomColor: colors.primaryDark,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
     marginBottom: 20,
   },
   ctaText: { color: '#fff', fontSize: 16, fontWeight: '800' },

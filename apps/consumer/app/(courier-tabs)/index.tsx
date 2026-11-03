@@ -14,6 +14,8 @@ import { uploadDocumentImage } from '../../src/api/upload'
 import { getDeliverySocket } from '../../src/socket'
 import { startCourierLocationUpdates, stopCourierLocationUpdates } from '../../src/tasks/locationTask'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 import { useAuthStore } from '../../src/stores/auth.store'
 
 const PRIMARY      = '#FF5500'
@@ -470,14 +472,14 @@ export default function CourierHomeScreen() {
               </View>
             ))}
           </View>
-          <TouchableOpacity style={[styles.outlineBtn, { marginBottom: 10 }]} onPress={() => fetchData()} activeOpacity={0.85}>
+          <Relevo style={[styles.outlineBtn, { marginBottom: 10 }]} onPress={() => fetchData()}>
             <Ionicons name="refresh-outline" size={16} color={PRIMARY} />
             <Text style={styles.outlineBtnText}>Verificar status agora</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.outlineBtn} onPress={() => router.replace('/(tabs)')} activeOpacity={0.85}>
+          </Relevo>
+          <Relevo style={styles.outlineBtn} onPress={() => router.replace('/(tabs)')}>
             <Ionicons name="arrow-back" size={16} color={PRIMARY} />
             <Text style={styles.outlineBtnText}>Voltar à seleção de modo</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       </View>
     )
@@ -495,7 +497,7 @@ export default function CourierHomeScreen() {
           <View style={{ width: 38 }} />
         </View>
         <View style={styles.center}>
-          <View style={[styles.emptyIconWrap, { backgroundColor: '#FEF2F2' }]}>
+          <View style={[styles.emptyIconWrap, styles.emptyIconWrapDanger]}>
             <Ionicons name="close-circle-outline" size={48} color={RED} />
           </View>
           <Text style={[styles.emptyTitle, { color: RED }]}>
@@ -515,12 +517,11 @@ export default function CourierHomeScreen() {
                 { key: 'identity' as const, label: 'Identidade',       status: profile.identityStatus },
                 { key: 'vehicle' as const,  label: 'Doc. do veículo',  status: profile.vehicleDocStatus },
               ]).filter(d => d.status === 'REJECTED').map(d => (
-                <TouchableOpacity
+                <Relevo
                   key={d.key}
                   style={[styles.primaryBtn, resubmitting !== null && { opacity: 0.6 }]}
                   onPress={() => handleResubmit(d.key, d.label)}
                   disabled={resubmitting !== null}
-                  activeOpacity={0.85}
                 >
                   {resubmitting === d.key ? (
                     <ActivityIndicator color="#fff" />
@@ -530,15 +531,15 @@ export default function CourierHomeScreen() {
                       <Text style={styles.primaryBtnText}>Reenviar {d.label}</Text>
                     </>
                   )}
-                </TouchableOpacity>
+                </Relevo>
               ))}
             </View>
           )}
 
-          <TouchableOpacity style={styles.outlineBtn} onPress={() => router.replace('/(tabs)')} activeOpacity={0.85}>
+          <Relevo style={styles.outlineBtn} onPress={() => router.replace('/(tabs)')}>
             <Ionicons name="arrow-back" size={16} color={PRIMARY} />
             <Text style={styles.outlineBtnText}>Voltar à seleção de modo</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       </View>
     )
@@ -563,14 +564,14 @@ export default function CourierHomeScreen() {
           <Text style={styles.emptySub}>
             Para começar a fazer entregas, você precisa enviar seus documentos para análise.
           </Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/courier-register' as any)} activeOpacity={0.85}>
+          <Relevo style={styles.primaryBtn} onPress={() => router.push('/courier-register' as any)}>
             <Ionicons name="document-text-outline" size={16} color="#fff" />
             <Text style={styles.primaryBtnText}>Completar cadastro</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.outlineBtn, { marginTop: 8 }]} onPress={() => router.replace('/(tabs)')} activeOpacity={0.85}>
+          </Relevo>
+          <Relevo style={[styles.outlineBtn, { marginTop: 8 }]} onPress={() => router.replace('/(tabs)')}>
             <Ionicons name="arrow-back" size={16} color={PRIMARY} />
             <Text style={styles.outlineBtnText}>Voltar à seleção de modo</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       </View>
     )
@@ -590,17 +591,17 @@ export default function CourierHomeScreen() {
           <View style={{ width: 38 }} />
         </View>
         <View style={styles.center}>
-          <View style={[styles.emptyIconWrap, { backgroundColor: '#FEF2F2' }]}>
+          <View style={[styles.emptyIconWrap, styles.emptyIconWrapDanger]}>
             <Ionicons name="cloud-offline-outline" size={48} color={RED} />
           </View>
           <Text style={styles.emptyTitle}>Não foi possível carregar</Text>
           <Text style={styles.emptySub}>
             Verifique sua conexão e tente novamente.
           </Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => fetchData()} activeOpacity={0.85}>
+          <Relevo style={styles.primaryBtn} onPress={() => fetchData()}>
             <Ionicons name="refresh-outline" size={16} color="#fff" />
             <Text style={styles.primaryBtnText}>Tentar novamente</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       </View>
     )
@@ -646,18 +647,17 @@ export default function CourierHomeScreen() {
               autoFocus
             />
 
-            <TouchableOpacity
+            <Relevo
               style={[codeM.confirmBtn, (codeInput.length !== 6 || advancingId) ? codeM.confirmBtnDisabled : null]}
               onPress={confirmDeliveryWithCode}
               disabled={codeInput.length !== 6 || !!advancingId}
-              activeOpacity={0.85}
             >
               {advancingId ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={codeM.confirmBtnText}>Confirmar entrega</Text>
               )}
-            </TouchableOpacity>
+            </Relevo>
 
             <TouchableOpacity style={codeM.cancelBtn} onPress={() => setCodeModal(null)} activeOpacity={0.7} disabled={!!advancingId}>
               <Text style={[codeM.cancelBtnText, advancingId ? { opacity: 0.4 } : null]}>Cancelar</Text>
@@ -708,11 +708,10 @@ export default function CourierHomeScreen() {
               </Text>
             </View>
           </View>
-          <TouchableOpacity
+          <Relevo
             style={[styles.toggleBtn, profile?.isOnline ? styles.toggleOff : styles.toggleOn, togglingOnline && { opacity: 0.7 }]}
             onPress={handleToggleOnline}
             disabled={togglingOnline}
-            activeOpacity={0.85}
           >
             {togglingOnline
               ? <ActivityIndicator size="small" color={profile?.isOnline ? TEXT : '#fff'} />
@@ -720,7 +719,7 @@ export default function CourierHomeScreen() {
                   {profile?.isOnline ? 'Ficar offline' : 'Ficar online'}
                 </Text>
             }
-          </TouchableOpacity>
+          </Relevo>
         </View>
 
         {/* Location indicator */}
@@ -738,7 +737,7 @@ export default function CourierHomeScreen() {
             { icon: 'cash-outline'    as IoniconName, value: `R$ ${Number(stats?.todayEarnings ?? 0).toFixed(0)}`, label: 'Ganhos',   color: GREEN,   bg: '#D1FAE5' },
             { icon: 'star-outline'    as IoniconName, value: stats?.rating != null ? Number(stats.rating).toFixed(1) : '—', label: 'Avaliação', color: AMBER,  bg: '#FEF3C7' },
           ].map(s => (
-            <View key={s.label} style={[styles.statCard, { borderColor: s.bg }]}>
+            <View key={s.label} style={styles.statCard}>
               <Ionicons name={s.icon} size={20} color={s.color} />
               <Text style={styles.statValue}>{s.value}</Text>
               <Text style={styles.statLabel}>{s.label}</Text>
@@ -889,11 +888,10 @@ function DeliveryCard({ delivery: d, advancing, onAdvance, onReturn }: {
             </TouchableOpacity>
           )}
           {action && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: action.color }]}
+            <Relevo
+              style={[styles.actionBtn, { backgroundColor: action.color, shadowColor: action.color }]}
               onPress={onAdvance}
               disabled={advancing}
-              activeOpacity={0.85}
             >
               {advancing
                 ? <ActivityIndicator size="small" color="#fff" />
@@ -902,7 +900,7 @@ function DeliveryCard({ delivery: d, advancing, onAdvance, onReturn }: {
                     <Text style={styles.actionBtnText}>{action.label}</Text>
                   </>
               }
-            </TouchableOpacity>
+            </Relevo>
           )}
         </View>
       </View>
@@ -1009,11 +1007,10 @@ function NewDeliveryModal({
 
           {/* Actions */}
           <View style={modal.actions}>
-            <TouchableOpacity
+            <Relevo
               style={[modal.btn, modal.rejectBtn]}
               onPress={onReject}
               disabled={!!actioning}
-              activeOpacity={0.85}
             >
               {actioning === 'reject'
                 ? <ActivityIndicator color={RED} size="small" />
@@ -1022,12 +1019,11 @@ function NewDeliveryModal({
                     <Text style={[modal.btnText, { color: RED }]}>Recusar</Text>
                   </>
               }
-            </TouchableOpacity>
-            <TouchableOpacity
+            </Relevo>
+            <Relevo
               style={[modal.btn, modal.acceptBtn]}
               onPress={onAccept}
               disabled={!!actioning}
-              activeOpacity={0.85}
             >
               {actioning === 'accept'
                 ? <ActivityIndicator color="#fff" size="small" />
@@ -1036,7 +1032,7 @@ function NewDeliveryModal({
                     <Text style={[modal.btnText, { color: '#fff' }]}>Aceitar entrega</Text>
                   </>
               }
-            </TouchableOpacity>
+            </Relevo>
           </View>
         </View>
       </View>
@@ -1104,12 +1100,10 @@ const styles = StyleSheet.create({
   locationText: { fontSize: 11, color: GREEN, fontWeight: '600' },
 
   onlineCard: {
-    backgroundColor: CARD, borderRadius: 18, padding: 16,
+    ...relevo.card,
+    borderRadius: 18, padding: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginBottom: 12, marginTop: 12,
-    borderWidth: 1, borderColor: BORDER,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 8, elevation: 3,
   },
   onlineCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   onlineIconWrap: {
@@ -1122,21 +1116,24 @@ const styles = StyleSheet.create({
   toggleBtn: {
     paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: 12, alignItems: 'center', justifyContent: 'center', minWidth: 96,
+    borderBottomWidth: 4,
   },
   toggleOn: {
-    backgroundColor: GREEN,
-    shadowColor: GREEN, shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
+    backgroundColor: GREEN, borderBottomColor: '#15803D',
+    shadowColor: GREEN, shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
   },
-  toggleOff: { backgroundColor: '#F5F5F5', borderWidth: 1.5, borderColor: BORDER },
+  toggleOff: {
+    backgroundColor: '#F5F5F5', borderWidth: 1.5, borderColor: BORDER,
+    borderBottomColor: LABIO_NEUTRO,
+  },
   toggleBtnText: { fontSize: 12, fontWeight: '800' },
 
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: {
-    flex: 1, backgroundColor: CARD, borderRadius: 14, padding: 14,
-    alignItems: 'center', gap: 6, borderWidth: 1.5,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    ...relevo.card,
+    flex: 1, borderRadius: 14, padding: 14,
+    alignItems: 'center', gap: 6,
   },
   statValue: { fontSize: 18, fontWeight: '900', color: TEXT },
   statLabel: { fontSize: 11, color: MUTED, fontWeight: '600' },
@@ -1148,18 +1145,17 @@ const styles = StyleSheet.create({
   },
 
   emptyCard: {
-    backgroundColor: CARD, borderRadius: 18, padding: 28,
+    ...relevo.card,
+    borderRadius: 18, padding: 28,
     alignItems: 'center', gap: 8,
-    borderWidth: 1, borderColor: BORDER,
   },
   emptyCardTitle: { fontSize: 15, fontWeight: '700', color: TEXT, marginTop: 4 },
   emptyCardSub: { fontSize: 13, color: MUTED, textAlign: 'center', lineHeight: 19 },
 
   deliveryCard: {
-    backgroundColor: CARD, borderRadius: 14, padding: 14,
-    marginBottom: 10, borderWidth: 1, borderColor: BORDER,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    ...relevo.card,
+    borderRadius: 14, padding: 14,
+    marginBottom: 10,
   },
   deliveryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   deliveryStore: { fontSize: 14, fontWeight: '800', color: TEXT, flex: 1, marginRight: 8 },
@@ -1191,7 +1187,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 10,
-    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3,
+    borderBottomWidth: 4, borderBottomColor: 'rgba(0,0,0,0.22)',
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 4,
   },
   actionBtnText: { fontSize: 12, fontWeight: '800', color: '#fff' },
   returnBtn: {
@@ -1213,25 +1210,26 @@ const styles = StyleSheet.create({
   progressLabel: { flex: 1, fontSize: 9, fontWeight: '600', textAlign: 'center' },
 
   emptyIconWrap: {
+    ...relevo.icone,
     width: 96, height: 96, borderRadius: 48,
-    backgroundColor: PRIMARY_LIGHT,
     alignItems: 'center', justifyContent: 'center', marginBottom: 16,
   },
+  emptyIconWrapDanger: { backgroundColor: '#FEF2F2', borderColor: '#FEE2E2', borderBottomColor: '#FCC5C5', shadowColor: RED },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: TEXT, marginBottom: 8, textAlign: 'center' },
   emptySub: { fontSize: 14, color: MUTED, textAlign: 'center', lineHeight: 21, marginBottom: 24 },
 
   primaryBtn: {
+    ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 24, paddingVertical: 14,
-    borderRadius: 12, backgroundColor: PRIMARY,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    borderRadius: 12,
   },
   primaryBtnText: { fontSize: 15, fontWeight: '800', color: '#fff' },
   outlineBtn: {
+    ...relevo.contorno,
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 20, paddingVertical: 12,
-    borderRadius: 12, borderWidth: 1.5, borderColor: PRIMARY,
+    borderRadius: 12,
     backgroundColor: PRIMARY_LIGHT,
   },
   outlineBtnText: { fontSize: 14, fontWeight: '700', color: PRIMARY },
@@ -1264,9 +1262,8 @@ const modal = StyleSheet.create({
   timerNumber: { fontSize: 22, fontWeight: '900', lineHeight: 24 },
   timerSec: { fontSize: 9, fontWeight: '700', color: MUTED, marginTop: -2 },
   iconWrap: {
+    ...relevo.icone,
     width: 68, height: 68, borderRadius: 20,
-    backgroundColor: PRIMARY_LIGHT,
-    borderWidth: 2, borderColor: PRIMARY + '33',
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 14,
   },
@@ -1281,8 +1278,8 @@ const modal = StyleSheet.create({
   },
   infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 12 },
   infoIcon: {
+    ...relevo.icone,
     width: 34, height: 34, borderRadius: 10,
-    backgroundColor: PRIMARY_LIGHT,
     alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
@@ -1309,11 +1306,12 @@ const modal = StyleSheet.create({
   rejectBtn: {
     backgroundColor: '#FEF2F2',
     borderWidth: 1.5, borderColor: RED + '44',
+    borderBottomWidth: 4, borderBottomColor: '#FCA5A5',
+    shadowColor: RED, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
   },
   acceptBtn: {
-    backgroundColor: PRIMARY,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
+    ...relevo.botao,
     flex: 1.5,
   },
   btnText: { fontSize: 15, fontWeight: '800' },
@@ -1321,15 +1319,15 @@ const modal = StyleSheet.create({
 
 const pendingCard = StyleSheet.create({
   box: {
-    width: '100%', backgroundColor: CARD,
+    ...relevo.card,
+    width: '100%',
     borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: BORDER,
     gap: 12, marginBottom: 20,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   iconWrap: {
+    ...relevo.icone,
     width: 34, height: 34, borderRadius: 10,
-    backgroundColor: PRIMARY_LIGHT,
     alignItems: 'center', justifyContent: 'center',
   },
   text: { flex: 1, fontSize: 13, color: MUTED, fontWeight: '500', lineHeight: 18 },
@@ -1339,7 +1337,8 @@ const codeM = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', paddingHorizontal: 24 },
   card: { backgroundColor: CARD, borderRadius: 24, padding: 24, alignItems: 'center' },
   iconWrap: {
-    width: 56, height: 56, borderRadius: 18, backgroundColor: PRIMARY_LIGHT,
+    ...relevo.icone,
+    width: 56, height: 56, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center', marginBottom: 14,
   },
   title: { fontSize: 19, fontWeight: '800', color: TEXT, marginBottom: 6 },
@@ -1355,7 +1354,8 @@ const codeM = StyleSheet.create({
   },
   photoBtnText: { fontSize: 13.5, fontWeight: '600', color: MUTED },
   confirmBtn: {
-    width: '100%', height: 54, borderRadius: 16, backgroundColor: PRIMARY,
+    ...relevo.botao,
+    width: '100%', height: 54, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',
   },
   confirmBtnDisabled: { opacity: 0.5 },

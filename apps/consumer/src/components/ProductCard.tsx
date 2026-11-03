@@ -2,6 +2,8 @@ import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
 import { Product } from '../types'
 import { promoLabel } from '../utils/promo'
 import { colors } from '../theme/colors'
+import { relevo } from '../theme/relevo'
+import { Relevo } from './Relevo'
 
 interface Props {
   product: Product
@@ -55,13 +57,12 @@ export function ProductCard({ product, onAdd, onPress }: Props) {
           {outOfStock ? (
             <Text style={styles.outLabel}>Indisponível</Text>
           ) : (
-            <TouchableOpacity
+            <Relevo
               style={styles.addBtn}
               onPress={onPress ?? (() => onAdd(product))}
-              activeOpacity={0.8}
             >
               <Text style={styles.addBtnText}>+</Text>
-            </TouchableOpacity>
+            </Relevo>
           )}
         </View>
       </View>
@@ -82,18 +83,12 @@ export function ProductCard({ product, onAdd, onPress }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.card,
-    borderRadius: 10,
+    ...relevo.card,
+    borderRadius: 12,
     marginBottom: 10,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
   },
   inner: { flexDirection: 'row' },
-  image: { width: 90, height: 90 },
+  image: { width: 90, height: 90, borderTopLeftRadius: 11, borderBottomLeftRadius: 11 },
   imageOut: { opacity: 0.5 },
   outBadge: {
     position: 'absolute', top: 6, left: 6,
@@ -124,7 +119,8 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
   price: { fontSize: 14, fontWeight: '700', color: colors.primary },
   addBtn: {
-    backgroundColor: colors.primary,
+    ...relevo.botao,
+    borderBottomWidth: 3,
     width: 28,
     height: 28,
     borderRadius: 14,

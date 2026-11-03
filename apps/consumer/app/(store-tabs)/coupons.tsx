@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../src/api/client'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 
 const PRIMARY   = '#FF5500'
 const BG        = '#FFF8F3'
@@ -200,10 +202,10 @@ function EmptyState({ onPress }: { onPress: () => void }) {
       </View>
       <Text style={styles.emptyTitle}>Nenhum cupom criado</Text>
       <Text style={styles.emptySub}>Crie cupons para atrair clientes e aumentar suas vendas</Text>
-      <TouchableOpacity style={styles.emptyBtn} onPress={onPress} activeOpacity={0.85}>
+      <Relevo style={styles.emptyBtn} onPress={onPress}>
         <Ionicons name="add" size={20} color="#fff" />
         <Text style={styles.emptyBtnText}>Criar primeiro cupom</Text>
-      </TouchableOpacity>
+      </Relevo>
     </View>
   )
 }
@@ -345,21 +347,20 @@ export default function CouponsScreen() {
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {expiredCount > 0 && (
-            <TouchableOpacity
-              style={[styles.addBtn, { backgroundColor: '#FEE2E2', paddingHorizontal: 12 }]}
+            <Relevo
+              style={[styles.addBtn, styles.addBtnDanger]}
               onPress={handleDeleteAllExpired}
               disabled={deletingExpired}
-              activeOpacity={0.8}
             >
               {deletingExpired
                 ? <ActivityIndicator size="small" color={DANGER} />
                 : <Ionicons name="trash-outline" size={18} color={DANGER} />
               }
-            </TouchableOpacity>
+            </Relevo>
           )}
-          <TouchableOpacity style={styles.addBtn} onPress={() => setShowSheet(true)} activeOpacity={0.85}>
+          <Relevo style={styles.addBtn} onPress={() => setShowSheet(true)}>
             <Ionicons name="add" size={22} color="#fff" />
-          </TouchableOpacity>
+          </Relevo>
         </View>
       </View>
 
@@ -549,11 +550,10 @@ export default function CouponsScreen() {
                 </View>
               ) : null}
 
-              <TouchableOpacity
+              <Relevo
                 style={[styles.saveBtn, createMutation.isPending && styles.saveBtnLoading]}
                 onPress={() => createMutation.mutate()}
                 disabled={createMutation.isPending}
-                activeOpacity={0.85}
               >
                 {createMutation.isPending
                   ? <ActivityIndicator color="#fff" size="small" />
@@ -564,7 +564,7 @@ export default function CouponsScreen() {
                     </>
                   )
                 }
-              </TouchableOpacity>
+              </Relevo>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -586,10 +586,13 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: '900', color: TEXT, letterSpacing: -0.5 },
   headerSub: { fontSize: 12, color: MUTED, marginTop: 1 },
   addBtn: {
+    ...relevo.botao,
     width: 42, height: 42, borderRadius: 13,
-    backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  addBtnDanger: {
+    backgroundColor: '#FEE2E2', paddingHorizontal: 12,
+    borderBottomColor: '#FCA5A5', shadowColor: DANGER, shadowOpacity: 0.15,
   },
 
   filterRow: {
@@ -600,8 +603,9 @@ const styles = StyleSheet.create({
   filterTab: {
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
     backgroundColor: '#F5F0EC',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  filterTabActive: { backgroundColor: PRIMARY },
+  filterTabActive: { ...relevo.chipAtivo },
   filterTabText: { fontSize: 12, fontWeight: '700', color: MUTED },
   filterTabTextActive: { color: '#fff' },
 
@@ -610,20 +614,12 @@ const styles = StyleSheet.create({
 
   // Ticket card
   ticket: {
+    ...relevo.card,
     flexDirection: 'row',
-    backgroundColor: CARD,
     borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: BORDER,
   },
   ticketInactive: { opacity: 0.65 },
-  ticketStripe: { width: 6 },
+  ticketStripe: { width: 6, borderTopLeftRadius: 15, borderBottomLeftRadius: 13 },
   perfColumn: {
     width: 18, paddingVertical: 10,
     justifyContent: 'space-around', alignItems: 'center',
@@ -687,11 +683,10 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 20, fontWeight: '800', color: TEXT, marginBottom: 8, textAlign: 'center' },
   emptySub: { fontSize: 13, color: MUTED, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
   emptyBtn: {
+    ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: PRIMARY, borderRadius: 14,
+    borderRadius: 14,
     paddingHorizontal: 24, paddingVertical: 14,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   emptyBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
@@ -714,8 +709,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
   sheetHeaderIcon: {
+    ...relevo.icone,
     width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#FFF0EB', alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: TEXT },
   sheetSub: { fontSize: 12, color: MUTED, marginTop: 1 },
@@ -756,10 +752,11 @@ const styles = StyleSheet.create({
   typeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     borderWidth: 1.5, borderColor: BORDER,
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
     borderRadius: 12, paddingVertical: 12,
     backgroundColor: CARD,
   },
-  typeBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  typeBtnActive: { ...relevo.chipAtivo },
   typeBtnText: { fontSize: 13, fontWeight: '700', color: MUTED },
   typeBtnTextActive: { color: '#fff' },
 
@@ -775,11 +772,10 @@ const styles = StyleSheet.create({
   errorText: { flex: 1, fontSize: 13, color: DANGER, fontWeight: '600' },
 
   saveBtn: {
+    ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 15,
+    borderRadius: 14, paddingVertical: 15,
     marginBottom: 8,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
   },
   saveBtnLoading: { opacity: 0.75 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },

@@ -1,6 +1,7 @@
 import { Tabs, router, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../src/theme/colors'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLojistaStore } from '../../src/stores/lojista.store'
@@ -13,8 +14,8 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
 function TabIcon({ name, focused }: { name: IoniconName; focused: boolean }) {
   return (
-    <View style={tab.iconWrap}>
-      <Ionicons name={name} size={22} color={focused ? colors.primary : '#AAAAAA'} />
+    <View style={[tab.iconWrap, focused && tab.iconWrapAtivo]}>
+      <Ionicons name={name} size={21} color={focused ? colors.primary : '#AAAAAA'} />
     </View>
   )
 }
@@ -98,10 +99,10 @@ function PendingTabIcon({ focused }: { focused: boolean }) {
   )
 
   return (
-    <View style={tab.iconWrap}>
+    <View style={[tab.iconWrap, focused && tab.iconWrapAtivo]}>
       <Ionicons
         name={focused ? 'receipt' : 'receipt-outline'}
-        size={22}
+        size={21}
         color={focused ? colors.primary : '#AAAAAA'}
       />
       {count > 0 && (
@@ -144,9 +145,13 @@ const avatar = StyleSheet.create({
 const tab = StyleSheet.create({
   iconWrap: {
     alignItems: 'center', justifyContent: 'center',
-    width: 40, height: 28,
-    position: 'relative',
+    width: 46, height: 32, borderRadius: 11,
+    position: 'relative', overflow: 'visible',
+    backgroundColor: '#FBF7F3',
+    borderWidth: 1, borderColor: '#F1E7DD',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
+  iconWrapAtivo: { ...relevo.icone },
 })
 
 const badge = StyleSheet.create({
@@ -208,9 +213,9 @@ export default function StoreTabsLayout() {
           borderTopColor: '#F0F0F0',
           borderTopWidth: 1,
           // Soma a área segura inferior (barra de gestos) pra não cortar os rótulos.
-          height: 62 + insets.bottom,
+          height: 70 + insets.bottom,
           paddingBottom: 8 + insets.bottom,
-          paddingTop: 6,
+          paddingTop: 10,
           backgroundColor: '#fff',
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
@@ -218,7 +223,7 @@ export default function StoreTabsLayout() {
           shadowRadius: 8,
           elevation: 12,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: 1 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: 4 },
         headerStyle: { backgroundColor: colors.primary },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: '800', fontSize: 17 },

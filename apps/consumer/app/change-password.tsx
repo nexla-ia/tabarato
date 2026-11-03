@@ -7,8 +7,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { api } from '../src/api/client'
-import { colors } from '../src/theme/colors'
 import { useToast } from '../src/components/Toast'
+import { Relevo } from '../src/components/Relevo'
+import { relevo } from '../src/theme/relevo'
 
 const TEXT = '#1A0A00'
 const MUTED = '#9A8880'
@@ -104,13 +105,13 @@ export default function ChangePasswordScreen() {
           placeholder="Repita a nova senha" editable={!loading}
         />
 
-        <TouchableOpacity style={styles.btn} onPress={submit} disabled={loading} activeOpacity={0.85}>
+        <Relevo style={styles.btn} onPress={submit} disabled={loading}>
           <View style={styles.btnInner}>
             {loading
               ? <ActivityIndicator color="#fff" />
               : <><Ionicons name="checkmark" size={18} color="#fff" /><Text style={styles.btnText}>Salvar nova senha</Text></>}
           </View>
-        </TouchableOpacity>
+        </Relevo>
       </ScrollView>
     </KeyboardAvoidingView>
   )
@@ -142,14 +143,12 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 15, color: TEXT, paddingVertical: 14 },
 
   btn: {
+    ...relevo.botao,
     borderRadius: 14, marginTop: 12,
-    shadowColor: colors.primaryDark, shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3, shadowRadius: 10, elevation: 7,
   },
   btnInner: {
-    backgroundColor: colors.primary, paddingVertical: 17,
+    paddingVertical: 17,
     alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8,
-    borderRadius: 14, borderBottomWidth: 3, borderBottomColor: colors.primaryDark,
   },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 })

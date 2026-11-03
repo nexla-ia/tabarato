@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react'
 import {
-  Modal, View, Text, TouchableOpacity, StyleSheet,
+  Modal, View, Text, StyleSheet,
   Animated, Pressable, Dimensions,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { Relevo } from './Relevo'
+import { relevo, LABIO_LARANJA } from '../theme/relevo'
 
 const { width: SW } = Dimensions.get('window')
 
@@ -27,6 +29,7 @@ const TYPE_CONFIG = {
     bg: '#D1FAE5',
     ring: '#A7F3D0',
     btnColor: '#059669',
+    btnLip: '#047857',
     dots: ['#34D399', '#6EE7B7', '#A7F3D0', '#059669', '#10B981'],
   },
   warning: {
@@ -35,6 +38,7 @@ const TYPE_CONFIG = {
     bg: '#FEF3C7',
     ring: '#FDE68A',
     btnColor: '#FF5500',
+    btnLip: LABIO_LARANJA,
     dots: [],
   },
   error: {
@@ -43,6 +47,7 @@ const TYPE_CONFIG = {
     bg: '#FEE2E2',
     ring: '#FECACA',
     btnColor: '#DC2626',
+    btnLip: '#991B1B',
     dots: [],
   },
   info: {
@@ -51,6 +56,7 @@ const TYPE_CONFIG = {
     bg: '#FFF0EB',
     ring: '#FFD9BF',
     btnColor: '#FF5500',
+    btnLip: LABIO_LARANJA,
     dots: [],
   },
 }
@@ -154,24 +160,22 @@ export function AppAlert({
             {/* Buttons */}
             <View style={cancelText ? styles.btnRow : styles.btnSingle}>
               {cancelText && (
-                <TouchableOpacity
+                <Relevo
                   style={styles.cancelBtn}
                   onPress={onClose}
-                  activeOpacity={0.75}
                 >
                   <Text style={styles.cancelBtnText}>{cancelText}</Text>
-                </TouchableOpacity>
+                </Relevo>
               )}
-              <TouchableOpacity
+              <Relevo
                 style={[
                   cancelText ? styles.confirmBtnHalf : styles.confirmBtnFull,
-                  { backgroundColor: cfg.btnColor },
+                  { backgroundColor: cfg.btnColor, borderBottomColor: cfg.btnLip, shadowColor: cfg.btnLip },
                 ]}
                 onPress={handleConfirm}
-                activeOpacity={0.85}
               >
                 <Text style={styles.confirmBtnText}>{confirmText}</Text>
-              </TouchableOpacity>
+              </Relevo>
             </View>
           </Pressable>
         </Animated.View>
@@ -260,10 +264,10 @@ const styles = StyleSheet.create({
   },
   btnSingle: {},
   cancelBtn: {
+    ...relevo.neutro,
     flex: 1,
     height: 50,
     borderRadius: 14,
-    backgroundColor: '#F5EEE9',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -273,12 +277,14 @@ const styles = StyleSheet.create({
     color: '#9A8880',
   },
   confirmBtnFull: {
+    ...relevo.botao,
     height: 50,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   confirmBtnHalf: {
+    ...relevo.botao,
     flex: 1,
     height: 50,
     borderRadius: 14,

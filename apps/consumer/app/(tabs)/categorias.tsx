@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../src/api/client'
 import { colors } from '../../src/theme/colors'
+import { relevo } from '../../src/theme/relevo'
 
 const BG = '#FFF8F3'
 const CARD = '#FFFFFF'
@@ -150,13 +151,12 @@ const styles = StyleSheet.create({
   row: { gap: 12 },
 
   card: {
-    flex: 1, backgroundColor: CARD, borderRadius: 18, padding: 16, marginBottom: 12,
-    borderWidth: 1, borderColor: BORDER,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    ...relevo.card,
+    flex: 1, borderRadius: 18, padding: 16, marginBottom: 12,
   },
   iconWrap: {
     width: 54, height: 54, borderRadius: 16,
+    borderBottomWidth: 3, borderBottomColor: 'rgba(0,0,0,0.07)',
     alignItems: 'center', justifyContent: 'center', marginBottom: 12,
   },
   cardName: { fontSize: 15.5, fontWeight: '800', color: TEXT, letterSpacing: -0.2, lineHeight: 20 },

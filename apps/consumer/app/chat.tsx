@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuthStore } from '../src/stores/auth.store'
 import { getDeliverySocket } from '../src/socket'
 import { colors } from '../src/theme/colors'
+import { Relevo } from '../src/components/Relevo'
+import { relevo } from '../src/theme/relevo'
 
 const PRIMARY = colors.primary
 const BG = '#FFF8F3'
@@ -153,14 +155,13 @@ export default function ChatScreen() {
             returnKeyType="send"
             maxLength={500}
           />
-          <TouchableOpacity
+          <Relevo
             style={[styles.sendBtn, !input.trim() && { opacity: 0.5 }]}
             onPress={sendMessage}
             disabled={!input.trim()}
-            activeOpacity={0.8}
           >
             <Ionicons name="send" size={18} color="#fff" />
-          </TouchableOpacity>
+          </Relevo>
         </View>
       )}
     </KeyboardAvoidingView>
@@ -205,8 +206,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: TEXT,
   },
   sendBtn: {
+    ...relevo.botao,
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   closedRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

@@ -7,6 +7,8 @@ import { useAuthStore } from '../../src/stores/auth.store'
 import { useLojistaStore } from '../../src/stores/lojista.store'
 import { api } from '../../src/api/client'
 import { colors } from '../../src/theme/colors'
+import { relevo } from '../../src/theme/relevo'
+import { Relevo } from '../../src/components/Relevo'
 import { useToast } from '../../src/components/Toast'
 import { STORE_TERMS_URL, STORE_TERMS_VERSION } from '../../src/links'
 import { AdPromoCard } from '../../src/components/AdPromoCard'
@@ -443,14 +445,13 @@ export default function StoreDashboard() {
               >
                 <Text style={styles.termsLink}>Ler os termos</Text>
               </TouchableOpacity>
-              <TouchableOpacity
+              <Relevo
                 style={[styles.termsBtn, acceptingTerms && { opacity: 0.6 }]}
                 onPress={acceptTerms}
                 disabled={acceptingTerms}
-                activeOpacity={0.85}
               >
                 <Text style={styles.termsBtnText}>{acceptingTerms ? 'Registrando…' : 'Li e aceito'}</Text>
-              </TouchableOpacity>
+              </Relevo>
             </View>
           </View>
         </View>
@@ -469,14 +470,13 @@ export default function StoreDashboard() {
           <Text style={styles.welcomeText}>
             Primeiro passo: configure o perfil da loja — foto, horário de funcionamento e entrega — pra começar a receber pedidos.
           </Text>
-          <TouchableOpacity
+          <Relevo
             style={styles.welcomeBtn}
-            activeOpacity={0.85}
             onPress={() => { setWelcomeDismissed(true); router.push('/(store-tabs)/store') }}
           >
             <Text style={styles.welcomeBtnText}>Vamos lá</Text>
             <Ionicons name="arrow-forward" size={17} color="#fff" />
-          </TouchableOpacity>
+          </Relevo>
         </View>
       )}
 
@@ -604,7 +604,7 @@ export default function StoreDashboard() {
               const isLast = i === recentOrders.length - 1
               return (
                 <View key={order.id} style={[styles.orderRow, !isLast && styles.orderRowBorder]}>
-                  <View style={[styles.orderStripe, { backgroundColor: s.color }]} />
+                  <View style={[styles.orderStripe, { backgroundColor: s.color }, i === 0 && styles.orderStripeFirst, isLast && styles.orderStripeLast]} />
                   <View style={styles.orderBody}>
                     <View style={styles.orderTop}>
                       <Text style={styles.orderId}>{shortId(order.id)}</Text>
@@ -633,24 +633,24 @@ export default function StoreDashboard() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Ações rápidas</Text>
         <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(store-tabs)/products')} activeOpacity={0.8}>
+          <Relevo style={styles.quickBtn} onPress={() => router.push('/(store-tabs)/products')}>
             <View style={styles.quickIcon}>
               <Ionicons name="add-circle-outline" size={22} color={colors.primary} />
             </View>
             <Text style={styles.quickLabel}>Novo produto</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(store-tabs)/orders')} activeOpacity={0.8}>
+          </Relevo>
+          <Relevo style={styles.quickBtn} onPress={() => router.push('/(store-tabs)/orders')}>
             <View style={styles.quickIcon}>
               <Ionicons name="receipt-outline" size={22} color={colors.primary} />
             </View>
             <Text style={styles.quickLabel}>Ver pedidos</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/store-reports')} activeOpacity={0.8}>
+          </Relevo>
+          <Relevo style={styles.quickBtn} onPress={() => router.push('/store-reports')}>
             <View style={styles.quickIcon}>
               <Ionicons name="bar-chart-outline" size={22} color={colors.primary} />
             </View>
             <Text style={styles.quickLabel}>Relatórios</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       </View>
 
@@ -729,7 +729,7 @@ const styles = StyleSheet.create({
   termsText: { fontSize: 12, color: '#9A3412', marginTop: 2, lineHeight: 16 },
   termsActions: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 10 },
   termsLink: { fontSize: 12.5, fontWeight: '700', color: '#C2410C', textDecorationLine: 'underline' },
-  termsBtn: { backgroundColor: '#EA580C', borderRadius: 9, paddingVertical: 8, paddingHorizontal: 16 },
+  termsBtn: { ...relevo.botao, backgroundColor: '#EA580C', borderRadius: 9, paddingVertical: 8, paddingHorizontal: 16 },
   termsBtnText: { fontSize: 12.5, fontWeight: '800', color: '#fff' },
 
   welcomeCard: {
@@ -747,17 +747,16 @@ const styles = StyleSheet.create({
   welcomeTitle: { fontSize: 17, fontWeight: '900', color: '#1A0A00', letterSpacing: -0.3, marginBottom: 5 },
   welcomeText: { fontSize: 13.5, color: '#7A5C4A', lineHeight: 19, marginBottom: 14 },
   welcomeBtn: {
+    ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-    backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 13,
-    borderBottomWidth: 3, borderBottomColor: colors.primaryDark,
+    borderRadius: 12, paddingVertical: 13,
   },
   welcomeBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 12, gap: 10 },
   statCard: {
-    width: '47%', backgroundColor: '#fff', borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    ...relevo.card,
+    width: '47%', borderRadius: 16, padding: 16,
   },
   statIconWrap: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   statValue: { fontSize: 22, fontWeight: '900', color: '#1A0A00', letterSpacing: -0.5 },
@@ -772,9 +771,8 @@ const styles = StyleSheet.create({
   sectionLink: { fontSize: 13, color: colors.primary, fontWeight: '700' },
 
   ordersCard: {
-    backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    ...relevo.card,
+    borderRadius: 16,
   },
   ordersLoading: { alignItems: 'center', paddingVertical: 32 },
   ordersEmpty: { alignItems: 'center', paddingVertical: 28, gap: 8 },
@@ -783,6 +781,8 @@ const styles = StyleSheet.create({
   orderRow: { flexDirection: 'row' },
   orderRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F5EEE9' },
   orderStripe: { width: 4 },
+  orderStripeFirst: { borderTopLeftRadius: 15 },
+  orderStripeLast: { borderBottomLeftRadius: 13 },
   orderBody: { flex: 1, padding: 14 },
   orderTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   orderId: { fontSize: 13, fontWeight: '800', color: '#1A0A00' },
@@ -797,12 +797,11 @@ const styles = StyleSheet.create({
 
   quickActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
   quickBtn: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 14, paddingVertical: 16,
+    ...relevo.neutro,
+    flex: 1, borderRadius: 14, paddingVertical: 16,
     alignItems: 'center', gap: 8,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
-  quickIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFF0EB', alignItems: 'center', justifyContent: 'center' },
+  quickIcon: { ...relevo.icone, width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   quickLabel: { fontSize: 12, fontWeight: '700', color: '#1A0A00', textAlign: 'center' },
 
   pauseToast: {

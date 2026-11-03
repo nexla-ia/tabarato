@@ -14,6 +14,8 @@ import { useAuthStore } from '../../src/stores/auth.store'
 import { ReviewModal } from '../../src/components/ReviewModal'
 import { CourierReviewModal } from '../../src/components/CourierReviewModal'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
+import { relevo } from '../../src/theme/relevo'
 
 const PRIMARY    = '#FF5500'
 const SUCCESS    = '#059669'
@@ -411,19 +413,18 @@ function PixPayment({ payment, orderId, onPaid }: {
 
             {/* Copia e cola */}
             {payment.pixCode && (
-              <TouchableOpacity style={styles.pixCopyBtn} onPress={handleCopy} activeOpacity={0.8}>
+              <Relevo style={styles.pixCopyBtn} onPress={handleCopy}>
                 <Ionicons name={copied ? 'checkmark-circle' : 'copy-outline'} size={16} color={copied ? SUCCESS : PRIMARY} />
                 <Text style={[styles.pixCopyText, copied && { color: SUCCESS }]}>
                   {copied ? 'Copiado!' : 'Copiar código PIX'}
                 </Text>
-              </TouchableOpacity>
+              </Relevo>
             )}
 
-            <TouchableOpacity
+            <Relevo
               style={styles.pixCheckBtn}
               onPress={handleCheckPayment}
               disabled={checking}
-              activeOpacity={0.85}
             >
               {checking
                 ? <ActivityIndicator size="small" color="#fff" />
@@ -432,7 +433,7 @@ function PixPayment({ payment, orderId, onPaid }: {
                     <Text style={styles.pixCheckText}>Já paguei — verificar</Text>
                   </>
               }
-            </TouchableOpacity>
+            </Relevo>
           </View>
         )}
       </View>
@@ -464,7 +465,7 @@ function CardCheckoutPending({ orderId, onPaid }: { orderId: string; onPaid: () 
         <Text style={{ color: MUTED, fontSize: 14, lineHeight: 20 }}>
           Aguardando a confirmação do pagamento na página segura do Asaas. Assim que for aprovado, seu pedido é confirmado automaticamente.
         </Text>
-        <TouchableOpacity style={styles.pixCheckBtn} onPress={check} disabled={checking} activeOpacity={0.85}>
+        <Relevo style={styles.pixCheckBtn} onPress={check} disabled={checking}>
           {checking
             ? <ActivityIndicator size="small" color="#fff" />
             : <>
@@ -472,7 +473,7 @@ function CardCheckoutPending({ orderId, onPaid }: { orderId: string; onPaid: () 
                 <Text style={styles.pixCheckText}>Já paguei — verificar</Text>
               </>
           }
-        </TouchableOpacity>
+        </Relevo>
       </View>
     </View>
   )
@@ -896,48 +897,44 @@ export default function OrderDetailScreen() {
         {(canReview || canReviewCourier || canCancel) && (
           <View style={styles.actions}>
             {canReview && (
-              <TouchableOpacity
+              <Relevo
                 style={styles.reviewBtn}
                 onPress={() => setShowReview(true)}
-                activeOpacity={0.85}
               >
                 <Ionicons name="star" size={18} color="#fff" />
                 <Text style={styles.reviewBtnText}>Avaliar loja</Text>
-              </TouchableOpacity>
+              </Relevo>
             )}
             {canReviewCourier && (
-              <TouchableOpacity
-                style={[styles.reviewBtn, { backgroundColor: '#7C3AED' }]}
+              <Relevo
+                style={[styles.reviewBtn, styles.reviewBtnCourier]}
                 onPress={() => setShowCourierReview(true)}
-                activeOpacity={0.85}
               >
                 <Ionicons name="bicycle" size={18} color="#fff" />
                 <Text style={styles.reviewBtnText}>Avaliar entregador</Text>
-              </TouchableOpacity>
+              </Relevo>
             )}
             {canCancel && (
-              <TouchableOpacity
+              <Relevo
                 style={styles.cancelBtn}
                 onPress={handleCancel}
-                activeOpacity={0.85}
                 disabled={cancelMutation.isPending}
               >
                 {cancelMutation.isPending
                   ? <ActivityIndicator size="small" color={DANGER} />
                   : <Text style={styles.cancelBtnText}>Cancelar pedido</Text>
                 }
-              </TouchableOpacity>
+              </Relevo>
             )}
 
             {/* Chat button — available for active orders */}
             {order && !['DELIVERED', 'CANCELLED'].includes(order.status) && (
-              <TouchableOpacity
-                style={[styles.cancelBtn, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
+              <Relevo
+                style={[styles.cancelBtn, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderBottomColor: '#93C5FD' }]}
                 onPress={() => router.push(`/chat?orderId=${id}` as any)}
-                activeOpacity={0.85}
               >
                 <Text style={[styles.cancelBtnText, { color: '#2563EB' }]}>💬 Chat com loja / entregador</Text>
-              </TouchableOpacity>
+              </Relevo>
             )}
           </View>
         )}
@@ -991,23 +988,20 @@ const styles = StyleSheet.create({
 
   // Hero card
   heroCard: {
-    backgroundColor: CARD, borderRadius: 18,
+    ...relevo.card, borderRadius: 18,
     padding: 18, marginBottom: 16,
     flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1, borderColor: BORDER,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  heroCardDanger: { borderColor: '#FCA5A5', backgroundColor: '#FFF5F5' },
+  heroCardDanger: { borderColor: '#FCA5A5', borderBottomColor: '#FCA5A5', backgroundColor: '#FFF5F5' },
   heroLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
   heroBadge: {
+    ...relevo.icone,
     width: 52, height: 52, borderRadius: 16,
-    backgroundColor: '#FFF0EB',
     alignItems: 'center', justifyContent: 'center',
     position: 'relative',
   },
   heroBadgePulse: {
-    position: 'absolute', width: 52, height: 52, borderRadius: 16,
+    ...StyleSheet.absoluteFillObject, borderRadius: 15,
     backgroundColor: PRIMARY, opacity: 0.12,
   },
   heroIconWrap: {
@@ -1038,15 +1032,17 @@ const styles = StyleSheet.create({
   pixQrPlaceholderText: { fontSize: 12, color: MUTED },
   pixHint: { fontSize: 12, color: MUTED, textAlign: 'center', marginBottom: 16 },
   pixCopyBtn: {
+    ...relevo.contorno,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1.5, borderColor: BORDER, borderRadius: 12,
+    borderRadius: 12,
     paddingVertical: 11, paddingHorizontal: 20,
-    backgroundColor: '#FFF0EB', width: '100%', justifyContent: 'center', marginBottom: 10,
+    width: '100%', justifyContent: 'center', marginBottom: 10,
   },
   pixCopyText: { fontSize: 14, fontWeight: '700', color: PRIMARY },
   pixCheckBtn: {
+    ...relevo.botao, backgroundColor: SUCCESS, borderBottomColor: '#047857', shadowColor: '#047857',
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: SUCCESS, borderRadius: 12,
+    borderRadius: 12,
     paddingVertical: 12, paddingHorizontal: 20,
     width: '100%', justifyContent: 'center',
   },
@@ -1082,15 +1078,11 @@ const styles = StyleSheet.create({
 
   // Generic card
   card: {
-    backgroundColor: CARD, borderRadius: 16,
-    borderWidth: 1, borderColor: BORDER,
-    overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    ...relevo.card, borderRadius: 16,
   },
 
   // Timeline
-  timelineCard: { backgroundColor: CARD, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: BORDER },
+  timelineCard: { ...relevo.card, borderRadius: 16, padding: 20 },
   stepRow:    { flexDirection: 'row', gap: 14 },
   stepLeft:   { alignItems: 'center', width: 24 },
   stepDot: {
@@ -1133,8 +1125,9 @@ const styles = StyleSheet.create({
   // Address
   addressCard: { flexDirection: 'row', alignItems: 'flex-start', padding: 16, gap: 12 },
   addressIcon: {
+    ...relevo.icone,
     width: 38, height: 38, borderRadius: 10,
-    backgroundColor: '#FFF0EB', alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   addressLabel:    { fontSize: 12, fontWeight: '700', color: PRIMARY, marginBottom: 3 },
   addressText:     { fontSize: 13, color: TEXT, fontWeight: '500', lineHeight: 18 },
@@ -1167,10 +1160,7 @@ const styles = StyleSheet.create({
 
   // Delivery tracker
   deliveryCard: {
-    backgroundColor: CARD, borderRadius: 16,
-    borderWidth: 1, borderColor: BORDER, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    ...relevo.card, borderRadius: 16,
   },
   courierRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   codeBox: {
@@ -1184,12 +1174,12 @@ const styles = StyleSheet.create({
 
   // ── Retirada na loja (tela do pedido) ──
   pickupBox: {
-    backgroundColor: CARD, borderRadius: 16, padding: 16,
-    borderWidth: 1.5, borderColor: BORDER,
+    ...relevo.card, borderRadius: 16, padding: 16,
   },
   pickupBoxHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   pickupBoxIcon: {
-    width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFF0EB',
+    ...relevo.icone,
+    width: 40, height: 40, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
   },
   pickupBoxStore: { fontSize: 15, fontWeight: '800', color: TEXT, marginBottom: 3 },
@@ -1204,11 +1194,11 @@ const styles = StyleSheet.create({
   },
   pickupWaitText: { flex: 1, fontSize: 12.5, color: MUTED, lineHeight: 18 },
   courierAvatar: {
+    ...relevo.icone,
     width: 44, height: 44, borderRadius: 14,
-    backgroundColor: '#FFF0EB', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: PRIMARY + '33',
+    alignItems: 'center', justifyContent: 'center',
   },
-  courierAvatarSearching: { backgroundColor: '#F5F5F5', borderColor: BORDER },
+  courierAvatarSearching: { backgroundColor: '#F5F5F5', borderColor: BORDER, borderBottomColor: '#E2DAD4', shadowOpacity: 0 },
   courierName: { fontSize: 15, fontWeight: '800', color: TEXT, marginBottom: 2 },
   courierStatus: { fontSize: 12, fontWeight: '600' },
   liveChip: {
@@ -1242,15 +1232,15 @@ const styles = StyleSheet.create({
   // Actions
   actions: { gap: 10, marginBottom: 8 },
   reviewBtn: {
-    backgroundColor: PRIMARY, borderRadius: 14,
+    ...relevo.botao, borderRadius: 14,
     paddingVertical: 15, flexDirection: 'row',
     alignItems: 'center', justifyContent: 'center', gap: 8,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
+  reviewBtnCourier: { backgroundColor: '#7C3AED', borderBottomColor: '#5B21B6', shadowColor: '#5B21B6' },
   reviewBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   cancelBtn: {
-    borderWidth: 2, borderColor: DANGER, borderRadius: 14,
+    ...relevo.neutro, borderWidth: 2, borderColor: DANGER, borderBottomWidth: 4, borderBottomColor: '#B91C1C',
+    borderRadius: 14,
     paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
   },
   cancelBtnText: { color: DANGER, fontSize: 15, fontWeight: '700' },

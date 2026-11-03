@@ -7,6 +7,8 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { api } from '../api/client'
+import { relevo } from '../theme/relevo'
+import { Relevo } from './Relevo'
 import { uploadImageAsset } from '../api/upload'
 
 const PRIMARY = '#FF5500'
@@ -198,11 +200,10 @@ export function ReviewModal({ visible, orderId, storeName, onClose, onSuccess }:
             ) : null}
 
             {/* Submit */}
-            <TouchableOpacity
+            <Relevo
               style={[styles.submitBtn, submitting && styles.submitBtnLoading]}
               onPress={handleSubmit}
               disabled={submitting}
-              activeOpacity={0.88}
             >
               {submitting
                 ? <ActivityIndicator color="#fff" size="small" />
@@ -211,7 +212,7 @@ export function ReviewModal({ visible, orderId, storeName, onClose, onSuccess }:
                     <Text style={styles.submitBtnText}>Enviar avaliação</Text>
                   </>
               }
-            </TouchableOpacity>
+            </Relevo>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
@@ -244,8 +245,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
   headerIcon: {
+    ...relevo.icone,
     width: 38, height: 38, borderRadius: 10,
-    backgroundColor: PRIMARY_LIGHT,
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { fontSize: 16, fontWeight: '800', color: TEXT },
@@ -296,9 +297,7 @@ const styles = StyleSheet.create({
 
   submitBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 15, marginTop: 20,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
+    ...relevo.botao, borderRadius: 14, paddingVertical: 15, marginTop: 20,
   },
   submitBtnLoading: { opacity: 0.75 },
   submitBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },

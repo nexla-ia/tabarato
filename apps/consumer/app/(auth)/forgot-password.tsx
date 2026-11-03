@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { api } from '../../src/api/client'
 import { colors } from '../../src/theme/colors'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
+import { relevo } from '../../src/theme/relevo'
 
 export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets()
@@ -110,13 +112,13 @@ export default function ForgotPasswordScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.btn} onPress={requestCode} disabled={loading} activeOpacity={0.85}>
+              <Relevo style={styles.btn} onPress={requestCode} disabled={loading}>
                 <View style={styles.btnInner}>
                   {loading
                     ? <ActivityIndicator color="#fff" />
                     : <><Text style={styles.btnText}>Enviar código</Text><Ionicons name="arrow-forward" size={18} color="#fff" /></>}
                 </View>
-              </TouchableOpacity>
+              </Relevo>
             </>
           ) : (
             <>
@@ -161,13 +163,13 @@ export default function ForgotPasswordScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.btn} onPress={submitNewPassword} disabled={loading} activeOpacity={0.85}>
+              <Relevo style={styles.btn} onPress={submitNewPassword} disabled={loading}>
                 <View style={styles.btnInner}>
                   {loading
                     ? <ActivityIndicator color="#fff" />
                     : <><Ionicons name="checkmark" size={18} color="#fff" /><Text style={styles.btnText}>Salvar nova senha</Text></>}
                 </View>
-              </TouchableOpacity>
+              </Relevo>
 
               <TouchableOpacity style={styles.resend} onPress={requestCode} disabled={loading}>
                 <Text style={styles.resendText}>Não chegou? Enviar outro código</Text>
@@ -228,14 +230,12 @@ const styles = StyleSheet.create({
   },
 
   btn: {
+    ...relevo.botao,
     borderRadius: 14, marginTop: 10,
-    shadowColor: colors.primaryDark, shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35, shadowRadius: 10, elevation: 8,
   },
   btnInner: {
-    backgroundColor: colors.primary, paddingVertical: 17,
+    paddingVertical: 17,
     alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8,
-    borderRadius: 14, borderBottomWidth: 3, borderBottomColor: colors.primaryDark,
   },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
 

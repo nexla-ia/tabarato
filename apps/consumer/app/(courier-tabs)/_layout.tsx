@@ -1,7 +1,8 @@
 import { Tabs } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { View } from 'react-native'
+import { View, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 
 const ORANGE = '#FF5500'
 
@@ -9,11 +10,23 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
 function TabIcon({ name, focused }: { name: IoniconName; focused: boolean }) {
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', width: 40, height: 28 }}>
-      <Ionicons name={name} size={22} color={focused ? ORANGE : '#AAAAAA'} />
+    <View style={[tab.iconWrap, focused && tab.iconWrapAtivo]}>
+      <Ionicons name={name} size={21} color={focused ? ORANGE : '#AAAAAA'} />
     </View>
   )
 }
+
+const tab = StyleSheet.create({
+  iconWrap: {
+    alignItems: 'center', justifyContent: 'center',
+    width: 46, height: 32, borderRadius: 11,
+    position: 'relative', overflow: 'visible',
+    backgroundColor: '#FBF7F3',
+    borderWidth: 1, borderColor: '#F1E7DD',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
+  },
+  iconWrapAtivo: { ...relevo.icone },
+})
 
 export default function CourierTabsLayout() {
   const insets = useSafeAreaInsets()
@@ -26,9 +39,9 @@ export default function CourierTabsLayout() {
           borderTopColor: '#F0E8E0',
           borderTopWidth: 1,
           // Soma a área segura inferior (barra de gestos) pra não cortar os rótulos.
-          height: 62 + insets.bottom,
+          height: 70 + insets.bottom,
           paddingBottom: 8 + insets.bottom,
-          paddingTop: 6,
+          paddingTop: 10,
           backgroundColor: '#fff',
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
@@ -36,7 +49,7 @@ export default function CourierTabsLayout() {
           shadowRadius: 8,
           elevation: 12,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: 1 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: 4 },
         headerShown: false,
       }}
     >

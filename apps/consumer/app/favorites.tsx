@@ -7,6 +7,8 @@ import { api } from '../src/api/client'
 import { StoreCard } from '../src/components/StoreCard'
 import { colors } from '../src/theme/colors'
 import { LoadError } from '../src/components/LoadError'
+import { Relevo } from '../src/components/Relevo'
+import { relevo } from '../src/theme/relevo'
 
 export default function FavoritesScreen() {
   const insets = useSafeAreaInsets()
@@ -44,9 +46,9 @@ export default function FavoritesScreen() {
           <Ionicons name="heart-outline" size={56} color={colors.primary} style={{ marginBottom: 16 }} />
           <Text style={styles.emptyTitle}>Nenhuma loja favorita</Text>
           <Text style={styles.emptySub}>Toque no coração em qualquer loja para salvá-la aqui</Text>
-          <TouchableOpacity style={styles.discoverBtn} onPress={() => router.push('/(tabs)')} activeOpacity={0.85}>
+          <Relevo style={styles.discoverBtn} onPress={() => router.push('/(tabs)')}>
             <Text style={styles.discoverText}>Descobrir lojas</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       ) : (
         <FlatList
@@ -77,6 +79,6 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyTitle: { fontSize: 20, fontWeight: '900', color: '#1A0A00', marginBottom: 8 },
   emptySub: { fontSize: 14, color: '#7A5C4A', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-  discoverBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28 },
+  discoverBtn: { ...relevo.botao, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28 },
   discoverText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 })

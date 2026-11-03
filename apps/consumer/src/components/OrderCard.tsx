@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Order } from '../types'
 import { colors } from '../theme/colors'
+import { relevo } from '../theme/relevo'
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Aguardando confirmação',
@@ -89,27 +90,21 @@ export function OrderCard({ order, onPress }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.card,
+    ...relevo.card,
     borderRadius: 16,
     marginBottom: 12,
     flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 3,
-    overflow: 'hidden',
   },
-  stripe: { width: 5, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 },
+  stripe: { width: 5, borderTopLeftRadius: 15, borderBottomLeftRadius: 15 },
   content: { flex: 1, padding: 14 },
 
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   storeInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 8 },
   storeLogo: {
+    ...relevo.icone,
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },

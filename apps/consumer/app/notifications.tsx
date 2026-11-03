@@ -9,6 +9,8 @@ import { useFocusEffect } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { api } from '../src/api/client'
 import { useAuthStore } from '../src/stores/auth.store'
+import { Relevo } from '../src/components/Relevo'
+import { relevo } from '../src/theme/relevo'
 
 const PRIMARY       = '#FF5500'
 const PRIMARY_LIGHT = '#FFF0EB'
@@ -177,12 +179,12 @@ export default function NotificationsScreen() {
           <Ionicons name="cloud-offline-outline" size={48} color={MUTED} />
           <Text style={styles.emptyTitle}>Não foi possível carregar</Text>
           <Text style={styles.emptySub}>Verifique sua conexão e tente novamente.</Text>
-          <TouchableOpacity
+          <Relevo
             onPress={() => { setLoading(true); load().finally(() => setLoading(false)) }}
-            style={{ backgroundColor: PRIMARY, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 }}
+            style={{ ...relevo.botao, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 }}
           >
             <Text style={{ color: '#fff', fontWeight: '800' }}>Tentar novamente</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       ) : (
         <FlatList

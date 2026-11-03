@@ -13,6 +13,8 @@ import { colors } from '../src/theme/colors'
 import { useAuthStore } from '../src/stores/auth.store'
 import { useToast } from '../src/components/Toast'
 import { LoadError } from '../src/components/LoadError'
+import { Relevo } from '../src/components/Relevo'
+import { relevo, LABIO_LARANJA, LABIO_NEUTRO } from '../src/theme/relevo'
 import { AdConfig, MyAd, VENDE_ANUNCIO_NO_APP, brl, dataCurta } from '../src/utils/ads'
 
 const TEXT = '#1A0A00'
@@ -130,9 +132,9 @@ export default function AnunciarScreen() {
           <Ionicons name="megaphone-outline" size={40} color={colors.primary} />
           <Text style={s.vazioTitulo}>Entre para anunciar</Text>
           <Text style={s.vazioTexto}>O anúncio fica ligado à sua conta: é por ela que você acompanha a aprovação, paga e vê os resultados.</Text>
-          <TouchableOpacity style={s.cta} onPress={() => router.push('/(auth)/login')} activeOpacity={0.85}>
+          <Relevo style={s.cta} onPress={() => router.push('/(auth)/login')}>
             <Text style={s.ctaTxt}>Entrar</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       </View>
     )
@@ -190,24 +192,24 @@ export default function AnunciarScreen() {
           <Text style={s.rotulo}>QUANTOS DIAS</Text>
           <View style={s.cartao}>
             <View style={s.diasLinha}>
-              <TouchableOpacity
+              <Relevo
                 style={[s.passo, dias <= config.minDays && s.passoOff]}
                 onPress={() => setDias((d) => Math.max(config.minDays, d - 1))}
                 disabled={dias <= config.minDays}
               >
                 <Ionicons name="remove" size={20} color={dias <= config.minDays ? '#C9B8AC' : colors.primary} />
-              </TouchableOpacity>
+              </Relevo>
               <View style={{ alignItems: 'center' }}>
                 <Text style={s.diasNum}>{dias}</Text>
                 <Text style={s.diasUn}>dias</Text>
               </View>
-              <TouchableOpacity
+              <Relevo
                 style={[s.passo, dias >= config.maxDays && s.passoOff]}
                 onPress={() => setDias((d) => Math.min(config.maxDays, d + 1))}
                 disabled={dias >= config.maxDays}
               >
                 <Ionicons name="add" size={20} color={dias >= config.maxDays ? '#C9B8AC' : colors.primary} />
-              </TouchableOpacity>
+              </Relevo>
             </View>
             <View style={s.atalhos}>
               {[7, 15, 30].filter((n) => n >= config.minDays && n <= config.maxDays).map((n) => (
@@ -253,12 +255,12 @@ export default function AnunciarScreen() {
             <Text style={s.rodapeTotal}>{brl(total)}</Text>
             <Text style={s.rodapeSub}>{faltando ?? 'Só cobra depois de aprovado'}</Text>
           </View>
-          <TouchableOpacity
+          <Relevo
             style={[s.cta, (faltando || enviando) && { opacity: 0.5 }]}
-            onPress={enviar} disabled={!!faltando || enviando} activeOpacity={0.85}
+            onPress={enviar} disabled={!!faltando || enviando}
           >
             {enviando ? <ActivityIndicator color="#fff" /> : <Text style={s.ctaTxt}>Enviar para aprovação</Text>}
-          </TouchableOpacity>
+          </Relevo>
         </View>
       )}
     </KeyboardAvoidingView>
@@ -337,18 +339,19 @@ const s = StyleSheet.create({
   trocarTxt: { fontSize: 13, fontWeight: '800', color: colors.primary },
   dica: { fontSize: 12, color: MUTED, lineHeight: 17, marginTop: 8 },
 
-  cartao: { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER },
+  cartao: { ...relevo.card, borderRadius: 16, padding: 16 },
   diasLinha: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   passo: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primaryLight,
+    ...relevo.icone,
+    width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center',
   },
-  passoOff: { backgroundColor: '#F6F0EB' },
+  passoOff: { backgroundColor: '#F6F0EB', borderColor: '#EFE4D9', borderBottomColor: LABIO_NEUTRO, shadowOpacity: 0, elevation: 0 },
   diasNum: { fontSize: 34, fontWeight: '900', color: TEXT, letterSpacing: -1 },
   diasUn: { fontSize: 12, fontWeight: '700', color: MUTED, marginTop: -4 },
   atalhos: { flexDirection: 'row', gap: 8, marginTop: 14, justifyContent: 'center' },
-  atalho: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: BORDER },
-  atalhoOn: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  atalho: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: BORDER, borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO },
+  atalhoOn: { backgroundColor: colors.primaryLight, borderColor: colors.primary, borderBottomColor: LABIO_LARANJA },
   atalhoTxt: { fontSize: 12.5, fontWeight: '700', color: MUTED },
   atalhoTxtOn: { color: colors.primary },
   conta: {
@@ -368,9 +371,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: TEXT, marginTop: 10,
   },
 
-  passos: { marginTop: 24, gap: 12, backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER },
+  passos: { ...relevo.card, marginTop: 24, gap: 12, borderRadius: 16, padding: 16 },
   passoLinha: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  passoIcone: { width: 30, height: 30, borderRadius: 9, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  passoIcone: { ...relevo.icone, width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   passoTxt: { flex: 1, fontSize: 13, color: TEXT, lineHeight: 18, paddingTop: 5 },
 
   rodape: {
@@ -382,7 +385,7 @@ const s = StyleSheet.create({
   rodapeTotal: { fontSize: 18, fontWeight: '900', color: TEXT },
   rodapeSub: { fontSize: 11.5, color: MUTED, marginTop: 1 },
   cta: {
-    backgroundColor: colors.primary, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 14,
+    ...relevo.botao, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 14,
     alignItems: 'center', justifyContent: 'center', minWidth: 120,
   },
   ctaTxt: { color: '#fff', fontSize: 14.5, fontWeight: '900' },

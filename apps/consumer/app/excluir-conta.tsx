@@ -11,6 +11,8 @@ import { colors } from '../src/theme/colors'
 import { useAuthStore } from '../src/stores/auth.store'
 import { useToast } from '../src/components/Toast'
 import { LoadError } from '../src/components/LoadError'
+import { Relevo } from '../src/components/Relevo'
+import { relevo } from '../src/theme/relevo'
 
 const TEXT = '#1A0A00'
 const MUTED = '#7A5C4A'
@@ -106,14 +108,13 @@ export default function ExcluirContaScreen() {
                 placeholder="EXCLUIR"
                 placeholderTextColor="#D6C6BA"
               />
-              <TouchableOpacity
+              <Relevo
                 style={[s.botao, (!pronto || excluindo) && { opacity: 0.45 }]}
                 onPress={excluir}
                 disabled={!pronto || excluindo}
-                activeOpacity={0.85}
               >
                 {excluindo ? <ActivityIndicator color="#fff" /> : <Text style={s.botaoTxt}>Excluir minha conta</Text>}
-              </TouchableOpacity>
+              </Relevo>
             </View>
           )}
         </ScrollView>
@@ -142,7 +143,7 @@ const s = StyleSheet.create({
   bloqueioTitulo: { fontSize: 14.5, fontWeight: '800', color: '#92400E' },
   bloqueioItem: { fontSize: 13.5, color: '#92400E', lineHeight: 19 },
 
-  cartao: { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, gap: 12 },
+  cartao: { ...relevo.card, borderRadius: 16, padding: 16, gap: 12 },
   cartaoTitulo: { fontSize: 14, fontWeight: '800', color: TEXT },
   item: { flexDirection: 'row', gap: 10 },
   itemTxt: { flex: 1, fontSize: 13.5, color: TEXT, lineHeight: 19 },
@@ -151,6 +152,6 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: BORDER, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
     fontSize: 16, fontWeight: '800', letterSpacing: 2, color: RED,
   },
-  botao: { backgroundColor: RED, borderRadius: 14, paddingVertical: 15, alignItems: 'center', justifyContent: 'center' },
+  botao: { ...relevo.botao, backgroundColor: RED, borderBottomColor: '#7F1D1D', shadowColor: '#7F1D1D', borderRadius: 14, paddingVertical: 15, alignItems: 'center', justifyContent: 'center' },
   botaoTxt: { color: '#fff', fontSize: 15, fontWeight: '900' },
 })

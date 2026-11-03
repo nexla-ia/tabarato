@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { api } from '../src/api/client'
 import { colors } from '../src/theme/colors'
 import { LoadError } from '../src/components/LoadError'
+import { relevo, LABIO_LARANJA } from '../src/theme/relevo'
 
 const PRIMARY = colors.primary
 const TEXT = '#1A0A00'
@@ -143,6 +144,7 @@ const styles = StyleSheet.create({
 
   balanceCard: {
     backgroundColor: PRIMARY, borderRadius: 20, padding: 24,
+    borderBottomWidth: 4, borderBottomColor: LABIO_LARANJA,
     alignItems: 'center', overflow: 'hidden', position: 'relative',
   },
   balanceDecor: {
@@ -159,13 +161,14 @@ const styles = StyleSheet.create({
   lifetimeText: { fontSize: 11, color: 'rgba(255,255,255,0.6)' },
 
   rulesCard: {
-    backgroundColor: CARD, borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: BORDER, gap: 12,
+    ...relevo.card, borderRadius: 16, padding: 16,
+    gap: 12,
   },
   rulesTitle: { fontSize: 14, fontWeight: '800', color: TEXT, marginBottom: 4 },
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   ruleIcon: {
-    width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFF0EB',
+    ...relevo.icone,
+    width: 32, height: 32, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   ruleText: { flex: 1, fontSize: 13, color: MUTED, lineHeight: 18, paddingTop: 6 },
@@ -173,12 +176,12 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 13, fontWeight: '700', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8 },
 
   emptyTx: {
-    backgroundColor: CARD, borderRadius: 12, padding: 20,
-    borderWidth: 1, borderColor: BORDER, alignItems: 'center',
+    ...relevo.card, borderRadius: 12, padding: 20,
+    alignItems: 'center',
   },
   emptyTxText: { fontSize: 13, color: MUTED, textAlign: 'center' },
 
-  txCard: { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
+  txCard: { ...relevo.card, borderRadius: 16 },
   txRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   txRowBorder: { borderTopWidth: 1, borderTopColor: BORDER },
   txIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

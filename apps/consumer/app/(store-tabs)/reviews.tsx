@@ -5,13 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from 'expo-router'
 import { api } from '../../src/api/client'
 import { LoadError } from '../../src/components/LoadError'
+import { relevo } from '../../src/theme/relevo'
 
 const PRIMARY = '#FF5500'
 const TEXT    = '#1A0A00'
 const MUTED   = '#7A5C4A'
 const BG      = '#FFF8F3'
-const CARD    = '#FFFFFF'
-const BORDER  = '#F0E8E0'
 const GOLD    = '#F59E0B'
 
 interface Review {
@@ -229,10 +228,8 @@ const styles = StyleSheet.create({
   list: { padding: 16, gap: 12 },
 
   card: {
-    backgroundColor: CARD, borderRadius: 14, padding: 16,
-    borderWidth: 1, borderColor: BORDER,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    ...relevo.card,
+    borderRadius: 14, padding: 16,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   avatar: {

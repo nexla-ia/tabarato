@@ -13,6 +13,8 @@ import { useAuthStore } from '../../src/stores/auth.store'
 import { colors } from '../../src/theme/colors'
 import { formatPhoneBR } from '../../src/utils/phone'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
+import { relevo } from '../../src/theme/relevo'
 
 const STATES = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO']
 
@@ -142,11 +144,10 @@ export default function CompleteProfileScreen() {
         <View style={styles.form}>
 
           {/* Botão detectar por GPS */}
-          <TouchableOpacity
+          <Relevo
             style={styles.detectBtn}
             onPress={() => detectLocation(true)}
             disabled={detecting}
-            activeOpacity={0.85}
           >
             {detecting ? (
               <>
@@ -159,7 +160,7 @@ export default function CompleteProfileScreen() {
                 <Text style={styles.detectText}>Usar minha localização</Text>
               </>
             )}
-          </TouchableOpacity>
+          </Relevo>
 
           {detected && (
             <View style={styles.detectedTag}>
@@ -234,7 +235,7 @@ export default function CompleteProfileScreen() {
           <Text style={styles.phoneHint}>Ajuda a loja e o entregador a falarem com você.</Text>
 
           {/* CTA */}
-          <TouchableOpacity style={styles.btn} onPress={handleSave} disabled={loading} activeOpacity={0.85}>
+          <Relevo style={styles.btn} onPress={handleSave} disabled={loading}>
             <View style={styles.btnInner}>
               {loading
                 ? <ActivityIndicator color="#fff" />
@@ -244,7 +245,7 @@ export default function CompleteProfileScreen() {
                   </>
               }
             </View>
-          </TouchableOpacity>
+          </Relevo>
         </View>
 
       </ScrollView>
@@ -288,9 +289,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    ...relevo.contorno,
     backgroundColor: '#FFF3EB',
-    borderWidth: 1.5,
-    borderColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
   },
@@ -363,24 +363,16 @@ const styles = StyleSheet.create({
   phoneHint: { fontSize: 12, color: '#B0A098', marginTop: 6, marginBottom: 8 },
 
   btn: {
+    ...relevo.botao,
     marginTop: 24,
     borderRadius: 14,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
   },
   btnInner: {
-    backgroundColor: colors.primary,
     paddingVertical: 17,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
-    borderRadius: 14,
-    borderBottomWidth: 3,
-    borderBottomColor: colors.primaryDark,
   },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
 })

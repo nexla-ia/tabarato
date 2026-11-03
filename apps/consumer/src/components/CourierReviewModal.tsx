@@ -5,6 +5,8 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { api } from '../api/client'
+import { relevo } from '../theme/relevo'
+import { Relevo } from './Relevo'
 
 const PRIMARY       = '#FF5500'
 const PRIMARY_LIGHT = '#FFF0EB'
@@ -147,11 +149,10 @@ export function CourierReviewModal({ visible, orderId, courierName, onClose, onS
               </View>
             ) : null}
 
-            <TouchableOpacity
+            <Relevo
               style={[styles.submitBtn, submitting && { opacity: 0.75 }]}
               onPress={handleSubmit}
               disabled={submitting}
-              activeOpacity={0.88}
             >
               {submitting
                 ? <ActivityIndicator color="#fff" size="small" />
@@ -160,7 +161,7 @@ export function CourierReviewModal({ visible, orderId, courierName, onClose, onS
                     <Text style={styles.submitBtnText}>Enviar avaliação</Text>
                   </>
               }
-            </TouchableOpacity>
+            </Relevo>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
@@ -187,8 +188,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
   headerIcon: {
+    ...relevo.icone,
     width: 38, height: 38, borderRadius: 10,
-    backgroundColor: PRIMARY_LIGHT, alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { fontSize: 16, fontWeight: '800', color: TEXT },
   headerSub:   { fontSize: 12, color: MUTED, marginTop: 1 },
@@ -234,9 +236,7 @@ const styles = StyleSheet.create({
 
   submitBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 15, marginTop: 20,
-    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
+    ...relevo.botao, borderRadius: 14, paddingVertical: 15, marginTop: 20,
   },
   submitBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 })

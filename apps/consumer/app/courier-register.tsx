@@ -12,6 +12,8 @@ import * as DocumentPicker from 'expo-document-picker'
 import { api } from '../src/api/client'
 import { uploadDocumentFile, uploadDocumentImage } from '../src/api/upload'
 import { useToast } from '../src/components/Toast'
+import { Relevo } from '../src/components/Relevo'
+import { relevo, LABIO_NEUTRO } from '../src/theme/relevo'
 
 const BLUE       = '#FF5500'
 const BLUE_DARK  = '#CC5200'
@@ -289,11 +291,10 @@ export default function CourierRegisterScreen() {
             </Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity
+        <Relevo
           style={[s.btn, ((!canNext && step < 2) || (step === 2 && !acceptedTerms)) && s.btnDisabled, submitting && { opacity: 0.7 }]}
           onPress={step < 2 ? handleNext : handleSubmit}
           disabled={(!canNext && step < 2) || (step === 2 && !acceptedTerms) || submitting}
-          activeOpacity={0.85}
         >
           {submitting ? (
             <ActivityIndicator color="#fff" />
@@ -304,7 +305,7 @@ export default function CourierRegisterScreen() {
               {step < 2 && <Ionicons name="arrow-forward" size={18} color="#fff" />}
             </>
           )}
-        </TouchableOpacity>
+        </Relevo>
       </View>
 
       {/* Modal — Termo de Responsabilidade do Entregador */}
@@ -323,9 +324,9 @@ export default function CourierRegisterScreen() {
                 </View>
               ))}
             </ScrollView>
-            <TouchableOpacity style={s.btn} onPress={() => { setAcceptedTerms(true); setTermsOpen(false) }} activeOpacity={0.85}>
+            <Relevo style={s.btn} onPress={() => { setAcceptedTerms(true); setTermsOpen(false) }}>
               <Text style={s.btnText}>Li e aceito</Text>
-            </TouchableOpacity>
+            </Relevo>
           </View>
         </View>
       </Modal>
@@ -620,12 +621,11 @@ const s = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: BORDER,
   },
   btn: {
-    backgroundColor: BLUE, borderRadius: 14, paddingVertical: 16,
+    ...relevo.botao,
+    borderRadius: 14, paddingVertical: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    shadowColor: BLUE_DARK, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28, shadowRadius: 8, elevation: 5,
   },
-  btnDisabled: { backgroundColor: '#D4B8A8', shadowOpacity: 0, elevation: 0 },
+  btnDisabled: { backgroundColor: '#D4B8A8', borderBottomColor: '#B89A88', shadowOpacity: 0, elevation: 0 },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 
   termsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12, paddingHorizontal: 2 },
@@ -665,10 +665,11 @@ const pt = StyleSheet.create({
   chip: {
     paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
     borderWidth: 1.5, borderColor: BORDER, backgroundColor: CARD,
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  chipOn: { borderColor: BLUE, backgroundColor: BLUE_LIGHT },
+  chipOn: { ...relevo.chipAtivo },
   chipText: { fontSize: 12.5, fontWeight: '700', color: MUTED },
-  chipTextOn: { color: BLUE },
+  chipTextOn: { color: '#fff' },
 })
 
 const w = StyleSheet.create({
@@ -692,19 +693,18 @@ const w = StyleSheet.create({
 const up = StyleSheet.create({
   intro: { fontSize: 13, color: MUTED, lineHeight: 19, marginBottom: 14, fontWeight: '500' },
   card: {
+    ...relevo.card,
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: CARD, borderRadius: 14,
-    borderWidth: 1, borderColor: BORDER,
+    borderRadius: 14,
     padding: 14, marginBottom: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
   },
-  cardDone:     { borderColor: '#A7F3D0', backgroundColor: '#F0FDF9' },
+  cardDone:     { borderColor: '#A7F3D0', borderBottomColor: '#6EE7B7', backgroundColor: '#F0FDF9' },
   iconBadge:    {
+    ...relevo.icone,
     width: 42, height: 42, borderRadius: 12,
-    backgroundColor: BLUE_LIGHT, alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  iconBadgeDone:{ backgroundColor: GREEN },
+  iconBadgeDone:{ backgroundColor: GREEN, borderColor: GREEN, borderBottomColor: '#16A34A', shadowColor: GREEN },
   textWrap:     { flex: 1 },
   cardLabel:    { fontSize: 14, fontWeight: '700', color: TEXT, marginBottom: 2 },
   cardLabelDone:{ color: '#065F46' },
@@ -727,16 +727,15 @@ const up = StyleSheet.create({
 
 const rv = StyleSheet.create({
   card: {
-    backgroundColor: CARD, borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: BORDER,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    ...relevo.card,
+    borderRadius: 16, padding: 16,
   },
   row:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: '#F0F8FF' },
   rowIcon:   {
+    ...relevo.icone,
     width: 32, height: 32, borderRadius: 9,
-    backgroundColor: BLUE_LIGHT, alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   rowLabel:  { flex: 1, fontSize: 13, color: MUTED, fontWeight: '600' },
   rowValue:  { fontSize: 14, fontWeight: '800', color: TEXT },

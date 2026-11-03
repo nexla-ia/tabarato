@@ -5,6 +5,8 @@ import { router } from 'expo-router'
 import { api } from '../../src/api/client'
 import { useLojistaStore } from '../../src/stores/lojista.store'
 import { colors } from '../../src/theme/colors'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
+import { Relevo } from '../../src/components/Relevo'
 import { useToast } from '../../src/components/Toast'
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED'
@@ -247,44 +249,40 @@ function OrderCard({ order, onAction, onPrint, flash, reannouncing }: {
               <Text style={card.urgentText}>Aguardando confirmação — responda para não perder o pedido</Text>
             </View>
             <View style={card.actions}>
-              <TouchableOpacity
+              <Relevo
                 style={[card.actionBtn, card.actionBtnDanger]}
                 onPress={() => onAction(order.id, 'reject')}
-                activeOpacity={0.8}
               >
                 <Ionicons name="close-outline" size={16} color="#DC2626" />
                 <Text style={[card.actionBtnText, { color: '#DC2626' }]}>Rejeitar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </Relevo>
+              <Relevo
                 style={[card.actionBtn, card.actionBtnPrimary]}
                 onPress={() => onAction(order.id, 'confirm')}
-                activeOpacity={0.8}
               >
                 <Ionicons name="checkmark-outline" size={16} color="#fff" />
                 <Text style={[card.actionBtnText, { color: '#fff' }]}>✓ Confirmar agora</Text>
-              </TouchableOpacity>
+              </Relevo>
             </View>
           </>
         )}
         {order.status === 'CONFIRMED' && (
-          <TouchableOpacity
-            style={[card.actionBtn, card.actionBtnFull, { backgroundColor: '#7C3AED' }]}
+          <Relevo
+            style={[card.actionBtn, card.actionBtnFull, card.actionBtnPurple]}
             onPress={() => onAction(order.id, 'prepare')}
-            activeOpacity={0.8}
           >
             <Ionicons name="flame-outline" size={16} color="#fff" />
             <Text style={[card.actionBtnText, { color: '#fff' }]}>Iniciar preparo</Text>
-          </TouchableOpacity>
+          </Relevo>
         )}
         {order.status === 'PREPARING' && (
-          <TouchableOpacity
-            style={[card.actionBtn, card.actionBtnFull, { backgroundColor: '#059669' }]}
+          <Relevo
+            style={[card.actionBtn, card.actionBtnFull, card.actionBtnGreen]}
             onPress={() => onAction(order.id, 'ready')}
-            activeOpacity={0.8}
           >
             <Ionicons name="bag-check-outline" size={16} color="#fff" />
             <Text style={[card.actionBtnText, { color: '#fff' }]}>Marcar como pronto</Text>
-          </TouchableOpacity>
+          </Relevo>
         )}
         {order.status === 'READY' && (
           <View style={{ gap: 8, marginTop: 14 }}>
@@ -294,14 +292,13 @@ function OrderCard({ order, onAction, onPrint, flash, reannouncing }: {
                   <Ionicons name="storefront" size={14} color="#FF5500" />
                   <Text style={[card.courierBadgeText, { color: '#FF5500' }]}>Aguardando o cliente retirar</Text>
                 </View>
-                <TouchableOpacity
-                  style={[card.actionBtn, card.actionBtnFull, { backgroundColor: '#059669', marginTop: 0 }]}
+                <Relevo
+                  style={[card.actionBtn, card.actionBtnFull, card.actionBtnGreen, { marginTop: 0 }]}
                   onPress={() => onAction(order.id, 'confirm-pickup')}
-                  activeOpacity={0.8}
                 >
                   <Ionicons name="checkmark-done-outline" size={16} color="#fff" />
                   <Text style={[card.actionBtnText, { color: '#fff' }]}>Confirmar retirada</Text>
-                </TouchableOpacity>
+                </Relevo>
               </>
             ) : order.deliveryCourier ? (
               <View style={card.courierBadge}>
@@ -318,11 +315,10 @@ function OrderCard({ order, onAction, onPrint, flash, reannouncing }: {
                     Nenhum entregador aceitou — reanuncie a corrida
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={[card.actionBtn, card.actionBtnFull, { backgroundColor: '#0284C7', marginTop: 0 }, reannouncing && { opacity: 0.6 }]}
+                <Relevo
+                  style={[card.actionBtn, card.actionBtnFull, card.actionBtnBlue, { marginTop: 0 }, reannouncing && { opacity: 0.6 }]}
                   onPress={() => onAction(order.id, 'reannounce')}
                   disabled={reannouncing}
-                  activeOpacity={0.8}
                 >
                   {reannouncing ? (
                     <ActivityIndicator size="small" color="#fff" />
@@ -332,7 +328,7 @@ function OrderCard({ order, onAction, onPrint, flash, reannouncing }: {
                       <Text style={[card.actionBtnText, { color: '#fff' }]}>Reanunciar corrida</Text>
                     </>
                   )}
-                </TouchableOpacity>
+                </Relevo>
               </>
             ) : (
               <View style={[card.courierBadge, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' }]}>
@@ -341,25 +337,23 @@ function OrderCard({ order, onAction, onPrint, flash, reannouncing }: {
               </View>
             )}
             {/* Cancel always available for READY while courier hasn't picked up — backend validates */}
-            <TouchableOpacity
-              style={[card.actionBtn, { backgroundColor: '#FEE2E2', marginTop: 0 }]}
+            <Relevo
+              style={[card.actionBtn, card.actionBtnDanger, { marginTop: 0 }]}
               onPress={() => onAction(order.id, 'cancel-store')}
-              activeOpacity={0.8}
             >
               <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
               <Text style={[card.actionBtnText, { color: '#DC2626' }]}>Cancelar pedido</Text>
-            </TouchableOpacity>
+            </Relevo>
           </View>
         )}
         {['CONFIRMED', 'PREPARING'].includes(order.status) && (
-          <TouchableOpacity
-            style={[card.actionBtn, { backgroundColor: '#FEE2E2', marginTop: 8 }]}
+          <Relevo
+            style={[card.actionBtn, card.actionBtnDanger, { marginTop: 8 }]}
             onPress={() => onAction(order.id, 'cancel-store')}
-            activeOpacity={0.8}
           >
             <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
             <Text style={[card.actionBtnText, { color: '#DC2626' }]}>Cancelar pedido</Text>
-          </TouchableOpacity>
+          </Relevo>
         )}
       </View>
     </Animated.View>
@@ -760,24 +754,22 @@ export default function StoreOrdersScreen() {
             <Text style={rf.charCount}>{refusalNote.length}/200</Text>
 
             <View style={rf.actions}>
-              <TouchableOpacity
+              <Relevo
                 style={rf.cancelBtn}
                 onPress={() => setRefusalOrderId(null)}
-                activeOpacity={0.8}
               >
                 <Text style={rf.cancelBtnText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </Relevo>
+              <Relevo
                 style={[rf.confirmBtn, rejecting && { opacity: 0.7 }]}
                 onPress={handleConfirmReject}
                 disabled={rejecting}
-                activeOpacity={0.8}
               >
                 {rejecting
                   ? <ActivityIndicator color="#fff" size="small" />
                   : <Text style={rf.confirmBtnText}>Confirmar rejeição</Text>
                 }
-              </TouchableOpacity>
+              </Relevo>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -816,24 +808,22 @@ export default function StoreOrdersScreen() {
             />
 
             <View style={rf.actions}>
-              <TouchableOpacity
+              <Relevo
                 style={rf.cancelBtn}
                 onPress={() => setPickupOrderId(null)}
-                activeOpacity={0.8}
               >
                 <Text style={rf.cancelBtnText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[rf.confirmBtn, { backgroundColor: '#059669' }, (pickupBusy || pickupCode.length < 4) && { opacity: 0.6 }]}
+              </Relevo>
+              <Relevo
+                style={[rf.confirmBtn, rf.confirmBtnGreen, (pickupBusy || pickupCode.length < 4) && { opacity: 0.6 }]}
                 onPress={handleConfirmPickup}
                 disabled={pickupBusy || pickupCode.length < 4}
-                activeOpacity={0.8}
               >
                 {pickupBusy
                   ? <ActivityIndicator color="#fff" size="small" />
                   : <Text style={rf.confirmBtnText}>Confirmar retirada</Text>
                 }
-              </TouchableOpacity>
+              </Relevo>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -887,31 +877,30 @@ const rf = StyleSheet.create({
   },
   actions: { flexDirection: 'row', gap: 10 },
   cancelBtn: {
+    ...relevo.neutro,
     flex: 1, paddingVertical: 14, borderRadius: 12,
-    backgroundColor: '#F0EBE5', alignItems: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   cancelBtnText: { fontSize: 15, fontWeight: '700', color: '#7A6A60' },
   confirmBtn: {
     flex: 2, paddingVertical: 14, borderRadius: 12,
     backgroundColor: '#DC2626', alignItems: 'center',
-    borderBottomWidth: 3, borderBottomColor: '#B91C1C',
+    borderBottomWidth: 4, borderBottomColor: '#991B1B',
+    shadowColor: '#DC2626', shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25, shadowRadius: 8, elevation: 5,
     minHeight: 50, justifyContent: 'center',
   },
+  confirmBtnGreen: { backgroundColor: '#059669', borderBottomColor: '#047857', shadowColor: '#059669' },
   confirmBtnText: { fontSize: 15, fontWeight: '800', color: '#fff' },
 })
 
 const card = StyleSheet.create({
   container: {
+    ...relevo.card,
     flexDirection: 'row',
-    backgroundColor: '#fff',
     borderRadius: 16,
     marginBottom: 12,
     overflow: 'visible',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   containerPending: {
     shadowColor: '#D97706',
@@ -919,7 +908,7 @@ const card = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  stripe: { width: 5 },
+  stripe: { width: 5, borderTopLeftRadius: 15, borderBottomLeftRadius: 13 },
   body: { flex: 1, padding: 14 },
 
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
@@ -955,8 +944,31 @@ const card = StyleSheet.create({
     gap: 6, paddingVertical: 10, borderRadius: 10,
   },
   actionBtnFull: { marginTop: 14 },
-  actionBtnDanger: { backgroundColor: '#FEE2E2' },
-  actionBtnPrimary: { backgroundColor: colors.primary },
+  actionBtnDanger: {
+    backgroundColor: '#FEE2E2',
+    borderBottomWidth: 4, borderBottomColor: '#FCA5A5',
+    shadowColor: '#DC2626', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 6, elevation: 2,
+  },
+  actionBtnPrimary: { ...relevo.botao },
+  actionBtnPurple: {
+    backgroundColor: '#7C3AED',
+    borderBottomWidth: 4, borderBottomColor: '#5B21B6',
+    shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25, shadowRadius: 8, elevation: 5,
+  },
+  actionBtnGreen: {
+    backgroundColor: '#059669',
+    borderBottomWidth: 4, borderBottomColor: '#047857',
+    shadowColor: '#059669', shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25, shadowRadius: 8, elevation: 5,
+  },
+  actionBtnBlue: {
+    backgroundColor: '#0284C7',
+    borderBottomWidth: 4, borderBottomColor: '#075985',
+    shadowColor: '#0284C7', shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25, shadowRadius: 8, elevation: 5,
+  },
   actionBtnText: { fontSize: 13, fontWeight: '800' },
   courierBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -1009,8 +1021,11 @@ const styles = StyleSheet.create({
     maxHeight: 52,
   },
   filterContent: { paddingHorizontal: 16, paddingVertical: 9, gap: 8 },
-  filterBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: '#F5F0EC' },
-  filterBtnActive: { backgroundColor: colors.primary },
+  filterBtn: {
+    paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: '#F5F0EC',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
+  },
+  filterBtnActive: { ...relevo.chipAtivo },
   filterBtnText: { fontSize: 13, fontWeight: '700', color: '#7A6A60' },
   filterBtnTextActive: { color: '#fff' },
 
@@ -1018,8 +1033,8 @@ const styles = StyleSheet.create({
 
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: {
+    ...relevo.icone,
     width: 88, height: 88, borderRadius: 44,
-    backgroundColor: '#FFF0EB',
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 16,
   },

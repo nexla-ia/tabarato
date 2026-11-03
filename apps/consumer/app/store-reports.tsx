@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { api } from '../src/api/client'
 import { colors } from '../src/theme/colors'
+import { relevo, LABIO_NEUTRO } from '../src/theme/relevo'
 import { LoadError } from '../src/components/LoadError'
 
 type Period = 'day' | 'week' | 'month'
@@ -225,8 +226,9 @@ const styles = StyleSheet.create({
   periodBtn: {
     flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.18)',
+    borderBottomWidth: 3, borderBottomColor: 'rgba(120,30,0,0.18)',
   },
-  periodBtnActive: { backgroundColor: '#fff' },
+  periodBtnActive: { backgroundColor: '#fff', borderBottomColor: LABIO_NEUTRO },
   periodText: { fontSize: 13, fontWeight: '800', color: 'rgba(255,255,255,0.9)' },
   periodTextActive: { color: colors.primary },
 
@@ -235,15 +237,15 @@ const styles = StyleSheet.create({
 
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
   kpiCard: {
-    width: '47.5%', backgroundColor: '#fff', borderRadius: 16, padding: 14, gap: 4,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    ...relevo.card,
+    width: '47.5%', borderRadius: 16, padding: 14, gap: 4,
   },
   kpiValue: { fontSize: 20, fontWeight: '900', color: '#1A0A00', letterSpacing: -0.5, marginTop: 4 },
   kpiLabel: { fontSize: 11.5, color: '#9A8880', fontWeight: '600' },
 
   card: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 16, marginTop: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    ...relevo.card,
+    borderRadius: 16, padding: 16, marginTop: 14,
   },
   cardTitle: { fontSize: 15, fontWeight: '800', color: '#1A0A00', marginBottom: 8 },
 

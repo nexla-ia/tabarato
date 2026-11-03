@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../src/api/client'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 
 const PRIMARY = '#FF5500'
 const PRIMARY_LIGHT = '#FFF3EB'
@@ -187,14 +189,13 @@ export default function CourierWalletScreen() {
             <Text style={styles.balanceValue}>{fmtBRL(data?.balance ?? 0)}</Text>
             <Text style={styles.balanceSub}>Ganhos de entregas realizadas</Text>
 
-            <TouchableOpacity
+            <Relevo
               style={styles.withdrawBtn}
               onPress={() => setShowWithdraw(!showWithdraw)}
-              activeOpacity={0.85}
             >
               <Ionicons name="arrow-up-circle-outline" size={16} color={PRIMARY} />
               <Text style={styles.withdrawBtnText}>Solicitar saque via PIX</Text>
-            </TouchableOpacity>
+            </Relevo>
           </View>
 
           {/* Chave PIX */}
@@ -228,16 +229,16 @@ export default function CourierWalletScreen() {
                   keyboardType={pixType === 'EMAIL' ? 'email-address' : pixType === 'EVP' ? 'default' : 'numbers-and-punctuation'}
                 />
                 <View style={styles.pixActions}>
-                  <TouchableOpacity onPress={() => setEditingPix(false)} style={styles.pixCancel}>
+                  <Relevo onPress={() => setEditingPix(false)} style={styles.pixCancel}>
                     <Text style={styles.pixCancelText}>Cancelar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </Relevo>
+                  <Relevo
                     style={styles.pixSave}
                     onPress={() => { const k = pixInput.trim(); if (k) savePix({ key: k, type: pixType }) }}
                     disabled={savingPix}
                   >
                     {savingPix ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.pixSaveText}>Salvar</Text>}
-                  </TouchableOpacity>
+                  </Relevo>
                 </View>
               </>
             ) : pixKey ? (
@@ -275,10 +276,10 @@ export default function CourierWalletScreen() {
               ) : (
                 <>
                   <Text style={styles.mpDesc}>Conecte sua conta pra receber cada entrega na hora, direto na sua conta MP.</Text>
-                  <TouchableOpacity style={styles.mpBtn} onPress={connectMp} activeOpacity={0.85}>
+                  <Relevo style={styles.mpBtn} onPress={connectMp}>
                     <Ionicons name="open-outline" size={16} color="#fff" />
                     <Text style={styles.mpBtnText}>Conectar Mercado Pago</Text>
-                  </TouchableOpacity>
+                  </Relevo>
                 </>
               )}
             </View>
@@ -299,17 +300,16 @@ export default function CourierWalletScreen() {
                   keyboardType="decimal-pad"
                 />
               </View>
-              <TouchableOpacity
+              <Relevo
                 style={[styles.withdrawConfirmBtn, withdrawing && { opacity: 0.7 }]}
                 onPress={handleWithdraw}
                 disabled={withdrawing}
-                activeOpacity={0.85}
               >
                 {withdrawing
                   ? <ActivityIndicator size="small" color="#fff" />
                   : <Text style={styles.withdrawConfirmText}>Confirmar saque</Text>
                 }
-              </TouchableOpacity>
+              </Relevo>
               <Text style={styles.withdrawNote}>
                 O valor será enviado via PIX para a chave cadastrada.
               </Text>
@@ -356,6 +356,9 @@ const styles = StyleSheet.create({
   balanceCard: {
     backgroundColor: TEXT, borderRadius: 20, padding: 24,
     overflow: 'hidden', position: 'relative',
+    borderBottomWidth: 4, borderBottomColor: '#000000',
+    shadowColor: '#7A3A10', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25, shadowRadius: 14, elevation: 6,
   },
   balanceDecor: {
     position: 'absolute', width: 200, height: 200, borderRadius: 100,
@@ -367,15 +370,16 @@ const styles = StyleSheet.create({
   balanceSub: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 20 },
 
   withdrawBtn: {
+    ...relevo.neutro,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#fff', borderRadius: 12,
+    borderRadius: 12,
     paddingHorizontal: 16, paddingVertical: 11, alignSelf: 'flex-start',
   },
   withdrawBtnText: { fontSize: 13, fontWeight: '800', color: PRIMARY },
 
   withdrawForm: {
-    backgroundColor: CARD, borderRadius: 16, padding: 18,
-    borderWidth: 1, borderColor: BORDER,
+    ...relevo.card,
+    borderRadius: 16, padding: 18,
   },
   withdrawFormTitle: { fontSize: 14, fontWeight: '800', color: TEXT, marginBottom: 12 },
   withdrawInputRow: {
@@ -386,7 +390,8 @@ const styles = StyleSheet.create({
   withdrawCurrency: { fontSize: 16, fontWeight: '700', color: MUTED },
   withdrawInput: { flex: 1, fontSize: 22, fontWeight: '900', color: TEXT, paddingVertical: 12 },
   withdrawConfirmBtn: {
-    backgroundColor: PRIMARY, borderRadius: 12,
+    ...relevo.botao,
+    borderRadius: 12,
     paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
     marginBottom: 10,
   },
@@ -398,7 +403,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.8,
   },
 
-  pixCard: { backgroundColor: CARD, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER },
+  pixCard: { ...relevo.card, borderRadius: 16, padding: 16 },
   pixHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10 },
   pixTitle: { fontSize: 13.5, fontWeight: '800', color: TEXT },
   pixRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
@@ -416,31 +421,38 @@ const styles = StyleSheet.create({
   pixTypeChip: {
     paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
     borderWidth: 1.5, borderColor: BORDER, backgroundColor: CARD,
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  pixTypeChipOn: { borderColor: PRIMARY, backgroundColor: '#FFF3EB' },
+  pixTypeChipOn: { ...relevo.chipAtivo },
   pixTypeChipText: { fontSize: 12.5, fontWeight: '700', color: MUTED },
-  pixTypeChipTextOn: { color: PRIMARY },
+  pixTypeChipTextOn: { color: '#fff' },
   pixActions: { flexDirection: 'row', gap: 10 },
-  pixCancel: { flex: 1, paddingVertical: 11, borderRadius: 10, backgroundColor: BG, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
+  pixCancel: { ...relevo.neutro, flex: 1, paddingVertical: 11, borderRadius: 10, alignItems: 'center' },
   pixCancelText: { fontSize: 13.5, fontWeight: '700', color: MUTED },
-  pixSave: { flex: 1, paddingVertical: 11, borderRadius: 10, backgroundColor: PRIMARY, alignItems: 'center' },
+  pixSave: { ...relevo.botao, flex: 1, paddingVertical: 11, borderRadius: 10, alignItems: 'center' },
   pixSaveText: { fontSize: 13.5, fontWeight: '800', color: '#fff' },
   mpDesc: { fontSize: 12.5, color: MUTED, lineHeight: 18, marginBottom: 12 },
-  mpBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#009EE3', borderRadius: 12, paddingVertical: 13 },
+  mpBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#009EE3', borderRadius: 12, paddingVertical: 13,
+    borderBottomWidth: 4, borderBottomColor: '#0074A8',
+    shadowColor: '#009EE3', shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25, shadowRadius: 8, elevation: 5,
+  },
   mpBtnText: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
   mpBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   mpBadgeText: { color: '#059669', fontWeight: '700', fontSize: 13.5 },
 
   emptyCard: {
-    backgroundColor: CARD, borderRadius: 16, padding: 32,
-    alignItems: 'center', gap: 8, borderWidth: 1, borderColor: BORDER,
+    ...relevo.card,
+    borderRadius: 16, padding: 32,
+    alignItems: 'center', gap: 8,
   },
   emptyTitle: { fontSize: 15, fontWeight: '700', color: TEXT },
   emptySub: { fontSize: 12, color: MUTED, textAlign: 'center', lineHeight: 18 },
 
   txCard: {
-    backgroundColor: CARD, borderRadius: 16,
-    borderWidth: 1, borderColor: BORDER, overflow: 'hidden',
+    ...relevo.card,
+    borderRadius: 16,
   },
   txRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,

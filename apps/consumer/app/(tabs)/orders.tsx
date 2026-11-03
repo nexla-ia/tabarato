@@ -7,11 +7,13 @@ import { api } from '../../src/api/client'
 import { OrderCard } from '../../src/components/OrderCard'
 import { ReviewModal } from '../../src/components/ReviewModal'
 import { colors } from '../../src/theme/colors'
+import { relevo } from '../../src/theme/relevo'
 import { Order } from '../../src/types'
 import { useAuthStore } from '../../src/stores/auth.store'
 import { useConsumerStore } from '../../src/stores/consumer.store'
 import { useCartStore } from '../../src/stores/cart.store'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
 
 const ACTIVE_STATUSES = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP']
 
@@ -117,9 +119,9 @@ export default function OrdersScreen() {
         </View>
         <Text style={styles.guestTitle}>Seus pedidos aparecem aqui</Text>
         <Text style={styles.guestSub}>Entre na sua conta para ver o histórico de compras e acompanhar entregas.</Text>
-        <TouchableOpacity style={styles.guestBtn} onPress={() => router.push('/(auth)/login')} activeOpacity={0.85}>
+        <Relevo style={styles.guestBtn} onPress={() => router.push('/(auth)/login')}>
           <Text style={styles.guestBtnText}>Entrar na conta</Text>
-        </TouchableOpacity>
+        </Relevo>
         <TouchableOpacity onPress={() => router.push('/(auth)/register')} activeOpacity={0.7}>
           <Text style={styles.guestRegisterText}>Criar conta grátis</Text>
         </TouchableOpacity>
@@ -155,9 +157,9 @@ export default function OrdersScreen() {
             </View>
             <Text style={styles.emptyTitle}>Nenhum pedido ainda</Text>
             <Text style={styles.emptySub}>Seus pedidos aparecerão aqui depois que você fizer a primeira compra</Text>
-            <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/(tabs)')} activeOpacity={0.85}>
+            <Relevo style={styles.emptyBtn} onPress={() => router.push('/(tabs)')}>
               <Text style={styles.emptyBtnText}>Explorar lojas</Text>
-            </TouchableOpacity>
+            </Relevo>
           </View>
         }
         renderItem={({ item }) => {
@@ -169,14 +171,13 @@ export default function OrdersScreen() {
               {isDelivered && (
                 <View style={styles.deliveredActions}>
                   {canReview && (
-                    <TouchableOpacity
+                    <Relevo
                       style={[styles.reviewBtn, { flex: 1 }]}
                       onPress={() => setReviewOrder({ id: item.id, storeName: (item as any).store?.name ?? 'Loja' })}
-                      activeOpacity={0.85}
                     >
                       <Ionicons name="star-outline" size={15} color={colors.primary} />
                       <Text style={styles.reviewBtnText}>Avaliar</Text>
-                    </TouchableOpacity>
+                    </Relevo>
                   )}
                   {reviewedOrderIds.has(item.id) && (
                     <View style={[styles.reviewedBadge, { flex: 1 }]}>
@@ -184,14 +185,13 @@ export default function OrdersScreen() {
                       <Text style={styles.reviewedText}>Avaliado</Text>
                     </View>
                   )}
-                  <TouchableOpacity
+                  <Relevo
                     style={styles.reorderBtn}
                     onPress={() => handleReorder(item as any)}
-                    activeOpacity={0.85}
                   >
                     <Ionicons name="refresh-outline" size={15} color="#fff" />
                     <Text style={styles.reorderBtnText}>Pedir novamente</Text>
-                  </TouchableOpacity>
+                  </Relevo>
                 </View>
               )}
             </View>
@@ -229,10 +229,10 @@ const styles = StyleSheet.create({
     marginTop: -4, marginBottom: 16, paddingHorizontal: 0,
   },
   reviewBtn: {
+    ...relevo.contorno, borderBottomWidth: 3,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    backgroundColor: '#FFF0EB', borderRadius: 12,
+    borderRadius: 12,
     paddingVertical: 10, paddingHorizontal: 12,
-    borderWidth: 1, borderColor: '#FFD9BF',
   },
   reviewBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
 
@@ -245,25 +245,24 @@ const styles = StyleSheet.create({
   reviewedText: { fontSize: 12, fontWeight: '600', color: '#059669' },
 
   reorderBtn: {
+    ...relevo.botao, borderBottomWidth: 3,
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.primary, borderRadius: 12,
+    borderRadius: 12,
     paddingVertical: 10, paddingHorizontal: 14,
   },
   reorderBtnText: { fontSize: 13, fontWeight: '800', color: '#fff' },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   emptyIconWrap: {
+    ...relevo.icone,
     width: 96, height: 96, borderRadius: 48,
-    backgroundColor: colors.primaryLight,
     alignItems: 'center', justifyContent: 'center', marginBottom: 20,
   },
   emptyIcon: { fontSize: 44 },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 8 },
   emptySub: { fontSize: 14, color: colors.textMuted, textAlign: 'center', lineHeight: 21, marginBottom: 28 },
   emptyBtn: {
-    backgroundColor: colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14,
-    shadowColor: colors.primaryDark, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
+    ...relevo.botao, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14,
   },
   emptyBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
@@ -273,17 +272,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   guestIcon: {
+    ...relevo.icone,
     width: 96, height: 96, borderRadius: 48,
-    backgroundColor: colors.primaryLight,
     alignItems: 'center', justifyContent: 'center', marginBottom: 20,
   },
   guestTitle: { fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 8, textAlign: 'center' },
   guestSub: { fontSize: 14, color: colors.textMuted, textAlign: 'center', lineHeight: 21, marginBottom: 28 },
   guestBtn: {
-    backgroundColor: colors.primary, paddingHorizontal: 40, paddingVertical: 14,
+    ...relevo.botao, paddingHorizontal: 40, paddingVertical: 14,
     borderRadius: 14, marginBottom: 14, width: '100%', alignItems: 'center',
-    shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   guestBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   guestRegisterText: { fontSize: 14, color: colors.primary, fontWeight: '700' },

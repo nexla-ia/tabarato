@@ -10,6 +10,8 @@ import { api } from '../api/client'
 import { uploadFile, uploadImageAsset } from '../api/upload'
 import { useAuthStore } from '../stores/auth.store'
 import { colors } from '../theme/colors'
+import { relevo } from '../theme/relevo'
+import { Relevo } from './Relevo'
 import { useToast } from './Toast'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
@@ -99,15 +101,15 @@ export function PendingReview({ store, onRefresh }: { store: StoreLite | null; o
   if (!store) {
     return (
       <View style={[styles.root, styles.center, { paddingTop: insets.top }]}>
-        <View style={[styles.badge, { backgroundColor: '#FFF0EB' }]}>
+        <View style={styles.badge}>
           <Ionicons name="storefront-outline" size={38} color={colors.primary} />
         </View>
         <Text style={styles.title}>Finalize o cadastro da sua loja</Text>
         <Text style={styles.desc}>Você ainda não tem uma loja cadastrada. Complete o cadastro para começar a vender.</Text>
-        <TouchableOpacity style={styles.cta} onPress={() => router.push('/(auth)/register-store')} activeOpacity={0.85}>
+        <Relevo style={styles.cta} onPress={() => router.push('/(auth)/register-store')}>
           <Ionicons name="add-circle-outline" size={18} color="#fff" />
           <Text style={styles.ctaText}>Cadastrar minha loja</Text>
-        </TouchableOpacity>
+        </Relevo>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
           <Text style={styles.logoutText}>Sair da conta</Text>
         </TouchableOpacity>
@@ -176,7 +178,7 @@ export function PendingReview({ store, onRefresh }: { store: StoreLite | null; o
         </View>
 
         {/* Ações */}
-        <TouchableOpacity style={styles.cta} onPress={handleRefresh} disabled={refreshing} activeOpacity={0.85}>
+        <Relevo style={styles.cta} onPress={handleRefresh} disabled={refreshing}>
           {refreshing
             ? <ActivityIndicator color="#fff" />
             : <>
@@ -184,7 +186,7 @@ export function PendingReview({ store, onRefresh }: { store: StoreLite | null; o
                 <Text style={styles.ctaText}>Já enviei tudo — verificar aprovação</Text>
               </>
           }
-        </TouchableOpacity>
+        </Relevo>
 
         {(status === 'REJECTED' || status === 'SUSPENDED') && (
           <TouchableOpacity style={styles.supportBtn} onPress={() => Linking.openURL(SUPPORT_WHATSAPP)} activeOpacity={0.85}>
@@ -237,10 +239,7 @@ const styles = StyleSheet.create({
 
   body: { padding: 16, gap: 12 },
   card: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 18,
-    borderWidth: 1, borderColor: '#F0E8E0',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    ...relevo.card, borderRadius: 16, padding: 18,
   },
   desc: { fontSize: 14, color: '#5A4636', lineHeight: 21 },
 
@@ -268,9 +267,9 @@ const styles = StyleSheet.create({
   docChange: { fontSize: 13, color: colors.primary, fontWeight: '800' },
 
   cta: {
+    ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: colors.primary, paddingVertical: 16, borderRadius: 14,
-    borderBottomWidth: 3, borderBottomColor: colors.primaryDark, marginTop: 4,
+    paddingVertical: 16, borderRadius: 14, marginTop: 4,
   },
   ctaText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
@@ -285,5 +284,5 @@ const styles = StyleSheet.create({
   logoutText: { color: '#DC2626', fontSize: 14, fontWeight: '700' },
 
   title: { fontSize: 20, fontWeight: '900', color: '#1A0A00', textAlign: 'center', marginBottom: 8 },
-  badge: { width: 84, height: 84, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+  badge: { ...relevo.icone, width: 84, height: 84, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
 })

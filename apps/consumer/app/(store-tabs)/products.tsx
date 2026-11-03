@@ -8,6 +8,8 @@ import * as ImagePicker from 'expo-image-picker'
 import { api } from '../../src/api/client'
 import { uploadImageAsset } from '../../src/api/upload'
 import { colors } from '../../src/theme/colors'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
+import { Relevo } from '../../src/components/Relevo'
 import { useToast } from '../../src/components/Toast'
 
 interface Category {
@@ -508,11 +510,10 @@ function ProductModal({
               </Text>
             </View>
 
-            <TouchableOpacity
+            <Relevo
               style={[modal.saveBtn, saving && { opacity: 0.7 }]}
               onPress={() => onSave(form)}
               disabled={saving}
-              activeOpacity={0.85}
             >
               {saving
                 ? <ActivityIndicator color="#fff" />
@@ -521,7 +522,7 @@ function ProductModal({
                     <Text style={modal.saveBtnText}>{isEdit ? 'Salvar alterações' : 'Criar produto'}</Text>
                   </>
               }
-            </TouchableOpacity>
+            </Relevo>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
@@ -699,10 +700,10 @@ function VariationsModal({
                   <Text style={varModal.emptyText}>
                     Adicione tamanhos, sabores ou outras variações do produto.
                   </Text>
-                  <TouchableOpacity style={varModal.emptyBtn} onPress={startAdd} activeOpacity={0.85}>
+                  <Relevo style={varModal.emptyBtn} onPress={startAdd}>
                     <Ionicons name="add" size={16} color="#fff" />
                     <Text style={varModal.emptyBtnText}>Adicionar variação</Text>
-                  </TouchableOpacity>
+                  </Relevo>
                 </View>
               )}
 
@@ -837,18 +838,16 @@ function VariationsModal({
                   </View>
 
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-                    <TouchableOpacity
+                    <Relevo
                       style={varModal.cancelBtn}
                       onPress={() => setForm(null)}
-                      activeOpacity={0.8}
                     >
                       <Text style={varModal.cancelBtnText}>Cancelar</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
+                    </Relevo>
+                    <Relevo
                       style={[modal.saveBtn, { flex: 2 }, saving && { opacity: 0.7 }]}
                       onPress={handleSaveVariation}
                       disabled={saving}
-                      activeOpacity={0.85}
                     >
                       {saving
                         ? <ActivityIndicator color="#fff" />
@@ -857,7 +856,7 @@ function VariationsModal({
                             <Text style={modal.saveBtnText}>Salvar</Text>
                           </>
                       }
-                    </TouchableOpacity>
+                    </Relevo>
                   </View>
                 </View>
               )}
@@ -1145,9 +1144,9 @@ export default function StoreProductsScreen() {
             <TouchableOpacity style={styles.selectBtn} onPress={() => setSelectMode(true)} activeOpacity={0.8}>
               <Ionicons name="checkmark-done-outline" size={18} color={colors.primary} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.addBtn} onPress={handleAdd} activeOpacity={0.85}>
+            <Relevo style={styles.addBtn} onPress={handleAdd}>
               <Ionicons name="add" size={20} color="#fff" />
-            </TouchableOpacity>
+            </Relevo>
           </>
         )}
       </View>
@@ -1196,10 +1195,10 @@ export default function StoreProductsScreen() {
                 {search ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado'}
               </Text>
               {!search && (
-                <TouchableOpacity style={styles.emptyBtn} onPress={handleAdd} activeOpacity={0.85}>
+                <Relevo style={styles.emptyBtn} onPress={handleAdd}>
                   <Ionicons name="add" size={16} color="#fff" />
                   <Text style={styles.emptyBtnText}>Adicionar produto</Text>
-                </TouchableOpacity>
+                </Relevo>
               )}
             </View>
           ) : (
@@ -1256,14 +1255,13 @@ export default function StoreProductsScreen() {
       {selectMode && selectedIds.size > 0 && (
         <View style={styles.bulkBar}>
           <Text style={styles.bulkBarText}>{selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}</Text>
-          <TouchableOpacity
+          <Relevo
             style={styles.bulkEditBtn}
             onPress={() => setBulkModalVisible(true)}
-            activeOpacity={0.85}
           >
             <Ionicons name="create-outline" size={16} color="#fff" />
             <Text style={styles.bulkEditBtnText}>Editar em lote</Text>
-          </TouchableOpacity>
+          </Relevo>
         </View>
       )}
 
@@ -1313,16 +1311,16 @@ export default function StoreProductsScreen() {
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-              <TouchableOpacity style={styles.bulkCancelBtn} onPress={() => setBulkModalVisible(false)}>
+              <Relevo style={styles.bulkCancelBtn} onPress={() => setBulkModalVisible(false)}>
                 <Text style={styles.bulkCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </Relevo>
+              <Relevo
                 style={[styles.bulkSaveBtn, bulkSaving && { opacity: 0.7 }]}
                 onPress={handleBulkSave}
                 disabled={bulkSaving}
               >
                 {bulkSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.bulkSaveText}>Aplicar alterações</Text>}
-              </TouchableOpacity>
+              </Relevo>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -1399,10 +1397,11 @@ const modal = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8, marginBottom: 8,
     backgroundColor: '#F0EBE5',
     borderWidth: 1.5, borderColor: 'transparent',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  catBtnActive: { backgroundColor: '#FFF0EB', borderColor: colors.primary },
+  catBtnActive: { ...relevo.chipAtivo },
   catBtnText: { fontSize: 13, fontWeight: '700', color: '#7A6A60' },
-  catBtnTextActive: { color: colors.primary },
+  catBtnTextActive: { color: '#fff' },
   infoBox: {
     flexDirection: 'row', gap: 8, alignItems: 'flex-start',
     backgroundColor: '#F5F3FF', borderRadius: 10, padding: 12, marginBottom: 20,
@@ -1415,11 +1414,9 @@ const modal = StyleSheet.create({
   },
   promoPreviewText: { flex: 1, fontSize: 12, color: '#15803D', fontWeight: '700', lineHeight: 16 },
   saveBtn: {
+    ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: colors.primary, paddingVertical: 16, borderRadius: 14,
-    borderBottomWidth: 3, borderBottomColor: colors.primaryDark,
-    shadowColor: colors.primaryDark, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 6, minHeight: 56,
+    paddingVertical: 16, borderRadius: 14, minHeight: 56,
   },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 })
@@ -1460,12 +1457,15 @@ const varModal = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: '#7C3AED', paddingHorizontal: 20, paddingVertical: 12,
     borderRadius: 12,
+    borderBottomWidth: 4, borderBottomColor: '#5B21B6',
+    shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25, shadowRadius: 8, elevation: 5,
   },
   emptyBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   list: {
-    backgroundColor: '#fff', borderRadius: 16,
-    borderWidth: 1, borderColor: '#F0EBE5',
-    overflow: 'hidden', marginBottom: 16,
+    ...relevo.card,
+    borderRadius: 16,
+    marginBottom: 16,
   },
   varRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -1492,15 +1492,15 @@ const varModal = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   formCard: {
-    backgroundColor: '#fff', borderRadius: 16,
-    borderWidth: 1, borderColor: '#F0EBE5',
+    ...relevo.card,
+    borderRadius: 16,
     padding: 16, marginTop: 4,
   },
   formTitle: { fontSize: 15, fontWeight: '900', color: '#1A0A00', marginBottom: 16 },
   cancelBtn: {
+    ...relevo.neutro,
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 14, borderRadius: 12,
-    backgroundColor: '#F0EBE5',
   },
   cancelBtnText: { color: '#7A6A60', fontWeight: '700', fontSize: 15 },
 })
@@ -1581,8 +1581,9 @@ const styles = StyleSheet.create({
   },
   bulkBarText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   bulkEditBtn: {
+    ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9,
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9,
   },
   bulkEditBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' },
 
@@ -1601,9 +1602,9 @@ const styles = StyleSheet.create({
   },
   bulkStatusBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   bulkStatusText: { fontSize: 13, fontWeight: '800' },
-  bulkCancelBtn: { flex: 1, backgroundColor: '#F0EBE5', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  bulkCancelBtn: { ...relevo.neutro, flex: 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   bulkCancelText: { fontSize: 15, fontWeight: '700', color: '#7A6A60' },
-  bulkSaveBtn: { flex: 2, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  bulkSaveBtn: { ...relevo.botao, flex: 2, borderRadius: 12, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
   bulkSaveText: { fontSize: 15, fontWeight: '800', color: '#fff' },
 
   container: { flex: 1, backgroundColor: '#F5F5F5' },
@@ -1619,7 +1620,7 @@ const styles = StyleSheet.create({
   },
   searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, fontSize: 14, color: '#1A0A00' },
-  addBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  addBtn: { ...relevo.botao, width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 
   statsBar: {
     paddingHorizontal: 16, paddingVertical: 10,
@@ -1633,13 +1634,15 @@ const styles = StyleSheet.create({
 
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: {
-    width: 88, height: 88, borderRadius: 44, backgroundColor: '#FFF0EB',
+    ...relevo.icone,
+    width: 88, height: 88, borderRadius: 44,
     alignItems: 'center', justifyContent: 'center', marginBottom: 16,
   },
   emptyTitle: { fontSize: 16, fontWeight: '800', color: '#1A0A00', marginBottom: 16 },
   emptyBtn: {
+    ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.primary, paddingHorizontal: 20, paddingVertical: 12,
+    paddingHorizontal: 20, paddingVertical: 12,
     borderRadius: 12,
   },
   emptyBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },

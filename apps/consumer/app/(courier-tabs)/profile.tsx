@@ -4,6 +4,7 @@ import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuthStore } from '../../src/stores/auth.store'
 import { colors } from '../../src/theme/colors'
+import { relevo } from '../../src/theme/relevo'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -228,10 +229,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 4,
   },
   card: {
-    backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
-    borderWidth: 1, borderColor: '#F0E8E0',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    ...relevo.card,
+    borderRadius: 18,
   },
   item: {
     flexDirection: 'row', alignItems: 'center',
@@ -239,11 +238,11 @@ const styles = StyleSheet.create({
   },
   itemBorder: { borderBottomWidth: 1, borderBottomColor: '#F5EEE9' },
   iconWrap: {
-    width: 38, height: 38, borderRadius: 10,
-    backgroundColor: colors.primaryLight,
+    ...relevo.icone,
+    width: 38, height: 38, borderRadius: 11,
     alignItems: 'center', justifyContent: 'center',
   },
-  iconDanger: { backgroundColor: '#FFF0F0' },
+  iconDanger: { backgroundColor: '#FFF0F0', borderColor: '#FFE0E0', borderBottomColor: '#FCC5C5', shadowColor: colors.danger },
   itemText: { flex: 1 },
   itemLabel: { fontSize: 15, color: '#1A0A00', fontWeight: '600' },
   itemDesc: { fontSize: 12, color: '#7A5C4A', marginTop: 1 },

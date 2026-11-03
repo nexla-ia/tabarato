@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../src/api/client'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 
 const PRIMARY = '#FF5500'
 const TEXT = '#1A0A00'
@@ -199,14 +201,13 @@ export default function StoreWalletScreen() {
             <Text style={styles.balanceValue}>{fmtBRL(data?.balance ?? 0)}</Text>
             <Text style={styles.balanceSub}>90% do subtotal dos pedidos entregues</Text>
 
-            <TouchableOpacity
+            <Relevo
               style={styles.withdrawBtn}
               onPress={() => setShowWithdraw(!showWithdraw)}
-              activeOpacity={0.85}
             >
               <Ionicons name="arrow-up-circle-outline" size={16} color={PRIMARY} />
               <Text style={styles.withdrawBtnText}>Solicitar saque via PIX</Text>
-            </TouchableOpacity>
+            </Relevo>
           </View>
 
           {/* Chave PIX de recebimento (pra onde vai o saque) */}
@@ -245,17 +246,16 @@ export default function StoreWalletScreen() {
                   keyboardType={pixType === 'CPF' || pixType === 'CNPJ' || pixType === 'PHONE' ? 'default' : (pixType === 'EMAIL' ? 'email-address' : 'default')}
                 />
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity
+                  <Relevo
                     style={[styles.pixSaveBtn, savingPix && { opacity: 0.7 }]}
                     onPress={() => { if (pixInput.trim()) savePix({ key: pixInput, type: pixType }) }}
                     disabled={savingPix}
-                    activeOpacity={0.85}
                   >
                     {savingPix ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.pixSaveText}>Salvar</Text>}
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.pixCancelBtn} onPress={() => setEditingPix(false)} activeOpacity={0.8}>
+                  </Relevo>
+                  <Relevo style={styles.pixCancelBtn} onPress={() => setEditingPix(false)}>
                     <Text style={styles.pixCancelText}>Cancelar</Text>
-                  </TouchableOpacity>
+                  </Relevo>
                 </View>
               </>
             ) : data?.pixKey ? (
@@ -271,10 +271,10 @@ export default function StoreWalletScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity style={styles.pixSetBtn} onPress={() => { setPixInput(''); setPixType('CPF'); setEditingPix(true) }} activeOpacity={0.85}>
+              <Relevo style={styles.pixSetBtn} onPress={() => { setPixInput(''); setPixType('CPF'); setEditingPix(true) }}>
                 <Ionicons name="add-circle-outline" size={16} color={PRIMARY} />
                 <Text style={styles.pixSetText}>Cadastrar chave PIX</Text>
-              </TouchableOpacity>
+              </Relevo>
             )}
             <Text style={styles.pixNote}>É para esta chave que enviamos seus saques. Não é a chave que o cliente usa pra pagar.</Text>
           </View>
@@ -313,17 +313,16 @@ export default function StoreWalletScreen() {
                   keyboardType="decimal-pad"
                 />
               </View>
-              <TouchableOpacity
+              <Relevo
                 style={[styles.withdrawConfirmBtn, withdrawing && { opacity: 0.7 }]}
                 onPress={handleWithdraw}
                 disabled={withdrawing}
-                activeOpacity={0.85}
               >
                 {withdrawing
                   ? <ActivityIndicator size="small" color="#fff" />
                   : <Text style={styles.withdrawConfirmText}>Confirmar saque</Text>
                 }
-              </TouchableOpacity>
+              </Relevo>
               <Text style={styles.withdrawNote}>
                 O valor será enviado para a chave PIX cadastrada na sua loja em até 24h.
               </Text>
@@ -331,11 +330,10 @@ export default function StoreWalletScreen() {
           )}
 
           {/* Export */}
-          <TouchableOpacity
+          <Relevo
             style={styles.exportBtn}
             onPress={handleExport}
             disabled={exporting}
-            activeOpacity={0.8}
           >
             {exporting
               ? <ActivityIndicator size="small" color={PRIMARY} />
@@ -344,7 +342,7 @@ export default function StoreWalletScreen() {
             <Text style={styles.exportBtnText}>
               {exporting ? 'Exportando...' : 'Exportar pedidos (CSV)'}
             </Text>
-          </TouchableOpacity>
+          </Relevo>
 
           {/* Transactions */}
           <Text style={styles.sectionTitle}>Histórico de movimentações</Text>
@@ -378,6 +376,9 @@ const styles = StyleSheet.create({
   balanceCard: {
     backgroundColor: '#0D3B2E', borderRadius: 20, padding: 24,
     overflow: 'hidden', position: 'relative',
+    borderBottomWidth: 4, borderBottomColor: '#06241B',
+    shadowColor: '#0D3B2E', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25, shadowRadius: 14, elevation: 6,
   },
   balanceDecor: {
     position: 'absolute', width: 200, height: 200, borderRadius: 100,
@@ -389,15 +390,16 @@ const styles = StyleSheet.create({
   balanceSub: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 20 },
 
   withdrawBtn: {
+    ...relevo.neutro,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#fff', borderRadius: 12,
+    borderRadius: 12,
     paddingHorizontal: 16, paddingVertical: 11, alignSelf: 'flex-start',
   },
   withdrawBtnText: { fontSize: 13, fontWeight: '800', color: PRIMARY },
 
   pixCard: {
-    backgroundColor: CARD, borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: BORDER, gap: 10,
+    ...relevo.card,
+    borderRadius: 16, padding: 16, gap: 10,
   },
   pixHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pixTitle: { fontSize: 14, fontWeight: '800', color: TEXT },
@@ -413,24 +415,28 @@ const styles = StyleSheet.create({
   pixTypeChip: {
     paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
     borderWidth: 1.5, borderColor: BORDER, backgroundColor: CARD,
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  pixTypeChipActive: { borderColor: PRIMARY, backgroundColor: '#FFF0EB' },
+  pixTypeChipActive: { ...relevo.chipAtivo },
   pixTypeChipText: { fontSize: 12.5, fontWeight: '700', color: MUTED },
-  pixTypeChipTextActive: { color: PRIMARY },
+  pixTypeChipTextActive: { color: '#fff' },
   pixTypeTag: { fontSize: 11, fontWeight: '700', color: MUTED, marginTop: 2 },
   pixSaveBtn: {
-    flex: 1, backgroundColor: PRIMARY, borderRadius: 12,
+    ...relevo.botao,
+    flex: 1, borderRadius: 12,
     paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
   },
   pixSaveText: { fontSize: 14, fontWeight: '800', color: '#fff' },
   pixCancelBtn: {
+    ...relevo.neutro,
     paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12,
-    backgroundColor: '#F5EEE9', alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   pixCancelText: { fontSize: 14, fontWeight: '700', color: MUTED },
   pixSetBtn: {
+    ...relevo.contorno,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    borderWidth: 1.5, borderColor: PRIMARY, borderRadius: 12, paddingVertical: 11,
+    borderRadius: 12, paddingVertical: 11,
   },
   pixSetText: { fontSize: 14, fontWeight: '800', color: PRIMARY },
   pixNote: { fontSize: 11, color: MUTED, lineHeight: 15 },
@@ -443,8 +449,8 @@ const styles = StyleSheet.create({
   infoText: { flex: 1, fontSize: 12, color: MUTED, lineHeight: 17 },
 
   withdrawForm: {
-    backgroundColor: CARD, borderRadius: 16, padding: 18,
-    borderWidth: 1, borderColor: BORDER,
+    ...relevo.card,
+    borderRadius: 16, padding: 18,
   },
   withdrawFormTitle: { fontSize: 14, fontWeight: '800', color: TEXT, marginBottom: 12 },
   withdrawInputRow: {
@@ -455,7 +461,8 @@ const styles = StyleSheet.create({
   withdrawCurrency: { fontSize: 16, fontWeight: '700', color: MUTED },
   withdrawInput: { flex: 1, fontSize: 22, fontWeight: '900', color: TEXT, paddingVertical: 12 },
   withdrawConfirmBtn: {
-    backgroundColor: PRIMARY, borderRadius: 12,
+    ...relevo.botao,
+    borderRadius: 12,
     paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
     marginBottom: 10,
   },
@@ -463,10 +470,10 @@ const styles = StyleSheet.create({
   withdrawNote: { fontSize: 11, color: MUTED, textAlign: 'center', lineHeight: 16 },
 
   exportBtn: {
+    ...relevo.contorno,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: CARD, borderRadius: 12,
+    borderRadius: 12,
     paddingVertical: 12, paddingHorizontal: 16,
-    borderWidth: 1.5, borderColor: PRIMARY,
     marginBottom: 20,
   },
   exportBtnText: { fontSize: 14, fontWeight: '700', color: PRIMARY },
@@ -477,15 +484,16 @@ const styles = StyleSheet.create({
   },
 
   emptyCard: {
-    backgroundColor: CARD, borderRadius: 16, padding: 32,
-    alignItems: 'center', gap: 8, borderWidth: 1, borderColor: BORDER,
+    ...relevo.card,
+    borderRadius: 16, padding: 32,
+    alignItems: 'center', gap: 8,
   },
   emptyTitle: { fontSize: 15, fontWeight: '700', color: TEXT },
   emptySub: { fontSize: 12, color: MUTED, textAlign: 'center', lineHeight: 18 },
 
   txCard: {
-    backgroundColor: CARD, borderRadius: 16,
-    borderWidth: 1, borderColor: BORDER, overflow: 'hidden',
+    ...relevo.card,
+    borderRadius: 16,
   },
   txRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   txIcon: {

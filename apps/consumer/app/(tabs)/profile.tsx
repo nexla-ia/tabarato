@@ -7,6 +7,8 @@ import { api } from '../../src/api/client'
 import { colors } from '../../src/theme/colors'
 import { useTheme } from '../../src/theme/theme'
 import { useToast } from '../../src/components/Toast'
+import { Relevo } from '../../src/components/Relevo'
+import { relevo } from '../../src/theme/relevo'
 import { VENDE_ANUNCIO_NO_APP } from '../../src/utils/ads'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
@@ -35,14 +37,14 @@ function GuestScreen() {
       </View>
 
       <View style={guestStyles.body}>
-        <TouchableOpacity style={guestStyles.loginBtn} onPress={() => router.push('/(auth)/login')} activeOpacity={0.85}>
+        <Relevo style={guestStyles.loginBtn} onPress={() => router.push('/(auth)/login')}>
           <Ionicons name="log-in-outline" size={20} color="#fff" />
           <Text style={guestStyles.loginBtnText}>Entrar na conta</Text>
-        </TouchableOpacity>
+        </Relevo>
 
-        <TouchableOpacity style={guestStyles.registerBtn} onPress={() => router.push('/(auth)/register')} activeOpacity={0.85}>
+        <Relevo style={guestStyles.registerBtn} onPress={() => router.push('/(auth)/register')}>
           <Text style={guestStyles.registerBtnText}>Criar conta grátis</Text>
-        </TouchableOpacity>
+        </Relevo>
 
         <View style={guestStyles.benefits}>
           {[
@@ -96,29 +98,26 @@ const guestStyles = StyleSheet.create({
 
   body: { padding: 24, gap: 12 },
   loginBtn: {
-    backgroundColor: colors.primary, borderRadius: 14,
+    ...relevo.botao, borderRadius: 16,
     paddingVertical: 15, flexDirection: 'row',
     alignItems: 'center', justifyContent: 'center', gap: 8,
-    shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   registerBtn: {
-    borderWidth: 2, borderColor: colors.primary, borderRadius: 14,
+    ...relevo.contorno, borderRadius: 16,
     paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
   },
   registerBtnText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
 
   benefits: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 16, marginTop: 8,
+    ...relevo.card, borderRadius: 18, padding: 16, marginTop: 8,
     gap: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
   benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   benefitIcon: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center',
+    ...relevo.icone,
+    width: 38, height: 38, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center',
   },
   benefitText: { flex: 1, fontSize: 13, color: colors.text, fontWeight: '500' },
 })
@@ -256,7 +255,7 @@ export default function ProfileScreen() {
             {section.title ? (
               <Text style={styles.menuSectionTitle}>{section.title}</Text>
             ) : null}
-            <View style={[styles.menuCard, { backgroundColor: tc.card, borderColor: tc.border }]}>
+            <View style={[styles.menuCard, { backgroundColor: tc.card }]}>
               {section.items.map((item, ii) => (
                 <TouchableOpacity
                   key={item.label}
@@ -371,6 +370,8 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+    borderBottomWidth: 3, borderBottomColor: 'rgba(120,30,0,0.25)',
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 8,
@@ -392,14 +393,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   menuCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    ...relevo.card,
+    borderRadius: 18,
   },
   menuItem: {
     flexDirection: 'row',
@@ -410,14 +405,14 @@ const styles = StyleSheet.create({
   },
   menuItemBorder: { borderBottomWidth: 1, borderBottomColor: '#F5EEE9' },
   menuIconWrap: {
+    ...relevo.icone,
     width: 38,
     height: 38,
-    borderRadius: 10,
-    backgroundColor: colors.primaryLight,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuIconDanger: { backgroundColor: '#FFF0F0' },
+  menuIconDanger: { backgroundColor: '#FFF0F0', borderColor: '#FFE0E0', borderBottomColor: '#FCC5C5', shadowColor: colors.danger },
   menuText: { flex: 1 },
   menuLabel: { fontSize: 15, color: colors.text, fontWeight: '600' },
   menuDesc: { fontSize: 12, color: colors.textMuted, marginTop: 1 },

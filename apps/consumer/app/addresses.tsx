@@ -12,6 +12,8 @@ import * as Location from 'expo-location'
 import { api } from '../src/api/client'
 import { colors } from '../src/theme/colors'
 import { useToast } from '../src/components/Toast'
+import { Relevo } from '../src/components/Relevo'
+import { relevo, LABIO_LARANJA } from '../src/theme/relevo'
 
 interface Address {
   id: string
@@ -261,10 +263,10 @@ export default function AddressesScreen() {
               </View>
               <Text style={styles.emptyTitle}>Nenhum endereço</Text>
               <Text style={styles.emptySub}>Adicione um endereço de entrega para facilitar seus pedidos.</Text>
-              <TouchableOpacity style={styles.emptyBtn} onPress={openNew} activeOpacity={0.85}>
+              <Relevo style={styles.emptyBtn} onPress={openNew}>
                 <Ionicons name="add" size={18} color="#fff" />
                 <Text style={styles.emptyBtnText}>Adicionar endereço</Text>
-              </TouchableOpacity>
+              </Relevo>
             </View>
           }
           renderItem={({ item }) => (
@@ -438,18 +440,16 @@ const styles = StyleSheet.create({
   listEmpty: { flex: 1, padding: 16 },
 
   card: {
-    backgroundColor: '#fff', borderRadius: 16,
+    ...relevo.card, borderRadius: 16,
     padding: 16, flexDirection: 'row', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
   cardLeft: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   cardIcon: {
+    ...relevo.icone,
     width: 38, height: 38, borderRadius: 10,
-    backgroundColor: colors.primaryLight,
     alignItems: 'center', justifyContent: 'center',
   },
-  cardIconDefault: { backgroundColor: colors.primary },
+  cardIconDefault: { backgroundColor: colors.primary, borderColor: colors.primary, borderBottomColor: LABIO_LARANJA },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
   cardLabel: { fontSize: 15, fontWeight: '700', color: '#1A0A00' },
   defaultBadge: {
@@ -468,15 +468,15 @@ const styles = StyleSheet.create({
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emptyIconWrap: {
+    ...relevo.icone,
     width: 88, height: 88, borderRadius: 44,
-    backgroundColor: colors.primaryLight,
     alignItems: 'center', justifyContent: 'center', marginBottom: 16,
   },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: '#1A0A00', marginBottom: 8 },
   emptySub: { fontSize: 14, color: '#9A8880', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
   emptyBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14,
+    ...relevo.botao, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14,
   },
   emptyBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
@@ -506,8 +506,7 @@ const styles = StyleSheet.create({
 
   switchRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 14,
-    borderWidth: 1.5, borderColor: '#EDE5DF',
+    ...relevo.card, borderRadius: 14, padding: 16, marginBottom: 14,
   },
   switchLabel: { fontSize: 15, fontWeight: '700', color: '#1A0A00', marginBottom: 2 },
   switchSub: { fontSize: 12, color: '#9A8880' },

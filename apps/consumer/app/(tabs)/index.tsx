@@ -11,12 +11,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import { api } from '../../src/api/client'
 import { colors } from '../../src/theme/colors'
+import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 import { useTheme } from '../../src/theme/theme'
 import { Store, Category } from '../../src/types'
 import { useAuthStore } from '../../src/stores/auth.store'
 import { useFavoritesStore } from '../../src/stores/favorites.store'
 import { ProductRail } from '../../src/components/ProductRail'
 import { AdCarousel } from '../../src/components/AdCarousel'
+import { Relevo } from '../../src/components/Relevo'
 
 const SLOGAN = 'Entrega na sua casa'
 
@@ -417,9 +419,9 @@ export default function HomeScreen() {
               })}
             </View>
 
-            <TouchableOpacity style={styles.fApplyBtn} onPress={() => setShowFilters(false)} activeOpacity={0.85}>
+            <Relevo style={styles.fApplyBtn} onPress={() => setShowFilters(false)}>
               <Text style={styles.fApplyText}>Ver {feed.length} {feed.length === 1 ? 'item' : 'itens'}</Text>
-            </TouchableOpacity>
+            </Relevo>
           </View>
         </View>
       </Modal>
@@ -535,9 +537,10 @@ const styles = StyleSheet.create({
   filterBtn: {
     width: 44, height: 40, marginRight: 10, marginLeft: 2, borderRadius: 12,
     borderWidth: 1.5, borderColor: '#E8E0D8', backgroundColor: '#fff',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
     alignItems: 'center', justifyContent: 'center', position: 'relative',
   },
-  filterBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterBtnActive: { ...relevo.chipAtivo },
   filterBadge: {
     position: 'absolute', top: -5, right: -5, backgroundColor: '#EF4444',
     minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
@@ -561,8 +564,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20,
     borderWidth: 1.5, borderColor: '#E8E0D8', backgroundColor: '#fff',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  fChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  fChipActive: { ...relevo.chipAtivo },
   fChipText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
   fChipTextActive: { color: '#fff' },
   fPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -572,9 +576,9 @@ const styles = StyleSheet.create({
   },
   fPriceDash: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
   fApplyBtn: {
-    marginTop: 24, height: 52, borderRadius: 14, backgroundColor: colors.primary,
+    ...relevo.botao,
+    marginTop: 24, height: 52, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   fApplyText: { fontSize: 16, fontWeight: '800', color: '#fff' },
 
@@ -590,19 +594,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
     borderWidth: 1.5, borderColor: '#E8E0D8', backgroundColor: '#fff',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  openChipActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
+  openChipActive: { backgroundColor: '#16A34A', borderColor: '#16A34A', borderBottomColor: '#15803D' },
   openDot: { width: 7, height: 7, borderRadius: 4 },
   catChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20,
     backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E8E0D8',
+    borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
-  catChipActive: {
-    backgroundColor: colors.primary, borderColor: colors.primary,
-    shadowColor: colors.primary, shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
-  },
+  catChipActive: { ...relevo.chipAtivo },
   catText: { fontSize: 13, color: colors.textMuted, fontWeight: '700' },
   catTextActive: { color: '#fff' },
 
@@ -616,9 +618,9 @@ const styles = StyleSheet.create({
   storeLogoWrap: { width: 60, height: 60, position: 'relative' },
   storeLogo: { width: 60, height: 60, borderRadius: 18, backgroundColor: '#F0EBE5' },
   storeLogoFallback: {
-    width: 60, height: 60, borderRadius: 18, backgroundColor: '#FFF0EB',
+    ...relevo.icone,
+    width: 60, height: 60, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: '#FFD9C2',
   },
   storeDot: {
     position: 'absolute', bottom: -2, right: -2,
@@ -641,11 +643,12 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: H_PAD, paddingBottom: 32 },
   gridRow: { gap: GRID_GAP, marginBottom: GRID_GAP },
   card: {
-    backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+    ...relevo.card, borderRadius: 18,
   },
-  cardImgWrap: { width: '100%', aspectRatio: 1.15, position: 'relative', backgroundColor: '#F5F0EC' },
+  cardImgWrap: {
+    width: '100%', aspectRatio: 1.15, position: 'relative', backgroundColor: '#F5F0EC',
+    borderTopLeftRadius: 17, borderTopRightRadius: 17, overflow: 'hidden',
+  },
   cardImg: { width: '100%', height: '100%' },
   cardImgFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF0EB' },
   closedOverlay: {
@@ -670,15 +673,16 @@ const styles = StyleSheet.create({
   cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardPrice: { fontSize: 15, fontWeight: '900', color: colors.primary, letterSpacing: -0.3, flexShrink: 1 },
   addBtn: {
-    width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary,
+    ...relevo.botao, borderBottomWidth: 3,
+    width: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 4, elevation: 4,
   },
 
   // ── Empty ──
   empty: { alignItems: 'center', marginTop: 48, paddingHorizontal: 32 },
   emptyIconWrap: {
-    width: 84, height: 84, borderRadius: 42, backgroundColor: colors.primaryLight,
+    ...relevo.icone,
+    width: 84, height: 84, borderRadius: 42,
     alignItems: 'center', justifyContent: 'center', marginBottom: 16,
   },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 6 },

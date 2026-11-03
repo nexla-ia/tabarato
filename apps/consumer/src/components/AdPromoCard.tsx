@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { colors } from '../theme/colors'
+import { relevo, LABIO_LARANJA } from '../theme/relevo'
 import { AdConfig, MyAd, VENDE_ANUNCIO_NO_APP, brl, ctr, dataCurta } from '../utils/ads'
 
 /**
@@ -105,8 +106,7 @@ function Numero({ valor, rotulo }: { valor: string; rotulo: string }) {
 
 const s = StyleSheet.create({
   card: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 14, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    ...relevo.card, borderRadius: 16, padding: 14,
   },
   linha: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   topo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
@@ -119,11 +119,15 @@ const s = StyleSheet.create({
   numeroValor: { fontSize: 17, fontWeight: '900', color: colors.primary, fontVariant: ['tabular-nums'] },
   numeroRotulo: { fontSize: 10.5, fontWeight: '600', color: '#9A8880', marginTop: 1 },
 
-  icone: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#FFF0EB', alignItems: 'center', justifyContent: 'center' },
+  icone: { ...relevo.icone, width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   titulo: { fontSize: 14.5, fontWeight: '800', color: '#1A0A00' },
   sub: { fontSize: 12, color: '#9A8880', marginTop: 2 },
 
-  convite: { backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16 },
+  convite: {
+    backgroundColor: colors.primary, borderColor: colors.primary, borderBottomColor: LABIO_LARANJA,
+    shadowColor: LABIO_LARANJA, shadowOpacity: 0.3, overflow: 'hidden',
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16,
+  },
   bola: {
     position: 'absolute', width: 130, height: 130, borderRadius: 65,
     backgroundColor: 'rgba(255,255,255,0.10)', top: -50, right: -20,

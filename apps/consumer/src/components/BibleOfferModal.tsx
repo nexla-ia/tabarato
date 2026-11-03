@@ -1,6 +1,8 @@
-import { Modal, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { Modal, View, Text, StyleSheet, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../theme/colors'
+import { relevo } from '../theme/relevo'
+import { Relevo } from './Relevo'
 
 /**
  * Cortesia da Bíblia, oferecida logo depois de criar a conta.
@@ -48,25 +50,23 @@ export function BibleOfferModal({
           </View>
 
           <View style={styles.actions}>
-            <TouchableOpacity
+            <Relevo
               style={[styles.btn, styles.btnGhost]}
               onPress={() => onAnswer(false)}
               disabled={saving}
-              activeOpacity={0.7}
             >
               <Text style={styles.btnGhostText}>Não, obrigado</Text>
-            </TouchableOpacity>
+            </Relevo>
 
-            <TouchableOpacity
+            <Relevo
               style={[styles.btn, styles.btnSolid, saving && styles.btnOff]}
               onPress={() => onAnswer(true)}
               disabled={saving}
-              activeOpacity={0.85}
             >
               {saving
                 ? <ActivityIndicator color="#fff" size="small" />
                 : <Text style={styles.btnSolidText}>Sim, quero receber</Text>}
-            </TouchableOpacity>
+            </Relevo>
           </View>
         </View>
       </View>
@@ -90,8 +90,8 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   iconWrap: {
+    ...relevo.icone,
     width: 52, height: 52, borderRadius: 15,
-    backgroundColor: colors.primaryLight,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 16,
   },
@@ -111,9 +111,9 @@ const styles = StyleSheet.create({
     flex: 1, height: 46, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
   },
-  btnGhost: { borderWidth: 1, borderColor: colors.border },
+  btnGhost: { ...relevo.neutro },
   btnGhostText: { fontSize: 14.5, fontWeight: '700', color: colors.textMuted },
-  btnSolid: { backgroundColor: colors.primary },
+  btnSolid: { ...relevo.botao },
   btnSolidText: { fontSize: 14.5, fontWeight: '800', color: '#fff' },
   btnOff: { opacity: 0.6 },
 })

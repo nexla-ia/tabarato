@@ -13,6 +13,8 @@ import { uploadImageAsset } from '../src/api/upload'
 import { colors } from '../src/theme/colors'
 import { formatPhoneBR } from '../src/utils/phone'
 import { useToast } from '../src/components/Toast'
+import { Relevo } from '../src/components/Relevo'
+import { relevo } from '../src/theme/relevo'
 
 function Field({
   label, value, onChangeText, placeholder, keyboardType, autoCapitalize, maxLength,
@@ -155,7 +157,7 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving} activeOpacity={0.85}>
+        <Relevo style={styles.saveBtn} onPress={handleSave} disabled={saving}>
           {saving
             ? <ActivityIndicator color="#fff" />
             : <>
@@ -163,7 +165,7 @@ export default function EditProfileScreen() {
                 <Text style={styles.saveBtnText}>Salvar alterações</Text>
               </>
           }
-        </TouchableOpacity>
+        </Relevo>
       </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -211,10 +213,8 @@ const styles = StyleSheet.create({
   avatarHint: { fontSize: 12, color: '#9A8880', textAlign: 'center' },
 
   card: {
-    backgroundColor: '#fff', borderRadius: 16,
+    ...relevo.card, borderRadius: 16,
     padding: 18, marginBottom: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
   cardTitle: { fontSize: 13, fontWeight: '800', color: '#9A8880', marginBottom: 14, textTransform: 'uppercase', letterSpacing: 0.5 },
 
@@ -231,12 +231,8 @@ const styles = StyleSheet.create({
 
   saveBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: colors.primary,
+    ...relevo.botao,
     paddingVertical: 16, borderRadius: 14,
-    borderBottomWidth: 3, borderBottomColor: colors.primaryDark,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
     minHeight: 56,
   },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
