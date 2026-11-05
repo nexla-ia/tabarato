@@ -8,6 +8,8 @@ const ICONS: Record<string, string> = {
   storefront: '🏪', market: '🛒', bakery: '🥐', bread: '🥖', leaf: '🍃',
   flame: '🔥', heart: '❤️', cube: '📦', home: '🏠', car: '🚗',
   'phone-portrait': '📱', laptop: '💻', football: '⚽', glasses: '👓',
+  tv: '📺', bed: '🛋️', rose: '💄', hammer: '🛠️', watch: '⌚', 'flame-outline': '🔥',
+  'game-controller': '🧸', 'musical-notes': '🎸', sparkles: '🧽',
 }
 
 export function emojiFor(icon?: string | null): string {
