@@ -14,6 +14,12 @@ export interface Pricing {
   adMinDays: number
   adSlots: number            // quantos anúncios giram ao mesmo tempo
   adPayDeadlineDays: number  // prazo para pagar depois de aprovado
+  // Baú dos entregadores (cm/kg): o lojista vê para decidir se o produto precisa
+  // de entrega própria.
+  courierBoxWidthCm: number
+  courierBoxHeightCm: number
+  courierBoxDepthCm: number
+  courierBoxMaxKg: number
 }
 
 // Padrões = comportamento atual (nada muda até o admin editar).
@@ -29,6 +35,10 @@ export const DEFAULT_PRICING: Pricing = {
   adMinDays: 7,
   adSlots: 5,
   adPayDeadlineDays: 3,
+  courierBoxWidthCm: 45,
+  courierBoxHeightCm: 45,
+  courierBoxDepthCm: 45,
+  courierBoxMaxKg: 20,
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100
@@ -58,6 +68,10 @@ export class PlatformSettingsService {
           adMinDays: row.adMinDays ?? DEFAULT_PRICING.adMinDays,
           adSlots: row.adSlots ?? DEFAULT_PRICING.adSlots,
           adPayDeadlineDays: row.adPayDeadlineDays ?? DEFAULT_PRICING.adPayDeadlineDays,
+          courierBoxWidthCm: row.courierBoxWidthCm ?? DEFAULT_PRICING.courierBoxWidthCm,
+          courierBoxHeightCm: row.courierBoxHeightCm ?? DEFAULT_PRICING.courierBoxHeightCm,
+          courierBoxDepthCm: row.courierBoxDepthCm ?? DEFAULT_PRICING.courierBoxDepthCm,
+          courierBoxMaxKg: row.courierBoxMaxKg ?? DEFAULT_PRICING.courierBoxMaxKg,
         }
       : { ...DEFAULT_PRICING }
     this.cache = { data, at: Date.now() }

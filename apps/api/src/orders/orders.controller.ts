@@ -51,8 +51,11 @@ export class OrdersController {
     @Query('storeLng') storeLng: string,
     @Query('lat') lat: string,
     @Query('lng') lng: string,
+    // Loja que entrega com os próprios meios: a cotação usa a taxa dela.
+    @Query('storeId') storeId?: string,
+    @Query('storeDelivery') storeDelivery?: string,
   ) {
-    return this.ordersService.quoteDelivery(Number(storeLat), Number(storeLng), Number(lat), Number(lng))
+    return this.ordersService.quoteDelivery(Number(storeLat), Number(storeLng), Number(lat), Number(lng), storeId, storeDelivery === '1' || storeDelivery === 'true')
   }
 
   @Get(':id')

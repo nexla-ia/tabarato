@@ -34,6 +34,10 @@ export class DeliveriesService {
       include: { address: { select: { lat: true, lng: true } } },
     })
     if (!order) throw new NotFoundException('Pedido não encontrado ou não está pronto')
+    // Retirada e entrega pela loja não usam entregador do app.
+    if ((order as any).fulfillmentType !== 'DELIVERY') {
+      throw new ConflictException('Este pedido não é entregue por entregador do app.')
+    }
 
     const courier = await this.prisma.courier.findUnique({
       where: { id: courierId },

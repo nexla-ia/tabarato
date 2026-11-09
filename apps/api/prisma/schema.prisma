@@ -187,6 +187,8 @@ model Store {
   status           StoreStatus @default(PENDING)
   prepTimeMin      Int         @default(30) @map("prep_time_min")
   deliveryRadiusKm Float       @default(5.0) @map("delivery_radius_km")
+  // Taxa cobrada do cliente quando a própria loja entrega (vai inteira para a loja).
+  ownDeliveryFee   Decimal     @default(0) @map("own_delivery_fee")
   lat              Float
   lng              Float
   address          String
@@ -329,6 +331,9 @@ model Product {
   // anunciar desconto que nao existe e publicidade enganosa (CDC art. 37).
   comparePrice   Decimal? @map("compare_price")
   maxDeliveryKm  Float?   @map("max_delivery_km")
+  // Grande demais para o baú do entregador (gás, móvel, eletrodoméstico): a própria
+  // loja entrega. Pedido com um item assim vira STORE_DELIVERY (ou retirada).
+  storeDelivery  Boolean  @default(false) @map("store_delivery")
   stock         Int?
   // Desconto progressivo "Leve X Pague Y" (ambos nulos = sem promoção)
   promoBuyQty   Int?     @map("promo_buy_qty")
@@ -393,7 +398,7 @@ model Order {
   paidViaSplit Boolean    @default(false) @map("paid_via_split")
   // DELIVERY (entrega por motoboy) ou PICKUP (cliente retira na loja). Retirada não
   // tem taxa de entrega nem motoboy; o cliente confirma com o deliveryCode na loja.
-  fulfillmentType String  @default("DELIVERY") @map("fulfillment_type")
+  fulfillmentType String  @default("DELIVERY") @map("fulfillment_type") // DELIVERY | PICKUP | STORE_DELIVERY
   notes        String?
   refusalNote  String?    @map("refusal_note")
   createdAt   DateTime    @default(now()) @map("created_at")
@@ -533,6 +538,11 @@ model PlatformSettings {
   // Acima deste valor de produtos (subtotal), a ENTREGA por motoboy é bloqueada e o
   // cliente precisa RETIRAR na loja (segurança — motoboy não carrega item caro). 0 = sem limite.
   maxDeliveryValue      Decimal  @default(1000) @map("max_delivery_value")
+  // Baú/bag dos entregadores: mostrado ao lojista para ele saber o que cabe.
+  courierBoxWidthCm     Int      @default(45) @map("courier_box_width_cm")
+  courierBoxHeightCm    Int      @default(45) @map("courier_box_height_cm")
+  courierBoxDepthCm     Int      @default(45) @map("courier_box_depth_cm")
+  courierBoxMaxKg       Int      @default(20) @map("courier_box_max_kg")
   // Anuncios pagos na vitrine. Editaveis no admin > Precos.
   adPricePerDay         Decimal  @default(10) @map("ad_price_per_day")
   adMinDays             Int      @default(7) @map("ad_min_days")

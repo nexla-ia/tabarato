@@ -70,6 +70,7 @@ const PUBLIC_STORE_SELECT = {
   phone: true,
   prepTimeMin: true,
   deliveryRadiusKm: true,
+  ownDeliveryFee: true,
   lat: true,
   lng: true,
   address: true,

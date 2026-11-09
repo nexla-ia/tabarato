@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsInt, IsNumber, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator'
 
 export class CreateProductDto {
   @IsString()
@@ -52,6 +52,11 @@ export class CreateProductDto {
   @Min(0)
   @Max(1000)
   maxDeliveryKm?: number | null
+
+  // Não cabe no baú do entregador: a própria loja entrega (ou o cliente retira).
+  @IsBoolean()
+  @IsOptional()
+  storeDelivery?: boolean
 
   // Desconto progressivo "Leve X Pague Y". Enviar os dois juntos; null limpa a promoção.
   @IsInt()

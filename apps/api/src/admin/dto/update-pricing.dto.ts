@@ -39,4 +39,17 @@ export class UpdatePricingDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(30)
   adPayDeadlineDays?: number
+
+  // Baú dos entregadores, mostrado ao lojista no cadastro de produto.
+  @IsOptional() @IsInt() @Min(1) @Max(300)
+  courierBoxWidthCm?: number
+
+  @IsOptional() @IsInt() @Min(1) @Max(300)
+  courierBoxHeightCm?: number
+
+  @IsOptional() @IsInt() @Min(1) @Max(300)
+  courierBoxDepthCm?: number
+
+  @IsOptional() @IsInt() @Min(1) @Max(200)
+  courierBoxMaxKg?: number
 }

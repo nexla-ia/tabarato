@@ -26,6 +26,7 @@ export class PlatformSettingsController {
       courierPerKm: p.courierPerKm,
       platformCommissionPct: p.platformCommissionPct,
       maxDeliveryValue: p.maxDeliveryValue,
+      courierBox: { widthCm: p.courierBoxWidthCm, heightCm: p.courierBoxHeightCm, depthCm: p.courierBoxDepthCm, maxKg: p.courierBoxMaxKg },
     }
   }
 }

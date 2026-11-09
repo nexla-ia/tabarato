@@ -28,6 +28,13 @@ export class UpdateStoreDto {
   @Max(100)
   deliveryRadiusKm?: number
 
+  // Taxa cobrada quando a própria loja entrega (produtos com "entrega pela loja").
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(1000)
+  ownDeliveryFee?: number
+
   @IsNumber()
   @IsOptional()
   @Min(-90)
