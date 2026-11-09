@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common'
 import { PlatformSettingsService } from './platform-settings.service'
+import { MIN_INSTALLMENT_VALUE } from '../payments/card-plan'
 
 /**
  * Preços vigentes, SEM autenticação.
@@ -27,6 +28,21 @@ export class PlatformSettingsController {
       platformCommissionPct: p.platformCommissionPct,
       maxDeliveryValue: p.maxDeliveryValue,
       courierBox: { widthCm: p.courierBoxWidthCm, heightCm: p.courierBoxHeightCm, depthCm: p.courierBoxDepthCm, maxKg: p.courierBoxMaxKg },
+      // Parcelamento (o app mostra "sem juros"/"com juros") e as taxas que a loja paga
+      // (aparecem nos Termos do Lojista).
+      card: {
+        maxInstallments: p.cardMaxInstallments,
+        freeInstallments: p.cardFreeInstallments,
+        interestMonthlyPct: p.cardInterestMonthlyPct,
+        minInstallmentValue: MIN_INSTALLMENT_VALUE,
+      },
+      paymentFees: {
+        cardPct1x: p.cardFeePct1x,
+        cardPct2to6: p.cardFeePct2to6,
+        cardPct7to12: p.cardFeePct7to12,
+        cardFixed: p.cardFeeFixed,
+        pix: p.pixFee,
+      },
     }
   }
 }

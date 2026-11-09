@@ -52,4 +52,32 @@ export class UpdatePricingDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(200)
   courierBoxMaxKg?: number
+
+  // Cartão: até quantas vezes (o Asaas aceita até 21) e quantas sem juros.
+  @IsOptional() @IsInt() @Min(1) @Max(21)
+  cardMaxInstallments?: number
+
+  @IsOptional() @IsInt() @Min(1) @Max(21)
+  cardFreeInstallments?: number
+
+  // Juros ao mês cobrado do cliente acima das parcelas sem juros (%).
+  @IsOptional() @IsNumber() @Min(0) @Max(15)
+  cardInterestMonthlyPct?: number
+
+  // Taxas do Asaas (pagas pela loja). Percentuais por faixa + fixo por cobrança.
+  @IsOptional() @IsNumber() @Min(0) @Max(20)
+  cardFeePct1x?: number
+
+  @IsOptional() @IsNumber() @Min(0) @Max(20)
+  cardFeePct2to6?: number
+
+  @IsOptional() @IsNumber() @Min(0) @Max(20)
+  cardFeePct7to12?: number
+
+  @IsOptional() @IsNumber() @Min(0) @Max(20)
+  cardFeeFixed?: number
+
+  // Taxa do PIX cobrada da loja. 0 = a plataforma absorve.
+  @IsOptional() @IsNumber() @Min(0) @Max(20)
+  pixFee?: number
 }

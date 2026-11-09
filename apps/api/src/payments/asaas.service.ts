@@ -219,7 +219,9 @@ export class AsaasService {
     const maxInst = input.installments && input.installments > 1 ? Math.min(input.installments, 21) : 1
     const data = await this.api<any>('POST', '/checkouts', {
       billingTypes: ['CREDIT_CARD'],
-      chargeTypes: maxInst > 1 ? ['DETACHED', 'INSTALLMENT'] : ['DETACHED'],
+      // O cliente já escolheu as parcelas no app (com ou sem juros). Parcelado = só
+      // INSTALLMENT: o total cobrado já tem o juros e o split vai por totalFixedValue.
+      chargeTypes: maxInst > 1 ? ['INSTALLMENT'] : ['DETACHED'],
       minutesToExpire: 60,
       callback: {
         successUrl: input.successUrl,
@@ -230,7 +232,13 @@ export class AsaasService {
       externalReference: input.orderId,
       ...(maxInst > 1 ? { installment: { maxInstallmentCount: maxInst } } : {}),
       ...(input.customerId ? { customer: input.customerId } : {}),
-      ...(input.split?.length ? { splits: input.split } : {}),
+      // No parcelado o fixedValue valeria POR PARCELA (o Asaas bloqueia o split por
+      // divergência); totalFixedValue reparte o valor da loja sobre o total.
+      ...(input.split?.length
+        ? { splits: maxInst > 1
+            ? input.split.map((x) => ({ walletId: x.walletId, totalFixedValue: x.fixedValue }))
+            : input.split }
+        : {}),
     })
     return { id: data.id, link: data.link, status: data.status }
   }

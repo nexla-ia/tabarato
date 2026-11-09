@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import type { PaymentTerms } from '../payments/card-plan'
 
 export interface Pricing {
   deliveryBaseFee: number
@@ -20,6 +21,15 @@ export interface Pricing {
   courierBoxHeightCm: number
   courierBoxDepthCm: number
   courierBoxMaxKg: number
+  // Cartão e taxas do meio de pagamento (ver payments/card-plan.ts)
+  cardMaxInstallments: number
+  cardFreeInstallments: number
+  cardInterestMonthlyPct: number
+  cardFeePct1x: number
+  cardFeePct2to6: number
+  cardFeePct7to12: number
+  cardFeeFixed: number
+  pixFee: number
 }
 
 // Padrões = comportamento atual (nada muda até o admin editar).
@@ -39,6 +49,14 @@ export const DEFAULT_PRICING: Pricing = {
   courierBoxHeightCm: 45,
   courierBoxDepthCm: 45,
   courierBoxMaxKg: 20,
+  cardMaxInstallments: 10,
+  cardFreeInstallments: 6,
+  cardInterestMonthlyPct: 2.99,
+  cardFeePct1x: 2.99,
+  cardFeePct2to6: 3.49,
+  cardFeePct7to12: 3.99,
+  cardFeeFixed: 0.49,
+  pixFee: 0,
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100
@@ -72,6 +90,14 @@ export class PlatformSettingsService {
           courierBoxHeightCm: row.courierBoxHeightCm ?? DEFAULT_PRICING.courierBoxHeightCm,
           courierBoxDepthCm: row.courierBoxDepthCm ?? DEFAULT_PRICING.courierBoxDepthCm,
           courierBoxMaxKg: row.courierBoxMaxKg ?? DEFAULT_PRICING.courierBoxMaxKg,
+          cardMaxInstallments: row.cardMaxInstallments ?? DEFAULT_PRICING.cardMaxInstallments,
+          cardFreeInstallments: row.cardFreeInstallments ?? DEFAULT_PRICING.cardFreeInstallments,
+          cardInterestMonthlyPct: Number(row.cardInterestMonthlyPct ?? DEFAULT_PRICING.cardInterestMonthlyPct),
+          cardFeePct1x: Number(row.cardFeePct1x ?? DEFAULT_PRICING.cardFeePct1x),
+          cardFeePct2to6: Number(row.cardFeePct2to6 ?? DEFAULT_PRICING.cardFeePct2to6),
+          cardFeePct7to12: Number(row.cardFeePct7to12 ?? DEFAULT_PRICING.cardFeePct7to12),
+          cardFeeFixed: Number(row.cardFeeFixed ?? DEFAULT_PRICING.cardFeeFixed),
+          pixFee: Number(row.pixFee ?? DEFAULT_PRICING.pixFee),
         }
       : { ...DEFAULT_PRICING }
     this.cache = { data, at: Date.now() }
@@ -100,6 +126,19 @@ export class PlatformSettingsService {
   async courierFeeFor(distanceKm: number): Promise<number> {
     const p = await this.get()
     return round2(p.courierBaseFee + distanceKm * p.courierPerKm)
+  }
+  async paymentTerms(): Promise<PaymentTerms> {
+    const p = await this.get()
+    return {
+      maxInstallments: p.cardMaxInstallments,
+      freeInstallments: p.cardFreeInstallments,
+      interestMonthlyPct: p.cardInterestMonthlyPct,
+      cardFeePct1x: p.cardFeePct1x,
+      cardFeePct2to6: p.cardFeePct2to6,
+      cardFeePct7to12: p.cardFeePct7to12,
+      cardFeeFixed: p.cardFeeFixed,
+      pixFee: p.pixFee,
+    }
   }
   async commissionFor(subtotal: number): Promise<number> {
     const p = await this.get()

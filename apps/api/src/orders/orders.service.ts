@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, HttpException, Injectable, Log
 import { randomInt } from 'crypto'
 import { OrderStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
+import { MIN_INSTALLMENT_VALUE, maxInstallmentsFor, paymentCharges, type PaymentTerms } from '../payments/card-plan'
 import { CouponsService } from '../coupons/coupons.service'
 import { PushService } from '../common/push.service'
 import { NotificationsService } from '../notifications/notifications.service'
@@ -80,15 +81,31 @@ function safePayerEmail(email?: string | null): string {
  * Parte da loja num pedido (split no pagamento ou crédito na carteira).
  * Entrega por motoboy: o frete é da plataforma; se o cupom deu frete grátis, a loja banca.
  * Entrega pela loja: o frete é da loja (só não entra se o cupom deu frete grátis).
+ * Pagamento: a loja paga a taxa do cartão/PIX e fica com o juros do parcelado.
  */
 export function storeShareOf(o: {
   subtotal: number; couponDiscount: number; promoDiscount: number; commission: number
   deliveryFee: number; freeShipping: boolean; storeDelivers: boolean
+  installmentInterest?: number; paymentFee?: number
 }): number {
   const frete = o.storeDelivers
     ? (o.freeShipping ? 0 : o.deliveryFee)
     : (o.freeShipping ? -o.deliveryFee : 0)
-  return Math.max(0, Math.round((o.subtotal - o.couponDiscount - o.promoDiscount - o.commission + frete) * 100) / 100)
+  const pagamento = (o.installmentInterest ?? 0) - (o.paymentFee ?? 0)
+  return Math.max(0, Math.round((o.subtotal - o.couponDiscount - o.promoDiscount - o.commission + frete + pagamento) * 100) / 100)
+}
+
+/** Barra parcelas acima do permitido para o valor (máximo do admin e parcela mínima). */
+function assertInstallments(method: string, requested: number | undefined, total: number, terms: PaymentTerms) {
+  if (method !== 'CREDIT_CARD' || !requested || requested <= 1) return
+  const max = maxInstallmentsFor(total, terms)
+  if (requested > max) {
+    throw new BadRequestException(
+      max <= 1
+        ? 'Neste valor o cartão é só à vista.'
+        : `Neste valor dá para parcelar em até ${max}x (parcela mínima de R$ ${MIN_INSTALLMENT_VALUE},00).`,
+    )
+  }
 }
 
 const STATUS_PUSH: Partial<Record<OrderStatus, { title: string; body: string }>> = {
@@ -392,6 +409,14 @@ export class OrdersService {
       throw new BadRequestException(`O valor mínimo do pedido para pagamento é R$ ${MIN_ASAAS_CHARGE},00.`)
     }
 
+    // Parcelamento + taxa do pagamento (paga pela loja). `charged` é o que o cliente
+    // paga de fato (total + juros, se parcelou acima das parcelas sem juros).
+    const terms = await this.settings.paymentTerms()
+    assertInstallments(dto.paymentMethod, dto.installments, total, terms)
+    const charges = paymentCharges(dto.paymentMethod, dto.installments, [total], terms)
+    const pay0 = charges.perOrder[0]
+    const charged = charges.chargedTotal
+
     // Código de entrega (anti-fraude): 6 dígitos CRIPTOGRÁFICOS que o cliente informa
     // ao entregador. Sem ele, o entregador não finaliza a corrida (padrão iFood).
     // 6 dígitos (900k combinações) + bloqueio por tentativas tornam brute-force inviável.
@@ -405,7 +430,7 @@ export class OrdersService {
     // Create payment + order in a single transaction to avoid orphaned records
     const { payment, order } = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
-        data: { method: dto.paymentMethod, amount: total, status: 'PENDING', idempotencyKey: dto.idempotencyKey },
+        data: { method: dto.paymentMethod, amount: charged, status: 'PENDING', idempotencyKey: dto.idempotencyKey },
       })
 
       const order = await tx.order.create({
@@ -422,7 +447,10 @@ export class OrdersService {
           loyaltyDiscount,
           promoDiscount,
           freeShipping: couponFreeShipping,
-          total,
+          total: pay0.total,
+          installments: charges.installments,
+          installmentInterest: pay0.interest,
+          paymentFee: pay0.fee,
           notes: dto.notes,
           scheduledFor: scheduledDate,
           deliveryCode,
@@ -502,7 +530,7 @@ export class OrdersService {
       // → fee = comissão + entrega − fidelidade (a plataforma banca a fidelidade).
       // Clamp em [0, total]: o split do MP não deixa a fee ser negativa nem > total.
       const rawFee = platformCommission + (isStoreDelivery ? 0 : deliveryFee) - loyaltyDiscount
-      const applicationFee = Math.max(0, Math.min(Math.round(rawFee * 100) / 100, total))
+      const applicationFee = Math.max(0, Math.min(Math.round(rawFee * 100) / 100, charged))
       splitOpts = { sellerToken, applicationFee }
     }
 
@@ -513,7 +541,7 @@ export class OrdersService {
     let asaasSplit: Array<{ walletId: string; fixedValue: number }> | undefined
     if (this.payments.asaasMoneyInEnabled && (store as any).asaasWalletId) {
       const commission = await this.settings.commissionFor(subtotal)
-      const storeShare = storeShareOf({ subtotal, couponDiscount, promoDiscount, commission, deliveryFee, freeShipping: couponFreeShipping, storeDelivers: isStoreDelivery })
+      const storeShare = storeShareOf({ subtotal, couponDiscount, promoDiscount, commission, deliveryFee, freeShipping: couponFreeShipping, storeDelivers: isStoreDelivery, installmentInterest: pay0.interest, paymentFee: pay0.fee })
       if (storeShare > 0) {
         asaasSplit = [{ walletId: (store as any).asaasWalletId, fixedValue: storeShare }]
         await this.prisma.order.update({ where: { id: order.id }, data: { paidViaSplit: true } }).catch(() => {})
@@ -524,7 +552,7 @@ export class OrdersService {
     if (dto.paymentMethod === 'PIX') {
       try {
         const pixResult = await this.payments.createPixPayment(
-          payment.id, total, order.id, safePayerEmail(payer?.email),
+          payment.id, charged, order.id, safePayerEmail(payer?.email),
           { ...splitOpts, userId, payerName: payer?.name, payerCpf: dto.payerCpf, payerPhone: payer?.phone ?? undefined, asaasSplit },
         )
         // O split foi recusado pelo MP e caiu pro modo centralizado — o dinheiro
@@ -567,7 +595,7 @@ export class OrdersService {
     // PENDING e é confirmado pelo webhook CHECKOUT_PAID.
     if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && this.payments.asaasCardCheckoutEnabled) {
       try {
-        const { checkoutUrl } = await this.payments.createAsaasCardCheckout(payment.id, total, order.id, { installments: dto.installments ?? 1, asaasSplit })
+        const { checkoutUrl } = await this.payments.createAsaasCardCheckout(payment.id, charged, order.id, { installments: charges.installments, asaasSplit })
         if ((order as any).payment) Object.assign((order as any).payment, { gateway: 'ASAAS', checkoutUrl })
       } catch (err: any) {
         this.logger.error('Asaas checkout (cartão) falhou após o pedido ser salvo', err)
@@ -587,9 +615,9 @@ export class OrdersService {
         const payerLastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined
         const payerPhone = (payer?.phone ?? '').replace(/\D/g, '') || undefined
         const result = await this.payments.createCardPayment(
-          payment.id, total, order.id,
+          payment.id, charged, order.id,
           dto.cardToken,
-          dto.installments ?? 1,
+          charges.installments,
           safePayerEmail(payer?.email),
           dto.payerCpf,
           {
@@ -658,7 +686,7 @@ export class OrdersService {
       store.userId,
       'ORDER_UPDATE',
       '🛒 Novo pedido!',
-      `Pedido #${order.id.slice(0, 8)} · R$ ${total.toFixed(2)}`,
+      `Pedido #${order.id.slice(0, 8)} · R$ ${charged.toFixed(2)}`,
       { orderId: order.id },
     ).catch((err) => this.logger.warn('Store notification failed', err))
 
@@ -857,7 +885,13 @@ export class OrdersService {
       const total = Math.round((g.subtotal + g.deliveryFee - discount - deliveryWaived) * 100) / 100
       return { discount, total }
     })
-    const grandTotal = Math.round(groupTotals.reduce((s, t) => s + t.total, 0) * 100) / 100
+    const productsTotal = Math.round(groupTotals.reduce((s, t) => s + t.total, 0) * 100) / 100
+    // Parcelamento + taxa do pagamento (paga pela loja, rateada entre as lojas).
+    const terms = await this.settings.paymentTerms()
+    assertInstallments(dto.paymentMethod, dto.installments, productsTotal, terms)
+    const charges = paymentCharges(dto.paymentMethod, dto.installments, groupTotals.map((t) => t.total), terms)
+    // grandTotal = o que o cliente paga de fato (com o juros, se houver).
+    const grandTotal = charges.chargedTotal
     if (this.payments.asaasMoneyInEnabled && grandTotal < MIN_ASAAS_CHARGE) {
       throw new BadRequestException(`O valor mínimo do pedido para pagamento é R$ ${MIN_ASAAS_CHARGE},00.`)
     }
@@ -886,7 +920,10 @@ export class OrdersService {
             subtotal: g.subtotal, deliveryFee: g.deliveryFee, discount: gt.discount,
             couponDiscount: g.couponDiscount, loyaltyDiscount: g.loyaltyDiscount,
             promoDiscount: g.promoDiscount,
-            freeShipping: g.couponFreeShipping, total: gt.total,
+            freeShipping: g.couponFreeShipping, total: charges.perOrder[i].total,
+            installments: charges.installments,
+            installmentInterest: charges.perOrder[i].interest,
+            paymentFee: charges.perOrder[i].fee,
             notes: dto.notes, scheduledFor: scheduledDate, deliveryCode: deliveryCodes[i],
             fulfillmentType: isPickup ? 'PICKUP' : g.storeDelivers ? 'STORE_DELIVERY' : 'DELIVERY',
             paidViaSplit,
@@ -942,11 +979,12 @@ export class OrdersService {
     if (this.payments.asaasMoneyInEnabled) {
       const splits: Array<{ walletId: string; fixedValue: number }> = []
       const splitOrderIds: string[] = []
-      for (const g of prepared) {
+      for (const [gi, g] of prepared.entries()) {
         const walletId = (g.store as any).asaasWalletId
         if (!walletId) continue
         const commission = await this.settings.commissionFor(g.subtotal)
-        const share = storeShareOf({ subtotal: g.subtotal, couponDiscount: g.couponDiscount, promoDiscount: g.promoDiscount, commission, deliveryFee: g.deliveryFee, freeShipping: g.couponFreeShipping, storeDelivers: g.storeDelivers })
+        const pc = charges.perOrder[gi]
+        const share = storeShareOf({ subtotal: g.subtotal, couponDiscount: g.couponDiscount, promoDiscount: g.promoDiscount, commission, deliveryFee: g.deliveryFee, freeShipping: g.couponFreeShipping, storeDelivers: g.storeDelivers, installmentInterest: pc.interest, paymentFee: pc.fee })
         if (share > 0) {
           splits.push({ walletId, fixedValue: share })
           const ord = orders.find((o) => o.storeId === g.store.id)
@@ -984,7 +1022,7 @@ export class OrdersService {
 
     if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && this.payments.asaasCardCheckoutEnabled) {
       try {
-        const { checkoutUrl } = await this.payments.createAsaasCardCheckout(payment.id, grandTotal, firstOrder.id, { installments: dto.installments ?? 1, asaasSplit })
+        const { checkoutUrl } = await this.payments.createAsaasCardCheckout(payment.id, grandTotal, firstOrder.id, { installments: charges.installments, asaasSplit })
         paymentOut = { ...paymentOut, gateway: 'ASAAS', checkoutUrl }
         orders.forEach((o) => { if (o.payment) Object.assign(o.payment, { gateway: 'ASAAS', checkoutUrl }) })
       } catch (err: any) {
@@ -997,7 +1035,7 @@ export class OrdersService {
     else if (['CREDIT_CARD', 'DEBIT_CARD'].includes(dto.paymentMethod) && dto.cardToken) {
       try {
         const nameParts = (payer?.name ?? '').trim().split(/\s+/).filter(Boolean)
-        const result = await this.payments.createCardPayment(payment.id, grandTotal, firstOrder.id, dto.cardToken, dto.installments ?? 1, safePayerEmail(payer?.email), dto.payerCpf, {
+        const result = await this.payments.createCardPayment(payment.id, grandTotal, firstOrder.id, dto.cardToken, charges.installments, safePayerEmail(payer?.email), dto.payerCpf, {
           ...splitOpts,
           payerFirstName: nameParts[0],
           payerLastName: nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined,
@@ -1327,6 +1365,8 @@ export class OrdersService {
         deliveryFee: lojaEntrega ? Number(order.deliveryFee) : 0,
         freeShipping: Boolean((order as any).freeShipping),
         storeDelivers: lojaEntrega,
+        installmentInterest: Number((order as any).installmentInterest ?? 0),
+        paymentFee: Number((order as any).paymentFee ?? 0),
       })
       if (storeAmount > 0) {
         await this.wallet.credit(store.id, 'STORE', storeAmount, `Pedido #${orderId.slice(0, 8)} (${lojaEntrega ? 'entrega própria' : 'retirada'})`, orderId)

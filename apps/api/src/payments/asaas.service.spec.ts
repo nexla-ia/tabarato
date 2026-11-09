@@ -105,13 +105,22 @@ describe('AsaasService', () => {
       expect(sent.installment).toBeUndefined()
     })
 
-    it('createCheckout parcelado → inclui INSTALLMENT + maxInstallmentCount', async () => {
+    it('createCheckout parcelado → só INSTALLMENT + maxInstallmentCount + split no total', async () => {
       fetchSpy = jest.spyOn(global as any, 'fetch').mockResolvedValue(OK({ id: 'chk_2', link: 'l', status: 'ACTIVE' }) as any)
       const a = makeAsaas({ ASAAS_API_KEY: 'k' })
-      await a.createCheckout({ value: 300, orderId: 'o', itemName: 'x', installments: 6, successUrl: 's', cancelUrl: 'c' })
+      await a.createCheckout({ value: 300, orderId: 'o', itemName: 'x', installments: 6, successUrl: 's', cancelUrl: 'c', split: [{ walletId: 'w1', fixedValue: 250 }] })
       const sent = JSON.parse(fetchSpy.mock.calls[0][1].body)
-      expect(sent.chargeTypes).toEqual(['DETACHED', 'INSTALLMENT'])
+      expect(sent.chargeTypes).toEqual(['INSTALLMENT'])
       expect(sent.installment).toEqual({ maxInstallmentCount: 6 })
+      expect(sent.splits).toEqual([{ walletId: 'w1', totalFixedValue: 250 }])
+    })
+
+    it('createCheckout à vista → split com fixedValue', async () => {
+      fetchSpy = jest.spyOn(global as any, 'fetch').mockResolvedValue(OK({ id: 'chk_3', link: 'l', status: 'ACTIVE' }) as any)
+      const a = makeAsaas({ ASAAS_API_KEY: 'k' })
+      await a.createCheckout({ value: 100, orderId: 'o', itemName: 'x', installments: 1, successUrl: 's', cancelUrl: 'c', split: [{ walletId: 'w1', fixedValue: 86.52 }] })
+      const sent = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(sent.splits).toEqual([{ walletId: 'w1', fixedValue: 86.52 }])
     })
 
     it('propaga a descrição do erro do Asaas quando !ok', async () => {

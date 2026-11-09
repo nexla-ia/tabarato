@@ -388,7 +388,10 @@ model Order {
   loyaltyDiscount Decimal @default(0) @map("loyalty_discount")
   promoDiscount   Decimal @default(0) @map("promo_discount")
   freeShipping    Boolean @default(false) @map("free_shipping")
-  total       Decimal
+  total       Decimal     // o que o cliente paga, já com o juros do parcelamento
+  installments        Int     @default(1)
+  installmentInterest Decimal @default(0) @map("installment_interest") // juros do parcelado (vai p/ a loja)
+  paymentFee          Decimal @default(0) @map("payment_fee")          // taxa do cartão/PIX paga pela loja
   couponId    String?     @map("coupon_id")
   status       OrderStatus @default(PENDING)
   scheduledFor DateTime?  @map("scheduled_for")
@@ -548,6 +551,16 @@ model PlatformSettings {
   adMinDays             Int      @default(7) @map("ad_min_days")
   adSlots               Int      @default(5) @map("ad_slots")          // quantos giram ao mesmo tempo
   adPayDeadlineDays     Int      @default(3) @map("ad_pay_deadline_days") // prazo p/ pagar depois de aprovado
+  // Cartão: até quantas vezes, quantas sem juros e o juros ao mês acima disso.
+  cardMaxInstallments    Int     @default(10) @map("card_max_installments")
+  cardFreeInstallments   Int     @default(6) @map("card_free_installments")
+  cardInterestMonthlyPct Decimal @default(2.99) @map("card_interest_monthly_pct")
+  // Taxa do meio de pagamento (Asaas) — paga pela LOJA, sai do repasse dela.
+  cardFeePct1x           Decimal @default(2.99) @map("card_fee_pct_1x")
+  cardFeePct2to6         Decimal @default(3.49) @map("card_fee_pct_2to6")
+  cardFeePct7to12        Decimal @default(3.99) @map("card_fee_pct_7to12")
+  cardFeeFixed           Decimal @default(0.49) @map("card_fee_fixed")
+  pixFee                 Decimal @default(0) @map("pix_fee") // 0 = plataforma absorve
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("platform_settings")
