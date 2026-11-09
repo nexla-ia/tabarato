@@ -99,6 +99,10 @@ export default function CheckoutPage() {
   // hospedado (redireciona pra página do Asaas, sem formulário de cartão aqui).
   const [asaasPix, setAsaasPix] = useState(false)
   const [cardCheckout, setCardCheckout] = useState(false)
+  // Juros nosso só no cartão pelo Asaas (no Mercado Pago o próprio MP cuida disso).
+  const termsShown: CardTerms = cardCheckout
+    ? cardTerms
+    : { ...cardTerms, interestMonthlyPct: 0, freeInstallments: cardTerms.maxInstallments }
   const [pixCpf, setPixCpf] = useState('')
   useEffect(() => {
     api.get('/payments/config')
@@ -173,9 +177,9 @@ export default function CheckoutPage() {
   const estimatedTotal = Math.round((productNet + deliveryCharged) * 100) / 100
   // Crédito: o total ganha juros se parcelar acima das parcelas sem juros.
   const isCredit = payMethod === 'CREDIT_CARD'
-  const maxInst = maxInstallmentsFor(estimatedTotal, cardTerms)
+  const maxInst = maxInstallmentsFor(estimatedTotal, termsShown)
   const instCount = isCredit ? Math.max(1, Math.min(installments, maxInst)) : 1
-  const plan = installmentPlan(estimatedTotal, instCount, cardTerms)
+  const plan = installmentPlan(estimatedTotal, instCount, termsShown)
   const payTotal = isCredit ? plan.chargedTotal : estimatedTotal
 
   useEffect(() => {
@@ -304,6 +308,8 @@ export default function CheckoutPage() {
         paymentMethod: payMethod,
         cardToken,
         installments: isCredit ? instCount : undefined,
+        // Total que o cliente viu (com juros) — o servidor confere antes de cobrar.
+        expectedTotal: isCredit ? payTotal : undefined,
         payerCpf: isCard ? cardCpf : (asaasPix ? pixCpf : undefined),
         idempotencyKey: idemKey.current,
         // Fingerprint do dispositivo (security.js do MP) — reduz recusa de cartão
@@ -602,15 +608,15 @@ export default function CheckoutPage() {
                 <label className={styles.fieldLabel}>Parcelas</label>
                 <div className={styles.installRule}>
                   {maxInst <= 1
-                    ? `Neste valor o cartão é só à vista (parcela mínima de ${fmtBRL(cardTerms.minInstallmentValue)}).`
-                    : cardTerms.freeInstallments >= maxInst
+                    ? `Neste valor o cartão é só à vista (parcela mínima de ${fmtBRL(termsShown.minInstallmentValue)}).`
+                    : termsShown.freeInstallments >= maxInst
                       ? `Até ${maxInst}x sem juros.`
-                      : `Até ${Math.max(1, cardTerms.freeInstallments)}x sem juros · de ${cardTerms.freeInstallments + 1}x a ${maxInst}x com juros de ${cardTerms.interestMonthlyPct.toFixed(2).replace('.', ',')}% ao mês.`}
+                      : `Até ${Math.max(1, termsShown.freeInstallments)}x sem juros · de ${termsShown.freeInstallments + 1}x a ${maxInst}x com juros de ${termsShown.interestMonthlyPct.toFixed(2).replace('.', ',')}% ao mês.`}
                 </div>
                 {maxInst > 1 && (
                   <div className={styles.installRow}>
                     {Array.from({ length: maxInst }, (_, k) => k + 1).map(n => {
-                      const free = n <= cardTerms.freeInstallments
+                      const free = n <= termsShown.freeInstallments
                       return (
                         <button key={n} type="button" className={`${styles.installChip} ${instCount===n ? styles.installChipActive : ''}`} onClick={() => setInstallments(n)}>
                           {n}x<span className={`${styles.installTag} ${free ? styles.installTagFree : ''}`}>{free ? 'sem juros' : 'c/ juros'}</span>

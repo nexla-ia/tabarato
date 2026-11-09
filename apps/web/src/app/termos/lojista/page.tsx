@@ -167,8 +167,10 @@ export default async function TermosLojistaPage() {
         ]}
       />
       <p>
-        O percentual incide sobre o valor cobrado do cliente. Num carrinho com mais de uma loja, a
-        taxa é dividida entre as lojas na proporção do valor de cada pedido.
+        O percentual incide sobre a parte do pedido que é da loja: os produtos, o juros do
+        parcelado e, quando a própria loja entrega, o frete dela. A taxa sobre o frete do
+        entregador da plataforma é paga pela plataforma. Num carrinho com mais de uma loja, cada
+        loja paga a taxa sobre o próprio pedido.
       </p>
       <p>
         <strong>Parcelamento.</strong> O cliente pode parcelar em até {taxas.maxInstallments}x.

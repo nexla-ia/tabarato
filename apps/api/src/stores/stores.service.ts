@@ -592,6 +592,7 @@ export class StoresService {
         where: { storeId: store.id, createdAt: { gte: rangeStart } },
         select: {
           subtotal: true, couponDiscount: true, promoDiscount: true, freeShipping: true, deliveryFee: true,
+          fulfillmentType: true, installmentInterest: true, paymentFee: true,
           status: true, createdAt: true,
           payment: { select: { status: true } },
           items: {
@@ -606,10 +607,16 @@ export class StoresService {
     ])
 
     // Receita = só pedidos ENTREGUES E PAGOS. Valor líquido da loja (igual ao crédito
-    // na carteira): subtotal*0.9 − cupom − promoção − (frete, se frete grátis).
+    // na carteira): subtotal*0.9 − cupom − promoção − (frete, se frete grátis no motoboy)
+    // + (frete, se a própria loja entregou) + juros do parcelado − taxa do pagamento.
     const orderNet = (o: any) => {
       const gross = Number(o.subtotal) * STORE_SHARE
-      const net = gross - Number(o.couponDiscount ?? 0) - Number(o.promoDiscount ?? 0) - (o.freeShipping ? Number(o.deliveryFee ?? 0) : 0)
+      const delivery = Number(o.deliveryFee ?? 0)
+      const frete = o.fulfillmentType === 'STORE_DELIVERY'
+        ? (o.freeShipping ? 0 : delivery)
+        : (o.freeShipping ? -delivery : 0)
+      const pagamento = Number(o.installmentInterest ?? 0) - Number(o.paymentFee ?? 0)
+      const net = gross - Number(o.couponDiscount ?? 0) - Number(o.promoDiscount ?? 0) + frete + pagamento
       return Math.max(0, Math.round(net * 100) / 100)
     }
     // Fator p/ ratear o líquido nos itens (categoria/produto), mantendo a soma = totalRevenue.

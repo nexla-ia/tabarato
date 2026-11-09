@@ -177,7 +177,11 @@ export default function CheckoutScreen() {
     queryFn: async () => (await api.get('/config/pricing')).data as { card?: CardTerms },
     staleTime: 5 * 60 * 1000,
   })
-  const cardTerms: CardTerms = pricingCfg?.card ?? DEFAULT_CARD_TERMS
+  // Juros nosso só no cartão pelo Asaas (no Mercado Pago o próprio MP cuida disso).
+  const baseCardTerms: CardTerms = pricingCfg?.card ?? DEFAULT_CARD_TERMS
+  const cardTerms: CardTerms = payCfg?.card === 'ASAAS'
+    ? baseCardTerms
+    : { ...baseCardTerms, interestMonthlyPct: 0, freeInstallments: baseCardTerms.maxInstallments }
   // Parcelas válidas para o valor (o total pode cair depois de escolher, ex.: cupom).
   const effectiveInstallments = (total: number) => Math.max(1, Math.min(installments, maxInstallmentsFor(total, cardTerms)))
   // ── Retirada na loja ──
@@ -404,6 +408,10 @@ export default function CheckoutScreen() {
         idempotencyKey: idemKey.current,
         cardToken,
         installments: isCard ? effectiveInstallments(computeTotals(couponResults).orderTotal) : undefined,
+        // Total que o cliente viu (com juros) — o servidor confere antes de cobrar.
+        expectedTotal: isCard
+          ? (() => { const t = computeTotals(couponResults).orderTotal; return installmentPlan(t, effectiveInstallments(t), cardTerms).chargedTotal })()
+          : undefined,
         payerCpf: isCard ? cardCpf : (asaasPix ? pixCpf : undefined),
         deviceId: isCard ? deviceId : undefined,
         scheduledFor: scheduledForIso,

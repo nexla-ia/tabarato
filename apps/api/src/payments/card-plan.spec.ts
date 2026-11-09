@@ -76,7 +76,38 @@ describe('taxa do cartão (paga pela loja)', () => {
     expect(c.perOrder[0].fee).toBeGreaterThan(c.perOrder[1].fee)
   })
 
-  it('allocate fecha o centavo no último', () => {
-    expect(allocate(10, [1, 1, 1])).toEqual([3.33, 3.33, 3.34])
+  it('allocate fecha o centavo no maior peso', () => {
+    expect(allocate(10, [1, 1, 1])).toEqual([3.34, 3.33, 3.33])
+    expect(allocate(10, [1, 3, 1])).toEqual([2, 6, 2])
+  })
+
+  it('allocate nunca dá parte negativa (pedido de R$ 0 no carrinho)', () => {
+    const parts = allocate(1.01, [1, 1, 0])
+    expect(parts.every((x) => x >= 0)).toBe(true)
+    expect(parts[2]).toBe(0)
+    expect(Math.round(parts.reduce((s, x) => s + x, 0) * 100) / 100).toBe(1.01)
+  })
+
+  it('frete do motoboy: a taxa sobre ele é da plataforma, não da loja', () => {
+    // produtos R$ 20 + frete do app R$ 12 = R$ 32 à vista → taxa total 2,99% + 0,49 = 1,45
+    const c = paymentCharges('CREDIT_CARD', 1, [32], terms, { storeBases: [20] })
+    expect(cardFeeFor(32, 1, terms)).toBe(1.45)
+    expect(c.perOrder[0].fee).toBe(0.91) // 1,45 × 20/32
+  })
+
+  it('entrega pela loja: o frete é dela, a taxa incide sobre tudo', () => {
+    const c = paymentCharges('CREDIT_CARD', 1, [32], terms, { storeBases: [32] })
+    expect(c.perOrder[0].fee).toBe(1.45)
+  })
+
+  it('split do Mercado Pago: não desconta taxa (o MP já cobra da loja)', () => {
+    expect(paymentCharges('CREDIT_CARD', 3, [100], terms, { noFees: true }).perOrder[0].fee).toBe(0)
+    expect(paymentCharges('PIX', undefined, [100], { ...terms, pixFee: 2 }, { noFees: true }).perOrder[0].fee).toBe(0)
+  })
+
+  it('base da loja nunca passa do total nem fica negativa', () => {
+    const c = paymentCharges('CREDIT_CARD', 1, [10, 10], terms, { storeBases: [50, -5] })
+    expect(c.perOrder[1].fee).toBe(0)
+    expect(c.perOrder[0].fee).toBeLessThanOrEqual(cardFeeFor(20, 1, terms))
   })
 })

@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsPositive, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { PaymentMethod } from '@prisma/client'
 
@@ -84,11 +84,20 @@ export class CreateOrderDto {
   @IsOptional()
   cardToken?: string
 
-  @IsNumber()
-  @IsPositive()
-  @Max(24)
+  @IsInt()
+  @Min(1)
+  @Max(21)
   @IsOptional()
   installments?: number
+
+  // Total que o app MOSTROU ao cliente (com o juros do parcelamento). Quando há
+  // juros, o servidor só cobra se bater — protege o cliente de app desatualizado
+  // (que não sabe do juros) e de preço que mudou entre a tela e o pedido.
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(1_000_000)
+  @IsOptional()
+  expectedTotal?: number
 
   @IsString()
   @IsOptional()

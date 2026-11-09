@@ -57,17 +57,24 @@ export function cardFeeFor(chargedTotal: number, installments: number, terms: Pa
   return round2((chargedTotal * pct) / 100 + terms.cardFeeFixed)
 }
 
-/** Divide `amount` proporcional aos pesos, em centavos; o resto vai pro último. */
+/**
+ * Divide `amount` proporcional aos pesos, em centavos. A sobra do arredondamento
+ * vai para o MAIOR peso (nunca para um peso zero — evitaria parte negativa).
+ */
 export function allocate(amount: number, weights: number[]): number[] {
   if (!weights.length) return []
-  const sum = weights.reduce((s, w) => s + Math.max(0, w), 0)
-  let given = 0
-  return weights.map((w, idx) => {
-    if (idx === weights.length - 1) return round2(amount - given)
-    const part = sum > 0 ? round2((amount * Math.max(0, w)) / sum) : 0
-    given = round2(given + part)
-    return part
-  })
+  const w = weights.map((x) => (Number.isFinite(x) && x > 0 ? x : 0))
+  const sum = w.reduce((s, x) => s + x, 0)
+  const out = w.map(() => 0)
+  if (sum <= 0) {
+    out[out.length - 1] = round2(amount)
+    return out
+  }
+  let big = 0
+  w.forEach((x, i) => { if (x > w[big]) big = i })
+  w.forEach((x, i) => { if (i !== big) out[i] = round2((amount * x) / sum) })
+  out[big] = round2(amount - out.reduce((s, v) => s + v, 0))
+  return out
 }
 
 export interface PaymentCharges {
@@ -86,13 +93,20 @@ export function paymentCharges(
   requestedInstallments: number | undefined,
   orderTotals: number[],
   terms: PaymentTerms,
+  opts: {
+    /** Parte de cada total que é da LOJA (total − frete do motoboy, que é da plataforma). */
+    storeBases?: number[]
+    /** Split do Mercado Pago: o próprio MP já cobra a taxa da loja — não desconta de novo. */
+    noFees?: boolean
+  } = {},
 ): PaymentCharges {
   const grand = round2(orderTotals.reduce((s, t) => s + t, 0))
   const isCard = method === 'CREDIT_CARD' || method === 'DEBIT_CARD'
+  const base = (i: number) => Math.max(0, Math.min(orderTotals[i], opts.storeBases?.[i] ?? orderTotals[i]))
 
   if (!isCard) {
-    const fee = method === 'PIX' ? terms.pixFee : 0
-    const fees = allocate(fee, orderTotals)
+    const fee = method === 'PIX' && !opts.noFees ? terms.pixFee : 0
+    const fees = allocate(fee, orderTotals.map((_, i) => base(i)))
     return {
       installments: 1,
       chargedTotal: grand,
@@ -105,7 +119,13 @@ export function paymentCharges(
   const plan = installmentPlan(grand, n, terms)
   const interests = allocate(plan.interest, orderTotals)
   const charged = orderTotals.map((t, i) => round2(t + interests[i]))
-  const fees = allocate(cardFeeFor(plan.chargedTotal, n, terms), charged)
+  // A loja paga a taxa sobre a parte dela (+ o juros, que é dela); a parte do frete do
+  // motoboy é da plataforma, que paga a taxa sobre ela.
+  const feeTotal = opts.noFees ? 0 : cardFeeFor(plan.chargedTotal, n, terms)
+  const storeWeights = orderTotals.map((_, i) => base(i) + interests[i])
+  const storeSum = storeWeights.reduce((s, x) => s + x, 0)
+  const storeFee = plan.chargedTotal > 0 ? round2(feeTotal * Math.min(1, storeSum / plan.chargedTotal)) : 0
+  const fees = allocate(storeFee, storeWeights)
   return {
     installments: n,
     chargedTotal: plan.chargedTotal,

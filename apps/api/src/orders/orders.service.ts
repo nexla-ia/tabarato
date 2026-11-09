@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, HttpException, Injectable, Log
 import { randomInt } from 'crypto'
 import { OrderStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
-import { MIN_INSTALLMENT_VALUE, maxInstallmentsFor, paymentCharges, type PaymentTerms } from '../payments/card-plan'
+import { MIN_INSTALLMENT_VALUE, maxInstallmentsFor, paymentCharges, type PaymentCharges, type PaymentTerms } from '../payments/card-plan'
 import { CouponsService } from '../coupons/coupons.service'
 import { PushService } from '../common/push.service'
 import { NotificationsService } from '../notifications/notifications.service'
@@ -95,8 +95,32 @@ export function storeShareOf(o: {
   return Math.max(0, Math.round((o.subtotal - o.couponDiscount - o.promoDiscount - o.commission + frete + pagamento) * 100) / 100)
 }
 
+/**
+ * Juros do parcelado só vale no cartão pelo Asaas. No Mercado Pago (legado) o
+ * próprio MP pode cobrar juros do comprador — somar o nosso seria juros em dobro.
+ */
+export function termsForProvider(terms: PaymentTerms, asaasCard: boolean): PaymentTerms {
+  return asaasCard ? terms : { ...terms, interestMonthlyPct: 0 }
+}
+
+/**
+ * Com juros, só cobra se o total que o app mostrou bater com o do servidor. App
+ * antigo (não sabe do juros) não manda `expectedTotal` → recusa em vez de cobrar
+ * mais do que o cliente viu na tela.
+ */
+export function assertExpectedTotal(charges: PaymentCharges, expected: number | undefined) {
+  const interest = charges.perOrder.reduce((s, o) => s + o.interest, 0)
+  if (interest <= 0) return
+  if (expected == null || Math.abs(expected - charges.chargedTotal) > 0.05) {
+    throw new BadRequestException(
+      `Com o juros do parcelamento, o total fica R$ ${charges.chargedTotal.toFixed(2).replace('.', ',')}. ` +
+      'Atualize o app e confira o valor antes de pagar, ou escolha menos parcelas.',
+    )
+  }
+}
+
 /** Barra parcelas acima do permitido para o valor (máximo do admin e parcela mínima). */
-function assertInstallments(method: string, requested: number | undefined, total: number, terms: PaymentTerms) {
+export function assertInstallments(method: string, requested: number | undefined, total: number, terms: PaymentTerms) {
   if (method !== 'CREDIT_CARD' || !requested || requested <= 1) return
   const max = maxInstallmentsFor(total, terms)
   if (requested > max) {
@@ -411,9 +435,15 @@ export class OrdersService {
 
     // Parcelamento + taxa do pagamento (paga pela loja). `charged` é o que o cliente
     // paga de fato (total + juros, se parcelou acima das parcelas sem juros).
-    const terms = await this.settings.paymentTerms()
+    const terms = termsForProvider(await this.settings.paymentTerms(), this.payments.asaasCardCheckoutEnabled)
     assertInstallments(dto.paymentMethod, dto.installments, total, terms)
-    const charges = paymentCharges(dto.paymentMethod, dto.installments, [total], terms)
+    // Frete do motoboy pago pelo cliente é da plataforma — fica fora da base da loja.
+    const platformDelivery = !isStoreDelivery && !couponFreeShipping ? deliveryFee : 0
+    const charges = paymentCharges(dto.paymentMethod, dto.installments, [total], terms, {
+      storeBases: [total - platformDelivery],
+      noFees: marketplaceOn, // split MP: o MP já cobra a taxa direto da loja
+    })
+    assertExpectedTotal(charges, dto.expectedTotal)
     const pay0 = charges.perOrder[0]
     const charged = charges.chargedTotal
 
@@ -887,9 +917,14 @@ export class OrdersService {
     })
     const productsTotal = Math.round(groupTotals.reduce((s, t) => s + t.total, 0) * 100) / 100
     // Parcelamento + taxa do pagamento (paga pela loja, rateada entre as lojas).
-    const terms = await this.settings.paymentTerms()
+    const terms = termsForProvider(await this.settings.paymentTerms(), this.payments.asaasCardCheckoutEnabled)
     assertInstallments(dto.paymentMethod, dto.installments, productsTotal, terms)
-    const charges = paymentCharges(dto.paymentMethod, dto.installments, groupTotals.map((t) => t.total), terms)
+    const charges = paymentCharges(dto.paymentMethod, dto.installments, groupTotals.map((t) => t.total), terms, {
+      // Frete do motoboy pago pelo cliente é da plataforma — fica fora da base da loja.
+      storeBases: prepared.map((g, i) => groupTotals[i].total - (!g.storeDelivers && !g.couponFreeShipping ? g.deliveryFee : 0)),
+      noFees: !multiStore && marketplaceOn, // split MP: o MP já cobra a taxa direto da loja
+    })
+    assertExpectedTotal(charges, dto.expectedTotal)
     // grandTotal = o que o cliente paga de fato (com o juros, se houver).
     const grandTotal = charges.chargedTotal
     if (this.payments.asaasMoneyInEnabled && grandTotal < MIN_ASAAS_CHARGE) {

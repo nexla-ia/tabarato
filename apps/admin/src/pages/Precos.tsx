@@ -89,9 +89,12 @@ export function Precos() {
   const clientPays = simInst >= 1 && withInterest ? Math.round(parcela * simInst * 100) / 100 : base
   const interest = Math.round((clientPays - base) * 100) / 100
   const feePct = simInst <= 1 ? p.cardFeePct1x : simInst <= 6 ? p.cardFeePct2to6 : p.cardFeePct7to12
-  const payFee = simInst === 0 ? p.pixFee : (clientPays * feePct) / 100 + p.cardFeeFixed
+  // A loja paga a taxa só sobre a parte dela (produtos + juros); a do frete é da plataforma.
+  const feeAll = (clientPays * feePct) / 100 + p.cardFeeFixed
+  const payFee = simInst === 0 ? p.pixFee : (clientPays > 0 ? feeAll * Math.min(1, (simSub + interest) / clientPays) : 0)
   const storeGets = Math.max(0, simSub - commission + interest - payFee)
-  const platformKeeps = commission + (deliveryFee - courierFee)
+  // Plataforma paga a taxa sobre o frete do motoboy (no cartão).
+  const platformKeeps = commission + (deliveryFee - courierFee) - (simInst === 0 ? 0 : feeAll - payFee)
 
   return (
     <div style={{ fontFamily: SANS, maxWidth: 900 }}>

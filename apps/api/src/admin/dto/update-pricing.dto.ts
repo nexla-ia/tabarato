@@ -53,11 +53,12 @@ export class UpdatePricingDto {
   @IsOptional() @IsInt() @Min(1) @Max(200)
   courierBoxMaxKg?: number
 
-  // Cartão: até quantas vezes (o Asaas aceita até 21) e quantas sem juros.
-  @IsOptional() @IsInt() @Min(1) @Max(21)
+  // Cartão: até quantas vezes e quantas sem juros. Até 12x: a tabela de taxas
+  // (1x / 2-6x / 7-12x) não cobre mais que isso.
+  @IsOptional() @IsInt() @Min(1) @Max(12)
   cardMaxInstallments?: number
 
-  @IsOptional() @IsInt() @Min(1) @Max(21)
+  @IsOptional() @IsInt() @Min(1) @Max(12)
   cardFreeInstallments?: number
 
   // Juros ao mês cobrado do cliente acima das parcelas sem juros (%).
