@@ -241,6 +241,14 @@ export interface Pricing {
   courierBoxHeightCm: number
   courierBoxDepthCm: number
   courierBoxMaxKg: number
+  cardMaxInstallments: number
+  cardFreeInstallments: number
+  cardInterestMonthlyPct: number
+  cardFeePct1x: number
+  cardFeePct2to6: number
+  cardFeePct7to12: number
+  cardFeeFixed: number
+  pixFee: number
 }
 
 export type AdStatus = 'PENDING_REVIEW' | 'REJECTED' | 'AWAITING_PAYMENT' | 'EXPIRED_UNPAID' | 'PAID' | 'CANCELLED'

@@ -148,6 +148,9 @@ export interface Order {
   deliveryFee: number | string
   discount: number | string
   total: number | string
+  installments?: number
+  installmentInterest?: number | string
+  paymentFee?: number | string
   notes?: string | null
   scheduledFor?: string | null
   createdAt: string

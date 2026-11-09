@@ -194,6 +194,9 @@ export default function OrderDetailPage() {
             <span>{isStoreDelivery && Number(order.deliveryFee) === 0 ? 'Grátis' : fmtBRL(order.deliveryFee)}</span>
           </div>
           {order.discount > 0 && <div className={styles.totalRow}><span style={{ color: 'var(--green)' }}>Desconto</span><span style={{ color: 'var(--green)' }}>-{fmtBRL(order.discount)}</span></div>}
+          {Number(order.installmentInterest ?? 0) > 0 && (
+            <div className={styles.totalRow}><span>Juros do parcelamento ({order.installments}x)</span><span>{fmtBRL(order.installmentInterest!)}</span></div>
+          )}
           <div className={styles.grandTotal}>
             <span>Total</span><span>{fmtBRL(order.total)}</span>
           </div>

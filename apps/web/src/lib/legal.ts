@@ -49,7 +49,7 @@ export const PRIVACIDADE_VERSAO = '2026-10-16'
  * e o painel do lojista compara com ela pra saber se precisa pedir o aceite de
  * novo. Bump SÓ quando o texto mudar de verdade.
  */
-export const TERMOS_LOJISTA_VERSAO = '2026-10-06'
+export const TERMOS_LOJISTA_VERSAO = '2026-11-09'
 
 /**
  * Vigência por extenso, derivada da própria versão do documento.
@@ -93,6 +93,29 @@ export type Precos = {
   maxDeliveryValue: number
 }
 
+/** Taxas do meio de pagamento, pagas pela loja (admin > Preços). */
+export type TaxasPagamento = {
+  cardPct1x: number
+  cardPct2to6: number
+  cardPct7to12: number
+  cardFixed: number
+  pix: number
+  maxInstallments: number
+  freeInstallments: number
+  interestMonthlyPct: number
+}
+
+export const TAXAS_FALLBACK: TaxasPagamento = {
+  cardPct1x: 2.99,
+  cardPct2to6: 3.49,
+  cardPct7to12: 3.99,
+  cardFixed: 0.49,
+  pix: 0,
+  maxInstallments: 10,
+  freeInstallments: 6,
+  interestMonthlyPct: 2.99,
+}
+
 /**
  * Fallback usado quando a API não responde. São os valores vigentes em 06/10/2026
  * — ficam aqui só pra página legal nunca renderizar em branco, e o texto avisa
@@ -115,7 +138,7 @@ export const PRECOS_FALLBACK: Precos = {
  * muda raramente e não vale bater na API a cada visita, mas também não dá pra
  * cachear pra sempre — é número de contrato.
  */
-export async function buscarPrecos(): Promise<{ precos: Precos; aoVivo: boolean }> {
+export async function buscarPrecos(): Promise<{ precos: Precos; taxas: TaxasPagamento; aoVivo: boolean }> {
   try {
     const res = await fetch(`${BASE}/config/pricing`, { next: { revalidate: 3600 } })
     if (!res.ok) throw new Error(String(res.status))
@@ -125,9 +148,22 @@ export async function buscarPrecos(): Promise<{ precos: Precos; aoVivo: boolean 
       (k) => typeof data[k] === 'number' && Number.isFinite(data[k]),
     )
     if (!completo) throw new Error('resposta incompleta')
-    return { precos: data as Precos, aoVivo: true }
+    const f = (data as any).paymentFees ?? {}
+    const c = (data as any).card ?? {}
+    const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d)
+    const taxas: TaxasPagamento = {
+      cardPct1x: num(f.cardPct1x, TAXAS_FALLBACK.cardPct1x),
+      cardPct2to6: num(f.cardPct2to6, TAXAS_FALLBACK.cardPct2to6),
+      cardPct7to12: num(f.cardPct7to12, TAXAS_FALLBACK.cardPct7to12),
+      cardFixed: num(f.cardFixed, TAXAS_FALLBACK.cardFixed),
+      pix: num(f.pix, TAXAS_FALLBACK.pix),
+      maxInstallments: num(c.maxInstallments, TAXAS_FALLBACK.maxInstallments),
+      freeInstallments: num(c.freeInstallments, TAXAS_FALLBACK.freeInstallments),
+      interestMonthlyPct: num(c.interestMonthlyPct, TAXAS_FALLBACK.interestMonthlyPct),
+    }
+    return { precos: data as Precos, taxas, aoVivo: true }
   } catch {
-    return { precos: PRECOS_FALLBACK, aoVivo: false }
+    return { precos: PRECOS_FALLBACK, taxas: TAXAS_FALLBACK, aoVivo: false }
   }
 }
 

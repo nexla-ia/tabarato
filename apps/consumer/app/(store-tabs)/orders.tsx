@@ -25,6 +25,9 @@ interface Order {
   items: OrderItem[]
   total: number
   deliveryFee: number
+  installments: number
+  installmentInterest: number
+  paymentFee: number
   notes?: string
   time: string
   createdAt: string
@@ -100,6 +103,9 @@ function transformOrder(raw: any): Order {
     })),
     total: Number(raw.total ?? 0),
     deliveryFee: Number(raw.deliveryFee ?? 0),
+    installments: Number(raw.installments ?? 1),
+    installmentInterest: Number(raw.installmentInterest ?? 0),
+    paymentFee: Number(raw.paymentFee ?? 0),
     notes: raw.notes,
     time: timeAgo(raw.createdAt),
     createdAt: raw.createdAt,
@@ -209,6 +215,20 @@ function OrderCard({ order, onAction, onPrint, flash, reannouncing }: {
                 <Text style={[card.itemName, { color: '#9A8880' }]}>{order.isPickup ? 'Retirada na loja' : order.isStoreDelivery ? 'Sua taxa de entrega' : 'Taxa de entrega'}</Text>
                 <Text style={[card.itemPrice, { color: '#9A8880' }]}>{order.isPickup ? 'sem taxa' : `R$ ${Number(order.deliveryFee).toFixed(2)}`}</Text>
               </View>
+              {order.installmentInterest > 0 && (
+                <View style={card.itemRow}>
+                  <Text style={card.itemQty} />
+                  <Text style={[card.itemName, { color: '#9A8880' }]}>Juros do parcelamento ({order.installments}x) · fica com você</Text>
+                  <Text style={[card.itemPrice, { color: '#9A8880' }]}>R$ {order.installmentInterest.toFixed(2)}</Text>
+                </View>
+              )}
+              {order.paymentFee > 0 && (
+                <View style={card.itemRow}>
+                  <Text style={card.itemQty} />
+                  <Text style={[card.itemName, { color: '#9A8880' }]}>Taxa do pagamento (descontada do repasse)</Text>
+                  <Text style={[card.itemPrice, { color: '#9A8880' }]}>−R$ {order.paymentFee.toFixed(2)}</Text>
+                </View>
+              )}
             </View>
 
             {order.notes ? (
@@ -459,7 +479,7 @@ async function handlePrintOrder(order: Order, toast: (message: string, type?: 's
       clientName: order.client,
       address: order.address,
       items: order.items.map(i => ({ name: i.name, qty: i.qty, price: i.price, notes: i.notes })),
-      subtotal: order.total - order.deliveryFee,
+      subtotal: order.total - order.deliveryFee - order.installmentInterest,
       deliveryFee: order.deliveryFee,
       discount: 0,
       total: order.total,

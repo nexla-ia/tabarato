@@ -12,6 +12,7 @@ import { geocodeAddress } from '@/lib/geocoding'
 import Image from 'next/image'
 import Script from 'next/script'
 import styles from './page.module.css'
+import { CardTerms, DEFAULT_CARD_TERMS, installmentPlan, maxInstallmentsFor } from '@/lib/parcelas'
 
 declare global {
   interface Window { MP_DEVICE_SESSION_ID?: string }
@@ -88,6 +89,11 @@ export default function CheckoutPage() {
   const [cardCvv, setCardCvv] = useState('')
   const [cardCpf, setCardCpf] = useState('')
   const [installments, setInstallments] = useState(1)
+  // Parcelamento: até quantas vezes e a partir de quando tem juros (admin > Preços).
+  const [cardTerms, setCardTerms] = useState<CardTerms>(DEFAULT_CARD_TERMS)
+  useEffect(() => {
+    api.get('/config/pricing').then(({ data }) => { if (data?.card) setCardTerms(data.card) }).catch(() => {})
+  }, [])
 
   // Provedor de pagamento (backend). Asaas: exige CPF no PIX; cartão vai pro Checkout
   // hospedado (redireciona pra página do Asaas, sem formulário de cartão aqui).
@@ -165,6 +171,12 @@ export default function CheckoutPage() {
   const productSubtotal = Math.max(0, Math.round((total() - promoTotal() - couponsTotal) * 100) / 100)
   const productNet = Math.max(0, Math.round((total() - promoTotal() - couponsTotal - loyaltyDiscount) * 100) / 100)
   const estimatedTotal = Math.round((productNet + deliveryCharged) * 100) / 100
+  // Crédito: o total ganha juros se parcelar acima das parcelas sem juros.
+  const isCredit = payMethod === 'CREDIT_CARD'
+  const maxInst = maxInstallmentsFor(estimatedTotal, cardTerms)
+  const instCount = isCredit ? Math.max(1, Math.min(installments, maxInst)) : 1
+  const plan = installmentPlan(estimatedTotal, instCount, cardTerms)
+  const payTotal = isCredit ? plan.chargedTotal : estimatedTotal
 
   useEffect(() => {
     api.get<Address[]>('/users/me/addresses').then(r => {
@@ -291,7 +303,7 @@ export default function CheckoutPage() {
         addressId: selectedAddr,
         paymentMethod: payMethod,
         cardToken,
-        installments: isCard ? installments : undefined,
+        installments: isCredit ? instCount : undefined,
         payerCpf: isCard ? cardCpf : (asaasPix ? pixCpf : undefined),
         idempotencyKey: idemKey.current,
         // Fingerprint do dispositivo (security.js do MP) — reduz recusa de cartão
@@ -581,16 +593,43 @@ export default function CheckoutPage() {
                 <label className={styles.fieldLabel}>CPF do titular</label>
                 <input className={styles.input} value={cardCpf} onChange={e => setCardCpf(fmtCpf(e.target.value))} placeholder="000.000.000-00" maxLength={14} />
               </div>
-              {payMethod === 'CREDIT_CARD' && (
-                <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Parcelas</label>
-                  <div className={styles.installRow}>
-                    {[1,2,3,6,12].map(n => (
-                      <button key={n} className={`${styles.installChip} ${installments===n ? styles.installChipActive : ''}`} onClick={() => setInstallments(n)}>{n}x</button>
-                    ))}
-                  </div>
+            </div>
+          )}
+
+          {isCredit && estimatedTotal > 0 && (
+            <div className={styles.cardForm}>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Parcelas</label>
+                <div className={styles.installRule}>
+                  {maxInst <= 1
+                    ? `Neste valor o cartão é só à vista (parcela mínima de ${fmtBRL(cardTerms.minInstallmentValue)}).`
+                    : cardTerms.freeInstallments >= maxInst
+                      ? `Até ${maxInst}x sem juros.`
+                      : `Até ${Math.max(1, cardTerms.freeInstallments)}x sem juros · de ${cardTerms.freeInstallments + 1}x a ${maxInst}x com juros de ${cardTerms.interestMonthlyPct.toFixed(2).replace('.', ',')}% ao mês.`}
                 </div>
-              )}
+                {maxInst > 1 && (
+                  <div className={styles.installRow}>
+                    {Array.from({ length: maxInst }, (_, k) => k + 1).map(n => {
+                      const free = n <= cardTerms.freeInstallments
+                      return (
+                        <button key={n} type="button" className={`${styles.installChip} ${instCount===n ? styles.installChipActive : ''}`} onClick={() => setInstallments(n)}>
+                          {n}x<span className={`${styles.installTag} ${free ? styles.installTagFree : ''}`}>{free ? 'sem juros' : 'c/ juros'}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                <div className={styles.installHint}>
+                  {instCount === 1
+                    ? `À vista: ${fmtBRL(plan.chargedTotal)}`
+                    : plan.interestFree
+                      ? `${instCount}x de ${fmtBRL(plan.installmentValue)} sem juros · total ${fmtBRL(plan.chargedTotal)}`
+                      : `${instCount}x de ${fmtBRL(plan.installmentValue)} · total ${fmtBRL(plan.chargedTotal)} (${fmtBRL(plan.interest)} de juros)`}
+                </div>
+                {cardCheckout && instCount > 1 && (
+                  <div className={styles.installRule}>Na página do Asaas, escolha {instCount}x.</div>
+                )}
+              </div>
             </div>
           )}
         </section>
@@ -673,11 +712,21 @@ export default function CheckoutPage() {
                 )}
               </>
             )}
+            {deliveryKnown && isCredit && plan.interest > 0 && (
+              <div className={styles.summaryRow}>
+                <span>Juros do parcelamento ({instCount}x)</span><span>{fmtBRL(plan.interest)}</span>
+              </div>
+            )}
             <div className={styles.summaryDivider} />
             <div className={styles.summaryRow} style={{ fontWeight: 800, fontSize: 16 }}>
               <span>{deliveryKnown ? 'Total' : 'Total (sem entrega)'}</span>
-              <span>{fmtBRL(deliveryKnown ? estimatedTotal : productNet)}</span>
+              <span>{fmtBRL(deliveryKnown ? payTotal : productNet)}</span>
             </div>
+            {deliveryKnown && isCredit && instCount > 1 && (
+              <div className={styles.summaryRow} style={{ fontSize: 12, color: 'var(--muted, #999)' }}>
+                <span>em {instCount}x de {fmtBRL(plan.installmentValue)}</span><span />
+              </div>
+            )}
             {!deliveryKnown && (
               <div className={styles.summaryRow} style={{ fontSize: 12, color: 'var(--muted, #999)' }}>
                 <span>Entrega sendo calculada…</span><span />
@@ -689,7 +738,7 @@ export default function CheckoutPage() {
         {error && <div className={styles.errorBox}>{error}</div>}
 
         <button className={styles.submitBtn} onClick={handleSubmit} disabled={loading || (!!selectedAddr && !deliveryKnown)}>
-          {loading ? 'Processando...' : (!!selectedAddr && !deliveryKnown) ? 'Calculando entrega…' : `Confirmar pedido${deliveryKnown ? ` · ${fmtBRL(estimatedTotal)}` : ''}`}
+          {loading ? 'Processando...' : (!!selectedAddr && !deliveryKnown) ? 'Calculando entrega…' : `Confirmar pedido${deliveryKnown ? ` · ${fmtBRL(payTotal)}` : ''}`}
         </button>
       </div>
     </>

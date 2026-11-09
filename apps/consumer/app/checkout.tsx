@@ -19,6 +19,7 @@ import { loadCardMeta, saveCardMeta, cardLabel, SavedCardMeta } from '../src/uti
 import { MpDeviceWebView } from '../src/components/MpDeviceWebView'
 import { Relevo } from '../src/components/Relevo'
 import { relevo, LABIO_LARANJA, LABIO_NEUTRO } from '../src/theme/relevo'
+import { CardTerms, DEFAULT_CARD_TERMS, installmentPlan, maxInstallmentsFor } from '../src/utils/parcelas'
 
 const PRIMARY = '#FF5500'
 const PRIMARY_LIGHT = '#FFF0EB'
@@ -83,7 +84,6 @@ const PAYMENT_METHODS = [
 ] as const
 
 // Parcelamento: 1x a 10x.
-const INSTALLMENT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 async function tokenizeCard(cardData: {
   cardNumber: string; cvv: string; expiryMonth: string; expiryYear: string
@@ -171,6 +171,15 @@ export default function CheckoutScreen() {
     staleTime: 5 * 60 * 1000,
   })
   const asaasPix = payCfg?.pix === 'ASAAS'
+  // Parcelamento: até quantas vezes e a partir de quando tem juros (admin > Preços).
+  const { data: pricingCfg } = useQuery({
+    queryKey: ['pricing-config'],
+    queryFn: async () => (await api.get('/config/pricing')).data as { card?: CardTerms },
+    staleTime: 5 * 60 * 1000,
+  })
+  const cardTerms: CardTerms = pricingCfg?.card ?? DEFAULT_CARD_TERMS
+  // Parcelas válidas para o valor (o total pode cair depois de escolher, ex.: cupom).
+  const effectiveInstallments = (total: number) => Math.max(1, Math.min(installments, maxInstallmentsFor(total, cardTerms)))
   // ── Retirada na loja ──
   // Acima do teto (por loja), a entrega por motoboy é bloqueada → só retirada.
   // maxDeliveryValue = 0 significa "sem limite".
@@ -394,7 +403,7 @@ export default function CheckoutScreen() {
         pointsToRedeem: pointsToRedeem > 0 ? pointsToRedeem : undefined,
         idempotencyKey: idemKey.current,
         cardToken,
-        installments: isCard ? installments : undefined,
+        installments: isCard ? effectiveInstallments(computeTotals(couponResults).orderTotal) : undefined,
         payerCpf: isCard ? cardCpf : (asaasPix ? pixCpf : undefined),
         deviceId: isCard ? deviceId : undefined,
         scheduledFor: scheduledForIso,
@@ -706,6 +715,11 @@ export default function CheckoutScreen() {
   const subtotal = total()
   // Totais do pedido (mesma função usada na validação do cupom → fonte única).
   const { deliveryKnown, deliveryFee, deliveryCharged, freeShipping, couponDiscount, promoDiscount, discount, orderTotal } = computeTotals(couponResults)
+  // Cartão: o total pode ganhar juros se parcelar acima das parcelas sem juros.
+  const maxInst = maxInstallmentsFor(orderTotal, cardTerms)
+  const instCount = isCard ? effectiveInstallments(orderTotal) : 1
+  const plan = installmentPlan(orderTotal, instCount, cardTerms)
+  const payTotal = isCard ? plan.chargedTotal : orderTotal
 
   const maxRedeemable = Math.floor(loyaltyPoints / 100) * 100  // multiples of 100
   function toggleLoyalty() {
@@ -1059,28 +1073,54 @@ export default function CheckoutScreen() {
               maxLength={14}
             />
 
-            {isCard && (
-              <>
-                <Text style={styles.fieldLabel}>Parcelas</Text>
-                <View style={styles.installmentsRow}>
-                  {INSTALLMENT_OPTIONS.map((n) => (
+          </View>
+        )}
+
+        {/* ── Parcelas (Asaas e Mercado Pago) ── */}
+        {isCard && orderTotal > 0 && (
+          <View style={styles.cardForm}>
+            <View style={styles.cardFormHeader}>
+              <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
+              <Text style={styles.cardFormTitle}>Parcelas</Text>
+            </View>
+            <Text style={styles.installmentRule}>
+              {maxInst <= 1
+                ? `Neste valor o cartão é só à vista (parcela mínima de R$ ${cardTerms.minInstallmentValue.toFixed(2)}).`
+                : cardTerms.freeInstallments >= maxInst
+                  ? `Até ${maxInst}x sem juros.`
+                  : `Até ${Math.max(1, cardTerms.freeInstallments)}x sem juros · de ${cardTerms.freeInstallments + 1}x a ${maxInst}x com juros de ${cardTerms.interestMonthlyPct.toFixed(2).replace('.', ',')}% ao mês.`}
+            </Text>
+            {maxInst > 1 && (
+              <View style={styles.installmentsRow}>
+                {Array.from({ length: maxInst }, (_, k) => k + 1).map((n) => {
+                  const active = instCount === n
+                  const free = n <= cardTerms.freeInstallments
+                  return (
                     <TouchableOpacity
                       key={n}
-                      style={[styles.installmentChip, installments === n && styles.installmentChipActive]}
+                      style={[styles.installmentChip, active && styles.installmentChipActive]}
                       onPress={() => setInstallments(n)}
                     >
-                      <Text style={[styles.installmentText, installments === n && styles.installmentTextActive]}>
-                        {n}x
+                      <Text style={[styles.installmentText, active && styles.installmentTextActive]}>{n}x</Text>
+                      <Text style={[styles.installmentTag, !free && styles.installmentTagJuros, active && styles.installmentTextActive]}>
+                        {free ? 'sem juros' : 'c/ juros'}
                       </Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-                {installments > 1 && orderTotal > 0 && (
-                  <Text style={styles.installmentHint}>
-                    {installments}x de R$ {(orderTotal / installments).toFixed(2)} · total R$ {orderTotal.toFixed(2)}
-                  </Text>
-                )}
-              </>
+                  )
+                })}
+              </View>
+            )}
+            <Text style={styles.installmentHint}>
+              {instCount === 1
+                ? `À vista: R$ ${plan.chargedTotal.toFixed(2)}`
+                : plan.interestFree
+                  ? `${instCount}x de R$ ${plan.installmentValue.toFixed(2)} sem juros · total R$ ${plan.chargedTotal.toFixed(2)}`
+                  : `${instCount}x de R$ ${plan.installmentValue.toFixed(2)} · total R$ ${plan.chargedTotal.toFixed(2)} (R$ ${plan.interest.toFixed(2)} de juros)`}
+            </Text>
+            {cardCheckout && instCount > 1 && (
+              <Text style={[styles.installmentHint, { color: MUTED, fontWeight: '500' }]}>
+                Na página do Asaas, escolha {instCount}x.
+              </Text>
             )}
           </View>
         )}
@@ -1238,14 +1278,24 @@ export default function CheckoutScreen() {
             )
           })()}
 
+          {plan.interest > 0 && isCard && (
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryLabelRow}>
+                <Ionicons name="card-outline" size={13} color={MUTED} />
+                <Text style={styles.summaryLabel}>Juros do parcelamento ({instCount}x)</Text>
+              </View>
+              <Text style={styles.summaryValue}>R$ {plan.interest.toFixed(2)}</Text>
+            </View>
+          )}
+
           <View style={styles.summaryDivider} />
 
           <View style={styles.totalRow}>
             <View>
               <Text style={styles.totalLabel}>Total a pagar</Text>
-              <Text style={styles.totalSub}>via {selectedPm.label}</Text>
+              <Text style={styles.totalSub}>via {selectedPm.label}{isCard && instCount > 1 ? ` em ${instCount}x de R$ ${plan.installmentValue.toFixed(2)}` : ''}</Text>
             </View>
-            <Text style={styles.totalValue}>R$ {orderTotal.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>R$ {payTotal.toFixed(2)}</Text>
           </View>
         </View>
       </ScrollView>
@@ -1253,7 +1303,7 @@ export default function CheckoutScreen() {
       {/* Sticky confirm button */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
         <View style={styles.bottomMeta}>
-          <Text style={styles.bottomTotal}>R$ {orderTotal.toFixed(2)}</Text>
+          <Text style={styles.bottomTotal}>R$ {payTotal.toFixed(2)}</Text>
           <Text style={styles.bottomTotalSub}>{isPickup ? 'Total (retirada na loja)' : (deliveryKnown ? 'Total com entrega' : 'Calculando entrega…')}</Text>
         </View>
         <Relevo
@@ -1618,12 +1668,15 @@ const styles = StyleSheet.create({
   installmentsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' as const, marginTop: 4 },
   installmentHint: { fontSize: 12, color: MUTED, fontWeight: '600', marginTop: 8 },
   installmentChip: {
-    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, minWidth: 62, alignItems: 'center' as const,
     borderWidth: 1.5, borderColor: BORDER, backgroundColor: CARD,
     borderBottomWidth: 3, borderBottomColor: LABIO_NEUTRO,
   },
   installmentChipActive: { ...relevo.chipAtivo },
   installmentText: { fontSize: 13, fontWeight: '700', color: MUTED },
+  installmentTag: { fontSize: 9, fontWeight: '700', color: SUCCESS, marginTop: 1 },
+  installmentTagJuros: { color: MUTED },
+  installmentRule: { fontSize: 12.5, color: MUTED, lineHeight: 18, marginBottom: 4 },
   installmentTextActive: { color: '#fff' },
 
   // Payment grid

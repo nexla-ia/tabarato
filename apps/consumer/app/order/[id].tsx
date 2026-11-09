@@ -922,6 +922,15 @@ export default function OrderDetailScreen() {
               </View>
               <Text style={styles.totalValue}>{fmt(order.deliveryFee)}</Text>
             </View>
+            {Number((order as any).installmentInterest ?? 0) > 0 && (
+              <View style={styles.totalRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="card-outline" size={13} color={MUTED} />
+                  <Text style={styles.totalLabel}>Juros do parcelamento ({(order as any).installments}x)</Text>
+                </View>
+                <Text style={styles.totalValue}>{fmt(Number((order as any).installmentInterest))}</Text>
+              </View>
+            )}
 
             <View style={styles.divider} />
 

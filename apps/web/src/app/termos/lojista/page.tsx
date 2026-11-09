@@ -22,7 +22,8 @@ export const metadata: Metadata = {
 export default async function TermosLojistaPage() {
   const razao = pendente(EMPRESA.razaoSocial, 'razão social')
   const email = pendente(EMPRESA.emailContato, 'e-mail de contato')
-  const { precos, aoVivo } = await buscarPrecos()
+  const { precos, taxas, aoVivo } = await buscarPrecos()
+  const pct = (v: number) => `${v.toFixed(2).replace('.', ',')}%`
 
   return (
     <LegalPage
@@ -139,6 +140,8 @@ export default async function TermosLojistaPage() {
           ['− Promoção "Leve X, pague Y"', 'Descontado (a oferta é dela)'],
           [`− Comissão de ${precos.platformCommissionPct}%`, 'Descontada'],
           ['− Taxa de entrega, só em cupom de frete grátis', 'Descontada (a loja absorve o frete que ofereceu)'],
+          ['− Taxa do meio de pagamento (cartão ou PIX)', 'Descontada (ver tabela abaixo)'],
+          ['+ Juros pago pelo cliente no parcelado', 'Somado (fica com a loja)'],
           ['Desconto de pontos de fidelidade', 'NÃO desconta — quem banca é a plataforma'],
         ]}
       />
@@ -149,6 +152,32 @@ export default async function TermosLojistaPage() {
           remuneração do entregador é paga pela plataforma.
         </p>
       </Callout>
+      <h3>Taxa do meio de pagamento</h3>
+      <p>
+        A taxa cobrada pela instituição de pagamento em cada venda é <strong>da loja</strong> e sai
+        do repasse dela — não da comissão. Os valores vigentes são:
+      </p>
+      <LegalTable
+        head={['Forma de pagamento', 'Taxa descontada da loja']}
+        rows={[
+          ['Cartão de crédito à vista', `${pct(taxas.cardPct1x)} + ${brl(taxas.cardFixed)}`],
+          ['Cartão de crédito de 2 a 6 parcelas', `${pct(taxas.cardPct2to6)} + ${brl(taxas.cardFixed)}`],
+          ['Cartão de crédito de 7 a 12 parcelas', `${pct(taxas.cardPct7to12)} + ${brl(taxas.cardFixed)}`],
+          ['PIX', taxas.pix > 0 ? brl(taxas.pix) : 'Sem taxa para a loja'],
+        ]}
+      />
+      <p>
+        O percentual incide sobre o valor cobrado do cliente. Num carrinho com mais de uma loja, a
+        taxa é dividida entre as lojas na proporção do valor de cada pedido.
+      </p>
+      <p>
+        <strong>Parcelamento.</strong> O cliente pode parcelar em até {taxas.maxInstallments}x.
+        {taxas.freeInstallments >= taxas.maxInstallments
+          ? ' Todas as parcelas são sem juros.'
+          : ` Até ${taxas.freeInstallments}x é sem juros; acima disso o cliente paga juros de ${pct(taxas.interestMonthlyPct)} ao mês, e esse juros é somado ao repasse da loja para cobrir a taxa maior do parcelado.`}
+        {' '}Em venda parcelada, a instituição de pagamento libera o dinheiro mês a mês, conforme as
+        parcelas vencem.
+      </p>
       {!aoVivo && (
         <Callout>
           <p>

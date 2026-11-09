@@ -11,4 +11,4 @@ export const STORE_TERMS_URL = `${WEB_URL}/termos/lojista`
  * Versão dos Termos do Lojista enviada no aceite do cadastro — tem que casar com
  * TERMOS_LOJISTA_VERSAO em apps/web/src/lib/legal.ts, que é quem publica o texto.
  */
-export const STORE_TERMS_VERSION = '2026-10-06'
+export const STORE_TERMS_VERSION = '2026-11-09'

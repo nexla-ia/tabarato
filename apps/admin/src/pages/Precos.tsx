@@ -47,6 +47,8 @@ export function Precos() {
   // Simulação (não é salvo — só pro preview)
   const [simSub, setSimSub] = useState(50)
   const [simKm, setSimKm] = useState(3)
+  // 0 = PIX; 1..N = cartão em N vezes
+  const [simInst, setSimInst] = useState(1)
 
   useEffect(() => {
     api.getSettings().then(setP).catch(() => showToast('Erro ao carregar preços', 'error'))
@@ -76,8 +78,19 @@ export function Precos() {
   const deliveryFee = Math.max(p.deliveryMinFee, p.deliveryBaseFee + simKm * p.deliveryPerKm)
   const courierFee = p.courierBaseFee + simKm * p.courierPerKm
   const commission = (simSub * p.platformCommissionPct) / 100
-  const clientPays = simSub + deliveryFee
-  const storeGets = Math.max(0, simSub - commission)
+  // Pagamento (mesma conta de apps/api/src/payments/card-plan.ts): a loja paga a taxa
+  // e fica com o juros do parcelado.
+  const base = simSub + deliveryFee
+  const i = p.cardInterestMonthlyPct / 100
+  const withInterest = simInst > p.cardFreeInstallments && i > 0
+  const parcela = simInst >= 1
+    ? (withInterest ? Math.round(((base * i) / (1 - Math.pow(1 + i, -simInst))) * 100) / 100 : base / simInst)
+    : 0
+  const clientPays = simInst >= 1 && withInterest ? Math.round(parcela * simInst * 100) / 100 : base
+  const interest = Math.round((clientPays - base) * 100) / 100
+  const feePct = simInst <= 1 ? p.cardFeePct1x : simInst <= 6 ? p.cardFeePct2to6 : p.cardFeePct7to12
+  const payFee = simInst === 0 ? p.pixFee : (clientPays * feePct) / 100 + p.cardFeeFixed
+  const storeGets = Math.max(0, simSub - commission + interest - payFee)
   const platformKeeps = commission + (deliveryFee - courierFee)
 
   return (
@@ -110,6 +123,41 @@ export function Precos() {
               próprios Termos, <strong>aumento de comissão precisa ser avisado com antecedência</strong>{' '}
               às lojas já cadastradas — avise antes de salvar.
             </div>
+          </Section>
+
+          <Section title="Cartão e parcelamento">
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const }}>
+              <Field label="Parcelar até" value={p.cardMaxInstallments} onChange={setInt('cardMaxInstallments')} suffix="vezes" step="1" />
+              <Field label="Sem juros até" value={p.cardFreeInstallments} onChange={setInt('cardFreeInstallments')} suffix="vezes" step="1" />
+            </div>
+            <Field
+              label="Juros ao mês (acima das sem juros)"
+              hint="Cobrado do cliente, que vê o valor antes de fechar. O juros vai para a loja, que paga a taxa maior do parcelado."
+              value={p.cardInterestMonthlyPct} onChange={set('cardInterestMonthlyPct')} suffix="% ao mês"
+            />
+            <div style={{ fontSize: 11.5, color: MUTED, marginTop: -4, lineHeight: 1.5 }}>
+              Parcela mínima de R$ 5,00: em pedidos pequenos o app mostra menos opções.
+            </div>
+          </Section>
+
+          <Section title="Taxas do pagamento (paga pela loja)">
+            <div style={{ fontSize: 11.5, color: MUTED, marginTop: -6, marginBottom: 12, lineHeight: 1.5 }}>
+              Copie as taxas do seu plano no Asaas. Elas saem do repasse da loja, não da comissão.
+              Durante a taxa promocional do Asaas, use os valores promocionais.
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const }}>
+              <Field label="Cartão à vista" value={p.cardFeePct1x} onChange={set('cardFeePct1x')} suffix="%" />
+              <Field label="Cartão 2 a 6x" value={p.cardFeePct2to6} onChange={set('cardFeePct2to6')} suffix="%" />
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const }}>
+              <Field label="Cartão 7 a 12x" value={p.cardFeePct7to12} onChange={set('cardFeePct7to12')} suffix="%" />
+              <Field label="Fixo por cobrança" value={p.cardFeeFixed} onChange={set('cardFeeFixed')} suffix="R$" />
+            </div>
+            <Field
+              label="PIX"
+              hint="Valor fixo por PIX cobrado da loja. Deixe 0 para a plataforma continuar pagando."
+              value={p.pixFee} onChange={set('pixFee')} suffix="R$"
+            />
           </Section>
 
           <Section title="Segurança da entrega">
@@ -171,9 +219,23 @@ export function Precos() {
               <Field label="Produtos" value={simSub} onChange={(v) => setSimSub(v || 0)} suffix="R$" />
               <Field label="Distância" value={simKm} onChange={(v) => setSimKm(v || 0)} suffix="km" />
             </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 700, color: TEXT, display: 'block', marginBottom: 4 }}>Pagamento</label>
+              <select
+                value={simInst} onChange={(e) => setSimInst(parseInt(e.target.value, 10))}
+                style={{ border: `1.5px solid ${BORDER}`, borderRadius: 9, padding: '9px 12px', fontSize: 14, color: TEXT, fontFamily: SANS, background: CARD }}
+              >
+                <option value={0}>PIX</option>
+                {Array.from({ length: Math.max(1, p.cardMaxInstallments) }, (_, k) => k + 1).map((n) => (
+                  <option key={n} value={n}>Cartão {n}x{n === 1 ? ' (à vista)' : n <= p.cardFreeInstallments ? ' sem juros' : ' com juros'}</option>
+                ))}
+              </select>
+            </div>
             {[
               { l: 'Cliente paga', v: clientPays, c: TEXT, b: true },
               { l: 'Taxa de entrega', v: deliveryFee, c: MUTED },
+              ...(interest > 0 ? [{ l: `Juros (${simInst}x de ${money(parcela)})`, v: interest, c: MUTED }] : []),
+              { l: 'Taxa do pagamento (loja paga)', v: payFee, c: MUTED },
               { l: 'Loja recebe', v: storeGets, c: GREEN },
               { l: 'Motoboy recebe', v: courierFee, c: GREEN },
               { l: 'Plataforma fica', v: platformKeeps, c: O, b: true },

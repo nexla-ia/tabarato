@@ -168,3 +168,4 @@
   .colBody { max-height: none; }
   .histClient { white-space: normal; }
 }
+.payNote { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); margin-top: 6px; text-align: right; }

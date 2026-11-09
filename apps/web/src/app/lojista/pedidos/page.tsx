@@ -122,6 +122,7 @@ export default function PedidosPage() {
         <tr><td>Subtotal</td><td style="text-align:right">${money(o.subtotal)}</td></tr>
         <tr><td>Entrega</td><td style="text-align:right">${money(o.deliveryFee)}</td></tr>
         ${Number(o.discount) > 0 ? `<tr><td>Desconto</td><td style="text-align:right">-${money(o.discount)}</td></tr>` : ''}
+        ${Number(o.installmentInterest ?? 0) > 0 ? `<tr><td>Juros (${o.installments}x)</td><td style="text-align:right">${money(o.installmentInterest!)}</td></tr>` : ''}
         <tr class="tot"><td>Total</td><td style="text-align:right">${money(o.total)}</td></tr>
       </table><hr/>
       <div>Pagamento: ${esc(PAYMENT_LABEL[o.payment?.method ?? ''] ?? o.payment?.method ?? '-')}</div>
@@ -194,6 +195,12 @@ export default function PedidosPage() {
             <span className={styles.total}>{money(o.total)}</span>
           </div>
         </div>
+        {(Number(o.installmentInterest ?? 0) > 0 || Number(o.paymentFee ?? 0) > 0) && (
+          <div className={styles.payNote}>
+            {Number(o.installmentInterest ?? 0) > 0 && <span>Inclui {money(o.installmentInterest!)} de juros ({o.installments}x), que ficam com você.</span>}
+            {Number(o.paymentFee ?? 0) > 0 && <span>Taxa do pagamento: −{money(o.paymentFee!)}, descontada do seu repasse.</span>}
+          </div>
+        )}
 
         {isPickup && o.status === 'READY' && (
           <div className={styles.waitRow}><ShoppingBag size={13} /> Aguardando o cliente retirar</div>
