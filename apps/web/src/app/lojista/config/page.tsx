@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, CreditCard, ExternalLink, AlertTriangle, Loader2, Store as StoreIcon, Camera, Copy, Plus, X, Upload, Clock, Images } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Store, DaySchedule, ScheduleException } from '@/lib/types'
-import { formatPhone, onlyDigits } from '@/lib/masks'
+import { formatPhone, onlyDigits, formatMoneyInput, moneyInputToNumber } from '@/lib/masks'
 import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 import { useDialogs } from '@/components/Dialogs'
@@ -35,6 +35,8 @@ export default function ConfigPage() {
   const [description, setDescription] = useState('')
   const [phone, setPhone] = useState('')
   const [radius, setRadius] = useState('')
+  // Taxa da entrega feita pela própria loja — dígitos crus em centavos (máscara de dinheiro).
+  const [ownDeliveryFee, setOwnDeliveryFee] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState('')
@@ -144,6 +146,7 @@ export default function ConfigPage() {
     setDescription(s.description ?? '')
     setPhone(formatPhone(s.phone ?? ''))
     setRadius(s.deliveryRadiusKm != null ? String(s.deliveryRadiusKm) : '')
+    setOwnDeliveryFee(s.ownDeliveryFee != null ? String(Math.round(Number(s.ownDeliveryFee) * 100)) : '')
     setLogoUrl(s.logoUrl ?? '')
     setHours(Array.isArray(s.openingHours) && s.openingHours.length === 7 ? s.openingHours : DEFAULT_HOURS)
     setExceptions(Array.isArray(s.scheduleExceptions) ? s.scheduleExceptions : [])
@@ -227,6 +230,7 @@ export default function ConfigPage() {
       description: description || undefined,
       phone: onlyDigits(phone) || undefined,
       deliveryRadiusKm: radius === '' ? undefined : Number(radius),
+      ownDeliveryFee: moneyInputToNumber(ownDeliveryFee),
       logoUrl: logoUrl || undefined,
       openingHours: hours,
       scheduleExceptions: exceptions,
@@ -317,6 +321,15 @@ export default function ConfigPage() {
         <label className={styles.label}>Raio de entrega (km)</label>
         <input className={styles.input} type="number" step="0.5" value={radius} onChange={e => setRadius(e.target.value)} placeholder="Ex.: 8" />
         <p className={styles.hint}>Clientes fora desse raio não verão sua loja.</p>
+
+        <label id="taxa-entrega-propria" className={styles.label}>Taxa da sua entrega própria (R$)</label>
+        <input
+          className={styles.input} inputMode="numeric"
+          value={formatMoneyInput(ownDeliveryFee)}
+          onChange={e => { const d = onlyDigits(e.target.value).slice(0, 6); setOwnDeliveryFee(Number(d) > 100000 ? '100000' : d) }}
+          placeholder="0,00 = grátis"
+        />
+        <p className={styles.hint}>Cobrada do cliente nos pedidos com produtos de Entrega feita pela loja. O valor é todo seu.</p>
 
         <button className={styles.saveBtn} onClick={() => save.mutate()} disabled={save.isPending || !name}>
           {saved ? <><Check size={17} /> Salvo!</> : save.isPending ? 'Salvando…' : 'Salvar alterações'}

@@ -36,6 +36,8 @@ export interface Store {
   photos?: string[]
   documentUrl?: string | null
   maxConcurrentOrders?: number | null
+  /** Taxa que a loja cobra quando ela mesma entrega (itens "Entrega feita pela loja"). 0 = grátis. */
+  ownDeliveryFee?: number | string | null
   /** Aceite dos Termos do Lojista — null nas lojas criadas antes do registro. */
   termsAcceptedAt?: string | null
   termsVersion?: string | null
@@ -69,6 +71,8 @@ export interface Product {
   variations?: ProductVariation[]
   promoBuyQty?: number | null
   promoPayQty?: number | null
+  /** Não cabe no baú do entregador: a própria loja entrega. */
+  storeDelivery?: boolean
 }
 
 export interface Coupon {
@@ -139,7 +143,7 @@ export interface OrderItem {
 export interface Order {
   id: string
   status: OrderStatus
-  fulfillmentType?: 'DELIVERY' | 'PICKUP'
+  fulfillmentType?: 'DELIVERY' | 'PICKUP' | 'STORE_DELIVERY'
   subtotal: number | string
   deliveryFee: number | string
   discount: number | string
@@ -172,6 +176,9 @@ export const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
 export const NEXT_STATUS_LABEL: Partial<Record<OrderStatus, string>> = {
   PENDING: 'Confirmar pedido', CONFIRMED: 'Iniciar preparo', PREPARING: 'Marcar como pronto',
 }
+
+/** Baú dos entregadores do app (GET /config/pricing → courierBox). */
+export interface CourierBox { widthCm: number; heightCm: number; depthCm: number; maxKg: number }
 
 export const PAYMENT_LABEL: Record<string, string> = {
   PIX: 'PIX', CREDIT_CARD: 'Crédito', DEBIT_CARD: 'Débito', WALLET: 'Carteira',

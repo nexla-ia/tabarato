@@ -175,8 +175,15 @@ export default function CheckoutScreen() {
   // Acima do teto (por loja), a entrega por motoboy é bloqueada → só retirada.
   // maxDeliveryValue = 0 significa "sem limite".
   const maxDeliveryValue = payCfg?.maxDeliveryValue ?? 0
+  // Lojas com item que não cabe no baú: a própria loja entrega (taxa dela, sem teto).
+  const storeDeliveryIds = cartGroups
+    .filter((g) => g.items.some((i) => i.product.storeDelivery))
+    .map((g) => g.storeId)
+  const storeDeliveryKey = storeDeliveryIds.join(',')
   const overCapStoreIds = maxDeliveryValue > 0
-    ? cartGroups.filter((g) => storeSubtotal(g.storeId) > maxDeliveryValue).map((g) => g.storeId)
+    ? cartGroups
+        .filter((g) => !storeDeliveryIds.includes(g.storeId) && storeSubtotal(g.storeId) > maxDeliveryValue)
+        .map((g) => g.storeId)
     : []
   const mustPickup = overCapStoreIds.length > 0
   const [pickupChosen, setPickupChosen] = useState(false)
@@ -655,7 +662,8 @@ export default function CheckoutScreen() {
     let cancelled = false
     Promise.all(ids.map(async (id) => {
       const c = storeCoordsMap[id]
-      const r = await api.get(`/orders/delivery-quote?storeLat=${c.lat}&storeLng=${c.lng}&lat=${addr.lat}&lng=${addr.lng}`)
+      const lojaEntrega = storeDeliveryKey.split(',').includes(id) ? `&storeId=${id}&storeDelivery=1` : ''
+      const r = await api.get(`/orders/delivery-quote?storeLat=${c.lat}&storeLng=${c.lng}&lat=${addr.lat}&lng=${addr.lng}${lojaEntrega}`)
       return { id, fee: Number(r.data?.deliveryFee) }
     })).then((rows) => {
       if (cancelled) return
@@ -666,7 +674,7 @@ export default function CheckoutScreen() {
       setEstimatedFee(all ? Math.round(ids.reduce((s, id) => s + map[id], 0) * 100) / 100 : null)
     }).catch(() => { if (!cancelled) setEstimatedFee(null) })
     return () => { cancelled = true }
-  }, [storeCoordsMap, storeIdsKey, selectedAddress, addresses])
+  }, [storeCoordsMap, storeIdsKey, storeDeliveryKey, selectedAddress, addresses])
 
   // Guest gate — after all hooks
   if (!user) {
@@ -770,6 +778,17 @@ export default function CheckoutScreen() {
             <Ionicons name="shield-checkmark" size={16} color={PRIMARY} />
             <Text style={styles.pickupNoticeText}>
               Pedidos acima de R$ {maxDeliveryValue.toFixed(0)} só com retirada na loja — por segurança, o motoboy não leva itens acima desse valor.
+            </Text>
+          </View>
+        )}
+
+        {!isPickup && storeDeliveryIds.length > 0 && (
+          <View style={styles.pickupNotice}>
+            <Ionicons name="cube-outline" size={16} color={PRIMARY} />
+            <Text style={styles.pickupNoticeText}>
+              {singleStore
+                ? 'Este pedido tem item grande: a própria loja faz a entrega.'
+                : `Itens grandes: ${cartGroups.filter((g) => storeDeliveryIds.includes(g.storeId)).map((g) => storeInfoMap[g.storeId]?.name ?? g.storeName).join(', ')} ${storeDeliveryIds.length > 1 ? 'fazem' : 'faz'} a própria entrega.`}
             </Text>
           </View>
         )}
@@ -1149,6 +1168,32 @@ export default function CheckoutScreen() {
             <Text style={styles.summaryLabel}>Subtotal</Text>
             <Text style={styles.summaryValue}>R$ {subtotal.toFixed(2)}</Text>
           </View>
+          {/* Com entrega pela loja, mostra o frete de cada loja separado. */}
+          {!isPickup && deliveryKnown && storeDeliveryIds.length > 0 ? cartGroups.map((g) => {
+            const lojaEntrega = storeDeliveryIds.includes(g.storeId)
+            const fee = storeFeesMap[g.storeId] ?? 0
+            const freeShip = !!couponResults[g.storeId]?.freeShipping
+            return (
+              <View key={`fee-${g.storeId}`} style={styles.summaryRow}>
+                <View style={[styles.summaryLabelRow, { flex: 1 }]}>
+                  <Ionicons name={lojaEntrega ? 'cube-outline' : 'bicycle-outline'} size={13} color={MUTED} />
+                  <Text style={[styles.summaryLabel, { flexShrink: 1 }]} numberOfLines={1}>
+                    {lojaEntrega ? 'Entrega pela loja' : 'Entrega'}{singleStore ? '' : ` · ${g.storeName}`}
+                  </Text>
+                </View>
+                {freeShip && fee > 0 ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.summaryValue, { color: MUTED, textDecorationLine: 'line-through', fontSize: 13 }]}>R$ {fee.toFixed(2)}</Text>
+                    <Text style={[styles.summaryValue, { color: SUCCESS, fontWeight: '800' }]}>Grátis</Text>
+                  </View>
+                ) : fee === 0 ? (
+                  <Text style={[styles.summaryValue, { color: SUCCESS, fontWeight: '800' }]}>Grátis</Text>
+                ) : (
+                  <Text style={styles.summaryValue}>R$ {fee.toFixed(2)}</Text>
+                )}
+              </View>
+            )
+          }) : (
           <View style={styles.summaryRow}>
             <View style={styles.summaryLabelRow}>
               <Ionicons name={isPickup ? 'storefront-outline' : 'bicycle-outline'} size={13} color={MUTED} />
@@ -1167,6 +1212,7 @@ export default function CheckoutScreen() {
               <Text style={styles.summaryValue}>R$ {deliveryFee.toFixed(2)}{cartGroups.length > 1 ? ` (${cartGroups.length} entregas)` : ''}</Text>
             )}
           </View>
+          )}
           {promoDiscount > 0 && (
             <View style={styles.summaryRow}>
               <View style={styles.summaryLabelRow}>

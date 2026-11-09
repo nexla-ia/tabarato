@@ -14,7 +14,7 @@ import { STORE_TERMS_URL, STORE_TERMS_VERSION } from '../../src/links'
 import { AdPromoCard } from '../../src/components/AdPromoCard'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
-type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED'
+type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'PICKED_UP' | 'DELIVERED' | 'CANCELLED'
 
 interface RecentOrder {
   id: string
@@ -30,6 +30,7 @@ const STATUS_MAP: Record<OrderStatus, { label: string; color: string; bg: string
   CONFIRMED: { label: 'Confirmado', color: '#2563EB', bg: '#DBEAFE' },
   PREPARING: { label: 'Preparando', color: '#7C3AED', bg: '#EDE9FE' },
   READY:     { label: 'Pronto',     color: '#059669', bg: '#D1FAE5' },
+  PICKED_UP: { label: 'Saiu para entrega', color: '#0284C7', bg: '#E0F2FE' },
   DELIVERED: { label: 'Entregue',   color: '#16A34A', bg: '#DCFCE7' },
   CANCELLED: { label: 'Cancelado',  color: '#DC2626', bg: '#FEE2E2' },
 }

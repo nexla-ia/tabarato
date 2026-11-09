@@ -204,3 +204,24 @@
 @media (max-width: 640px) {
   .grid { grid-template-columns: 1fr; }
 }
+
+/* Entrega feita pela loja (itens que não cabem no baú do entregador) */
+.storeDeliveryTag {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
+  background: #FFF0EB; color: #C2410C; font-size: 10.5px; font-weight: 800;
+  padding: 3px 8px; border-radius: 20px;
+}
+.boxCard {
+  display: flex; align-items: flex-start; gap: 10px; margin-top: 14px;
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--bg); border: 1.5px dashed var(--border);
+  color: var(--muted); font-size: 12.5px; line-height: 1.45;
+}
+.boxCard svg { flex-shrink: 0; margin-top: 1px; color: var(--orange); }
+.boxCard p { margin: 0; }
+.boxCard strong { color: var(--text); font-weight: 700; }
+.toggleRow { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; cursor: pointer; }
+.toggleRow .switch { margin-top: 1px; }
+.toggleText { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+.toggleText strong { font-weight: 700; }
+.toggleText span { color: var(--muted); font-size: 12px; line-height: 1.4; }

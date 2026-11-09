@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus, TriangleAlert, Layers, Ban, Sparkles } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus, TriangleAlert, Layers, Ban, Sparkles, Truck } from 'lucide-react'
+import Link from 'next/link'
 import { api } from '@/lib/api'
-import { Product, ProductVariation, Store, Category, money } from '@/lib/types'
+import { Product, ProductVariation, Store, Category, CourierBox, money } from '@/lib/types'
 import { formatMoneyInput, moneyInputToNumber, onlyDigits } from '@/lib/masks'
 import { CategorySelect } from '@/components/CategorySelect'
 import { Spinner } from '@/components/Spinner'
@@ -25,9 +26,19 @@ interface FormState {
   isActive: boolean
   promoBuyQty: string
   promoPayQty: string
+  storeDelivery: boolean // não cabe no baú do entregador: a própria loja entrega
 }
 
-const EMPTY: FormState = { name: '', description: '', basePrice: '', comparePrice: '', stock: '', categoryId: '', imageUrl: '', images: [], isActive: true, promoBuyQty: '', promoPayQty: '' }
+const EMPTY: FormState = { name: '', description: '', basePrice: '', comparePrice: '', stock: '', categoryId: '', imageUrl: '', images: [], isActive: true, promoBuyQty: '', promoPayQty: '', storeDelivery: false }
+
+// Baú padrão das motos (vale até a config de preços responder).
+const DEFAULT_BOX: CourierBox = { widthCm: 45, heightCm: 45, depthCm: 45, maxKg: 20 }
+
+// "Gás de cozinha" nunca cabe no baú — o toggle liga sozinho (o lojista pode desligar).
+function isGasCategory(name?: string | null) {
+  const n = (name ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return n.includes('gas de cozinha')
+}
 
 export default function ProdutosPage() {
   const { toast, confirm } = useDialogs()
@@ -55,6 +66,14 @@ export default function ProdutosPage() {
   const storeQ = useQuery<Store>({ queryKey: ['store-my'], queryFn: async () => (await api.get('/stores/my')).data })
   const productsQ = useQuery<Product[]>({ queryKey: ['products-my'], queryFn: async () => (await api.get('/products/my')).data })
   const catsQ = useQuery<Category[]>({ queryKey: ['categories'], queryFn: async () => (await api.get('/stores/categories')).data })
+  // Medidas do baú dos entregadores (definidas pelo admin).
+  const boxQ = useQuery<CourierBox>({
+    queryKey: ['courier-box'],
+    queryFn: async () => (await api.get('/config/pricing')).data?.courierBox ?? DEFAULT_BOX,
+    staleTime: 5 * 60_000,
+  })
+  const box = boxQ.data ?? DEFAULT_BOX
+  const ownFeeZero = Number(storeQ.data?.ownDeliveryFee ?? 0) === 0
 
   const save = useMutation({
     mutationFn: async (f: FormState) => {
@@ -83,6 +102,7 @@ export default function ProdutosPage() {
         isActive: f.isActive,
         promoBuyQty,
         promoPayQty,
+        storeDelivery: f.storeDelivery,
       }
       if (f.id) return (await api.patch(`/products/${f.id}`, payload)).data
       return (await api.post(`/products/store/${storeQ.data!.id}`, payload)).data
@@ -191,6 +211,7 @@ export default function ProdutosPage() {
       categoryId: p.categoryId ?? '', imageUrl: p.imageUrl ?? '', images: p.images ?? [], isActive: p.isActive,
       promoBuyQty: p.promoBuyQty != null ? String(p.promoBuyQty) : '',
       promoPayQty: p.promoPayQty != null ? String(p.promoPayQty) : '',
+      storeDelivery: !!p.storeDelivery,
     })
   }
 
@@ -239,6 +260,9 @@ export default function ProdutosPage() {
                 )}
                 {p.description && <div className={styles.pDesc}>{p.description}</div>}
                 <div className={styles.pPrice}>{money(p.basePrice)}</div>
+                {p.storeDelivery && (
+                  <div className={styles.storeDeliveryTag}><Truck size={11} /> Entrega feita pela loja</div>
+                )}
 
                 {p.stock == null ? (
                   <div className={styles.pMeta}>Estoque livre</div>
@@ -397,8 +421,36 @@ export default function ProdutosPage() {
             <CategorySelect
               options={catsQ.data ?? []}
               value={form.categoryId}
-              onChange={categoryId => setForm({ ...form, categoryId })}
+              onChange={categoryId => {
+                const cat = (catsQ.data ?? []).find(c => c.id === categoryId)
+                setForm({ ...form, categoryId, storeDelivery: isGasCategory(cat?.name) ? true : form.storeDelivery })
+              }}
             />
+
+            <div className={styles.boxCard}>
+              <Truck size={18} />
+              <p>
+                <strong>Baú do entregador: {box.widthCm} × {box.heightCm} × {box.depthCm} cm · até {box.maxKg} kg.</strong>{' '}
+                Maior ou mais pesado? Marque Entrega feita pela loja.
+              </p>
+            </div>
+
+            <label className={styles.toggleRow}>
+              <span className={styles.switch}>
+                <input type="checkbox" checked={form.storeDelivery} onChange={e => setForm({ ...form, storeDelivery: e.target.checked })} />
+                <span className={styles.slider} />
+              </span>
+              <span className={styles.toggleText}>
+                <strong>Entrega feita pela loja</strong>
+                <span>Para itens que não cabem no baú do entregador — gás, móveis, eletrodomésticos. Você mesmo entrega, cobrando a sua taxa.</span>
+              </span>
+            </label>
+            {form.storeDelivery && ownFeeZero && (
+              <p className={styles.hint} style={{ color: '#B45309' }}>
+                Sua taxa de entrega própria está em R$ 0,00 (grátis para o cliente). Para cobrar, ajuste em{' '}
+                <Link href="/lojista/config" style={{ color: 'var(--orange)', fontWeight: 700 }}>Configurações › Loja</Link>.
+              </p>
+            )}
 
             <label className={styles.label}>Foto principal</label>
             <div className={styles.imgUploadRow}>

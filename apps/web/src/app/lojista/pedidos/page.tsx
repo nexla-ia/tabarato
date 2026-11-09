@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRight, Clock, X, MapPin, CreditCard, TriangleAlert, MessageCircle, Printer,
-  Inbox, ChefHat, ShoppingBag, Bike, CheckCircle2, Ban,
+  Inbox, ChefHat, ShoppingBag, Bike, CheckCircle2, Ban, Truck,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import {
@@ -19,7 +19,8 @@ import styles from './page.module.css'
 const COLUMNS: { key: string; title: string; hint: string; color: string; icon: any; statuses: OrderStatus[] }[] = [
   { key: 'new',   title: 'Novos',      hint: 'Confirme e inicie o preparo', color: '#2563EB', icon: Inbox,      statuses: ['PENDING', 'CONFIRMED'] },
   { key: 'prep',  title: 'Preparando', hint: 'Em produção',                 color: '#7C3AED', icon: ChefHat,    statuses: ['PREPARING'] },
-  { key: 'ready', title: 'Prontos',    hint: 'Aguardando o entregador',     color: '#0891B2', icon: ShoppingBag, statuses: ['READY', 'PICKED_UP'] },
+  // PICKED_UP fica aqui também: na entrega feita pela loja, é a loja que confirma a entrega com o código.
+  { key: 'ready', title: 'Prontos',    hint: 'Retirada ou entrega',         color: '#0891B2', icon: ShoppingBag, statuses: ['READY', 'PICKED_UP'] },
 ]
 
 export default function PedidosPage() {
@@ -29,8 +30,9 @@ export default function PedidosPage() {
   const [histFilter, setHistFilter] = useState<'ALL' | 'DELIVERED' | 'CANCELLED'>('ALL')
   const [cancelId, setCancelId] = useState<string | null>(null)
   const [note, setNote] = useState('')
-  // Retirada na loja: modal pra digitar o código que o cliente mostra.
+  // Retirada na loja / entrega feita pela loja: modal pra digitar o código que o cliente mostra.
   const [pickupId, setPickupId] = useState<string | null>(null)
+  const [pickupIsDelivery, setPickupIsDelivery] = useState(false)
   const [pickupCode, setPickupCode] = useState('')
   const [pickupErr, setPickupErr] = useState('')
 
@@ -131,6 +133,10 @@ export default function PedidosPage() {
   function Card({ o }: { o: Order }) {
     const next = NEXT_STATUS[o.status]
     const isPickup = o.fulfillmentType === 'PICKUP'
+    // Entrega feita pela própria loja (itens que não cabem no baú): sem entregador do app.
+    const isStoreDelivery = o.fulfillmentType === 'STORE_DELIVERY'
+    const viaCourier = !isPickup && !isStoreDelivery
+    const statusLabel = isStoreDelivery && o.status === 'PICKED_UP' ? 'Saiu para entrega' : STATUS_LABEL[o.status]
     const canCancel = ['PENDING', 'CONFIRMED', 'PREPARING'].includes(o.status)
     const late = isOrderLate(o)
     const itemCount = (o.items ?? []).reduce((s, i) => s + i.quantity, 0)
@@ -141,9 +147,10 @@ export default function PedidosPage() {
           <div className={styles.headLeft}>
             <span className={styles.orderId}>#{o.id.slice(-6).toUpperCase()}</span>
             {isPickup && <span className={styles.pickupTag}><ShoppingBag size={11} /> Retirada</span>}
+            {isStoreDelivery && <span className={styles.pickupTag}><Truck size={11} /> Entrega própria</span>}
             {late
               ? <span className={styles.lateBadge}><TriangleAlert size={11} /> Atrasado</span>
-              : <span className={styles.badge} style={{ background: `${STATUS_COLOR[o.status]}18`, color: STATUS_COLOR[o.status] }}>{STATUS_LABEL[o.status]}</span>}
+              : <span className={styles.badge} style={{ background: `${STATUS_COLOR[o.status]}18`, color: STATUS_COLOR[o.status] }}>{statusLabel}</span>}
           </div>
           <span className={styles.time}><Clock size={12} /> {timeAgo(o.createdAt)}</span>
         </div>
@@ -191,7 +198,14 @@ export default function PedidosPage() {
         {isPickup && o.status === 'READY' && (
           <div className={styles.waitRow}><ShoppingBag size={13} /> Aguardando o cliente retirar</div>
         )}
-        {!isPickup && (o.status === 'READY' || o.status === 'PICKED_UP') && (
+        {isStoreDelivery && (o.status === 'READY' || o.status === 'PICKED_UP') && (
+          <div className={styles.waitRow}>
+            {o.status === 'READY'
+              ? <><Truck size={13} /> Você entrega — peça o código ao cliente na entrega</>
+              : <><Truck size={13} /> Saiu para entrega — confirme com o código do cliente</>}
+          </div>
+        )}
+        {viaCourier && (o.status === 'READY' || o.status === 'PICKED_UP') && (
           o.delivery?.matchingExpired
             ? <div className={styles.expiredRow}><TriangleAlert size={14} /> Sem entregador — reanuncie para procurar de novo</div>
             : <div className={styles.waitRow}>
@@ -213,11 +227,21 @@ export default function PedidosPage() {
             </button>
           )}
           {isPickup && o.status === 'READY' && (
-            <button className={styles.advanceBtn} onClick={() => { setPickupId(o.id); setPickupCode(''); setPickupErr('') }} disabled={confirmPickup.isPending}>
+            <button className={styles.advanceBtn} onClick={() => { setPickupId(o.id); setPickupIsDelivery(false); setPickupCode(''); setPickupErr('') }} disabled={confirmPickup.isPending}>
               Confirmar retirada <CheckCircle2 size={15} />
             </button>
           )}
-          {!isPickup && o.status === 'READY' && o.delivery?.matchingExpired && (
+          {isStoreDelivery && o.status === 'READY' && (
+            <button className={styles.outBtn} onClick={() => advance.mutate({ id: o.id, status: 'PICKED_UP' })} disabled={advance.isPending}>
+              Saiu para entrega
+            </button>
+          )}
+          {isStoreDelivery && (o.status === 'READY' || o.status === 'PICKED_UP') && (
+            <button className={styles.advanceBtn} onClick={() => { setPickupId(o.id); setPickupIsDelivery(true); setPickupCode(''); setPickupErr('') }} disabled={confirmPickup.isPending}>
+              Confirmar entrega <CheckCircle2 size={15} />
+            </button>
+          )}
+          {viaCourier && o.status === 'READY' && o.delivery?.matchingExpired && (
             <button className={styles.advanceBtn} onClick={() => reannounce.mutate(o.id)} disabled={reannounce.isPending}>
               Reanunciar <Bike size={15} />
             </button>
@@ -337,10 +361,14 @@ export default function PedidosPage() {
         <div className={styles.overlay} onClick={() => setPickupId(null)}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHead}>
-              <h3>Confirmar retirada</h3>
+              <h3>{pickupIsDelivery ? 'Confirmar entrega' : 'Confirmar retirada'}</h3>
               <button onClick={() => setPickupId(null)}><X size={18} /></button>
             </div>
-            <p className={styles.modalSub}>Peça ao cliente o <b>código de retirada</b> (aparece no app dele) e digite abaixo.</p>
+            <p className={styles.modalSub}>
+              {pickupIsDelivery
+                ? <>Ao entregar, peça ao cliente o <b>código de entrega</b> (aparece no app dele) e digite abaixo.</>
+                : <>Peça ao cliente o <b>código de retirada</b> (aparece no app dele) e digite abaixo.</>}
+            </p>
             <input
               className={styles.pickupInput}
               placeholder="Ex.: 482913"
@@ -359,7 +387,7 @@ export default function PedidosPage() {
                 onClick={() => confirmPickup.mutate({ id: pickupId, code: pickupCode })}
                 disabled={confirmPickup.isPending || pickupCode.length < 4}
               >
-                {confirmPickup.isPending ? 'Confirmando…' : 'Confirmar retirada'}
+                {confirmPickup.isPending ? 'Confirmando…' : pickupIsDelivery ? 'Confirmar entrega' : 'Confirmar retirada'}
               </button>
             </div>
           </div>

@@ -38,6 +38,7 @@ export interface Store {
   address: string
   prepTimeMin: number
   deliveryRadiusKm: number
+  ownDeliveryFee?: number | string
   isOpen: boolean
   rating?: number
   categories: Category[]
@@ -65,6 +66,8 @@ export interface Product {
   variations: ProductVariation[]
   promoBuyQty?: number | null
   promoPayQty?: number | null
+  // Item que não cabe no baú do entregador: a própria loja entrega.
+  storeDelivery?: boolean
 }
 
 export interface CartItem {
@@ -92,6 +95,7 @@ export interface Order {
   total: number
   notes?: string
   createdAt: string
+  fulfillmentType?: 'DELIVERY' | 'PICKUP' | 'STORE_DELIVERY'
   store: { id: string; name: string; logoUrl?: string }
   items: OrderItem[]
 }

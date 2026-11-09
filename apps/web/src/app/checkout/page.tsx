@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, CreditCard, Copy, Check, Clock, ShoppingBag, Store, ArrowLeft } from 'lucide-react'
+import { Zap, CreditCard, Copy, Check, Clock, ShoppingBag, Store, ArrowLeft, Truck } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useCartStore } from '@/stores/cart'
@@ -125,7 +125,12 @@ export default function CheckoutPage() {
   const [polling, setPolling] = useState(false)
   const [storeCoords, setStoreCoords] = useState<Record<string, { lat: number; lng: number }>>({})
   // Taxa de entrega por loja vinda do BACKEND (reflete a config de preços atual).
+  // Chave = feeKey(loja, entrega pela loja?) — muda de cotação se o carrinho mudar de modo.
   const [storeFees, setStoreFees] = useState<Record<string, number>>({})
+  // Loja com algum item "Entrega feita pela loja" → a própria loja entrega o pedido
+  // dela, cobrando a taxa que ela definiu (o servidor decide igual).
+  const storeDelivers = (s: { items: { storeDelivery?: boolean }[] }) => s.items.some((i) => i.storeDelivery)
+  const feeKey = (storeId: string, sd: boolean) => `${storeId}|${sd ? 'loja' : 'app'}`
 
   const isCard = payMethod === 'CREDIT_CARD' || payMethod === 'DEBIT_CARD'
   // Teto do cliente é só uma estimativa (o back é quem valida de verdade): não
@@ -141,11 +146,12 @@ export default function CheckoutPage() {
   const perStoreDelivery = stores.map((s) => {
     // Taxa vem do backend (cotação). Enquanto não chega, delivery = null (a UI
     // trata como "calculando" e não deixa fechar sem a entrega conhecida).
-    const delivery = (selAddr as any)?.lat != null && storeFees[s.storeId] != null
-      ? storeFees[s.storeId]
-      : null
-    return { delivery, freeShip: !!s.coupon?.freeShipping }
+    const byStore = storeDelivers(s)
+    const fee = storeFees[feeKey(s.storeId, byStore)]
+    const delivery = (selAddr as any)?.lat != null && fee != null ? fee : null
+    return { delivery, freeShip: !!s.coupon?.freeShipping, byStore }
   })
+  const onlyStoreDelivers = stores.length === 1 && !!perStoreDelivery[0]?.byStore
   const deliveryKnown = !!selAddr && perStoreDelivery.length > 0 && perStoreDelivery.every((x) => x.delivery != null)
   const deliveryCharged = deliveryKnown
     ? Math.round(perStoreDelivery.reduce((a, x) => a + (x.freeShip ? 0 : (x.delivery ?? 0)), 0) * 100) / 100
@@ -189,20 +195,24 @@ export default function CheckoutPage() {
   // Cotação da taxa de entrega no BACKEND (loja → endereço) — mantém o valor
   // exibido igual ao cobrado, mesmo quando o admin muda os preços.
   const coordsKey = Object.entries(storeCoords).map(([k, v]) => `${k}:${v.lat},${v.lng}`).join('|')
+  const storeDeliveryKey = stores.map((s) => feeKey(s.storeId, storeDelivers(s))).join(',')
   useEffect(() => {
     const addr = addresses.find((a) => a.id === selectedAddr) as any
     if (!addr || addr.lat == null || addr.lng == null) return
     stores.forEach((s) => {
       const c = storeCoords[s.storeId]
-      if (!c) return
-      api.get(`/orders/delivery-quote?storeLat=${c.lat}&storeLng=${c.lng}&lat=${addr.lat}&lng=${addr.lng}`)
+      const byStore = storeDelivers(s)
+      // Entrega pela loja: o servidor usa a posição e a taxa da própria loja.
+      if (!c && !byStore) return
+      const extra = byStore ? `&storeId=${s.storeId}&storeDelivery=1` : ''
+      api.get(`/orders/delivery-quote?storeLat=${c?.lat ?? ''}&storeLng=${c?.lng ?? ''}&lat=${addr.lat}&lng=${addr.lng}${extra}`)
         .then((r) => {
           const fee = Number(r.data?.deliveryFee)
-          if (Number.isFinite(fee)) setStoreFees((prev) => ({ ...prev, [s.storeId]: fee }))
+          if (Number.isFinite(fee)) setStoreFees((prev) => ({ ...prev, [feeKey(s.storeId, byStore)]: fee }))
         }).catch(() => {})
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddr, storeIdsKey, coordsKey])
+  }, [selectedAddr, storeIdsKey, coordsKey, storeDeliveryKey])
 
   // PIX: verifica o pagamento automaticamente (o webhook pode demorar/faltar). Se
   // o backend marcar como pago → vai pro pedido; se expirar/recusar (FAILED) → avisa.
@@ -589,7 +599,7 @@ export default function CheckoutPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}><span className={styles.stepNum}>3</span> Resumo</h2>
           <div className={styles.summaryCard}>
-            {stores.map(s => (
+            {stores.map((s, si) => (
               <div key={s.storeId}>
                 {stores.length > 1 && <div className={styles.summaryStoreLabel}>{s.storeName}</div>}
                 {s.items.map(i => (
@@ -603,6 +613,14 @@ export default function CheckoutPage() {
                   <div className={styles.summaryRow}>
                     <span>Cupom {s.coupon.code}</span>
                     <span>{s.coupon.discount > 0 ? `-${fmtBRL(s.coupon.discount)}` : ''}{s.coupon.freeShipping ? (s.coupon.discount > 0 ? ' + frete grátis' : 'Frete grátis') : ''}</span>
+                  </div>
+                )}
+                {stores.length > 1 && perStoreDelivery[si]?.byStore && (
+                  <div className={styles.summaryRow}>
+                    <span><Truck size={13} style={{ verticalAlign: -2 }} /> Entrega pela loja</span>
+                    <span>{perStoreDelivery[si].delivery == null ? 'Calculando…'
+                      : (perStoreDelivery[si].freeShip || perStoreDelivery[si].delivery === 0) ? 'Grátis'
+                      : fmtBRL(perStoreDelivery[si].delivery!)}</span>
                   </div>
                 )}
               </div>
@@ -622,7 +640,7 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className={styles.summaryRow}>
-              <span>Entrega{stores.length > 1 ? ` (${stores.length} lojas)` : ''}</span>
+              <span>{onlyStoreDelivers ? 'Entrega pela loja' : `Entrega${stores.length > 1 ? ` (${stores.length} lojas)` : ''}`}</span>
               <span>{!deliveryKnown ? 'Calculando…' : deliveryCharged === 0 ? 'Grátis' : fmtBRL(deliveryCharged)}</span>
             </div>
 

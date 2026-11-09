@@ -53,6 +53,16 @@ const PICKUP_STEPS: StepDef[] = [
   { status: 'DELIVERED', label: 'Retirado',   desc: 'Pedido retirado com sucesso',     icon: 'checkmark-done-outline' },
 ]
 
+// Entrega feita pela própria loja (item que não cabe no baú): sem entregador do app.
+const STORE_DELIVERY_STEPS: StepDef[] = [
+  { status: 'PENDING',   label: 'Aguardando',        desc: 'Loja recebeu seu pedido',         icon: 'time-outline' },
+  { status: 'CONFIRMED', label: 'Confirmado',        desc: 'Loja confirmou o pedido',          icon: 'checkmark-circle-outline' },
+  { status: 'PREPARING', label: 'Preparando',        desc: 'Seu pedido está sendo preparado',  icon: 'restaurant-outline' },
+  { status: 'READY',     label: 'Pronto',            desc: 'A loja vai sair para entregar',    icon: 'cube-outline' },
+  { status: 'PICKED_UP', label: 'Saiu para entrega', desc: 'A loja está levando seu pedido',   icon: 'car-outline' },
+  { status: 'DELIVERED', label: 'Entregue',          desc: 'Pedido entregue com sucesso',      icon: 'home-outline' },
+]
+
 const TERMINAL_BAD = ['CANCELLED', 'REFUSED']
 
 const STATUS_LABEL: Record<string, string> = {
@@ -584,11 +594,13 @@ export default function OrderDetailScreen() {
 
   const isCancelledOrRefused = TERMINAL_BAD.includes(order.status)
   const isPickup = order.fulfillmentType === 'PICKUP'
-  const steps = isPickup ? PICKUP_STEPS : STEPS
+  const isStoreDelivery = order.fulfillmentType === 'STORE_DELIVERY'
+  const steps = isPickup ? PICKUP_STEPS : isStoreDelivery ? STORE_DELIVERY_STEPS : STEPS
+  const statusLabel = isStoreDelivery && order.status === 'READY' ? 'Pronto' : (STATUS_LABEL[order.status] ?? order.status)
   // PICKED_UP is a legacy order status; treat as "between READY and DELIVERED"
   const currentStepIdx = (() => {
     if (order.status === 'DELIVERED') return steps.length - 1
-    if (order.status === 'PICKED_UP') return steps.findIndex(s => s.status === 'READY') // show READY as active
+    if (order.status === 'PICKED_UP' && !isStoreDelivery) return steps.findIndex(s => s.status === 'READY') // show READY as active
     return steps.findIndex((s) => s.status === order.status)
   })()
   const canCancel       = ['PENDING', 'CONFIRMED'].includes(order.status)
@@ -646,7 +658,7 @@ export default function OrderDetailScreen() {
                   styles.heroStatus,
                   { color: order.status === 'DELIVERED' ? SUCCESS : PRIMARY },
                 ]}>
-                  {STATUS_LABEL[order.status] ?? order.status}
+                  {statusLabel}
                 </Text>
               </View>
             </View>
@@ -683,7 +695,7 @@ export default function OrderDetailScreen() {
         )}
 
         {/* ── Delivery tracker ── */}
-        {!isPickup && order.delivery && !isCancelledOrRefused && (
+        {!isPickup && !isStoreDelivery && order.delivery && !isCancelledOrRefused && (
           <DeliveryTracker
             delivery={order.delivery}
             courierPosition={courierPosition}
@@ -723,6 +735,44 @@ export default function OrderDetailScreen() {
                   <Ionicons name="time-outline" size={15} color={MUTED} />
                   <Text style={styles.pickupWaitText}>
                     Assim que o pedido ficar pronto, aparece aqui o código para você retirar na loja.
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* ── Entrega feita pela loja ── */}
+        {isStoreDelivery && !isCancelledOrRefused && order.status !== 'DELIVERED' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Entrega pela loja</Text>
+            <View style={styles.pickupBox}>
+              <View style={styles.pickupBoxHead}>
+                <View style={styles.pickupBoxIcon}>
+                  <Ionicons name="cube" size={18} color={PRIMARY} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pickupBoxStore}>A própria loja vai entregar este pedido</Text>
+                  <Text style={styles.pickupBoxAddr}>
+                    {order.store?.name}{order.store?.phone ? ` · ${order.store.phone}` : ''}
+                  </Text>
+                </View>
+              </View>
+
+              {['READY', 'PICKED_UP'].includes(order.status) ? (
+                <View style={styles.pickupCodeWrap}>
+                  <View style={styles.codeHeader}>
+                    <Ionicons name="key" size={15} color={PRIMARY} />
+                    <Text style={styles.codeTitle}>Código de entrega</Text>
+                  </View>
+                  <Text style={styles.codeDigits}>{order.deliveryCode}</Text>
+                  <Text style={styles.codeHint}>Informe este código à loja quando receber o pedido.</Text>
+                </View>
+              ) : (
+                <View style={styles.pickupWaitRow}>
+                  <Ionicons name="time-outline" size={15} color={MUTED} />
+                  <Text style={styles.pickupWaitText}>
+                    Quando o pedido ficar pronto, aparece aqui o código para você informar na entrega.
                   </Text>
                 </View>
               )}

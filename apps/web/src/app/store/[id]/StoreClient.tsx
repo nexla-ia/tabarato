@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Heart } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Clock, MapPin, ChevronRight, ArrowLeft, Star, Search, Heart, Truck } from 'lucide-react'
 import { useCartStore, CartItem } from '@/stores/cart'
 import { promoLabel } from '@/lib/promo'
 import { useAuth } from '@/hooks/useAuth'
@@ -26,6 +26,7 @@ interface Product {
   stock?: number | null
   hasVariations?: boolean
   promoBuyQty?: number | null; promoPayQty?: number | null
+  storeDelivery?: boolean
   variations?: Variation[]
   category?: Category | null
 }
@@ -138,6 +139,7 @@ export function StoreClient({ store, products, rating, reviewCount, reviews = []
       productId: product.id, variationId: variation?.id, name: product.name,
       price, quantity: 1, imageUrl: product.imageUrl ?? undefined, variationName: variation?.name,
       promoBuyQty: product.promoBuyQty, promoPayQty: product.promoPayQty,
+      storeDelivery: !!product.storeDelivery,
     }, user?.id)
   }
 
@@ -436,6 +438,9 @@ function ProductCard({ product, storeId, onAdd, isStoreOwner }: {
       <div className={styles.productInfo}>
         <Link href={`/product/${product.id}`} className={styles.nameLink}><h3 className={styles.productName}>{product.name}</h3></Link>
         {product.description && <p className={styles.productDesc}>{product.description}</p>}
+        {product.storeDelivery && (
+          <span className={styles.storeDeliveryTag}><Truck size={11} /> Entrega pela loja</span>
+        )}
 
         {hasVars && (
           <div className={styles.varRow}>

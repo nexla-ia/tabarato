@@ -154,6 +154,12 @@ export default function CartScreen() {
                             </Text>
                           </View>
                         )}
+                        {item.product.storeDelivery && (
+                          <View style={styles.lojaEntregaPill}>
+                            <Ionicons name="cube-outline" size={10} color={colors.primaryDark} />
+                            <Text style={styles.lojaEntregaPillText}>Entrega pela loja</Text>
+                          </View>
+                        )}
                         <Text style={styles.itemPrice}>R$ {lineTotal.toFixed(2)}</Text>
                       </View>
                     </View>
@@ -252,6 +258,8 @@ const styles = StyleSheet.create({
   itemPrice: { fontSize: 14, fontWeight: '800', color: colors.primary, marginTop: 4 },
   promoPill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: '#DCFCE7', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, marginTop: 4 },
   promoPillText: { fontSize: 10.5, fontWeight: '800', color: '#15803D' },
+  lojaEntregaPill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: colors.primaryLight, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, marginTop: 4 },
+  lojaEntregaPillText: { fontSize: 10.5, fontWeight: '800', color: colors.primaryDark },
 
   storePromoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10 },
   storePromoLabel: { fontSize: 12, color: '#15803D', fontWeight: '700' },

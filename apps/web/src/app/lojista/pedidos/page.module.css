@@ -103,6 +103,12 @@
   background: #fff; border: 1.5px solid #FECACA; color: #DC2626; font-size: 12.5px; font-weight: 700; transition: all 0.12s;
 }
 .cancelBtn:hover { background: #FEF2F2; }
+.outBtn {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; padding: 9px 12px; border-radius: 9px;
+  background: #fff; border: 1.5px solid #A5F3FC; color: #0E7490; font-size: 12.5px; font-weight: 700; transition: all 0.12s;
+}
+.outBtn:hover { background: #ECFEFF; }
+.outBtn:disabled { opacity: 0.6; }
 .advanceBtn {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
   background: var(--orange); color: #fff; padding: 10px 14px; border-radius: 9px;

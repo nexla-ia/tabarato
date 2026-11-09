@@ -214,3 +214,10 @@
 .modalConfirm { flex: 1; padding: 12px; border-radius: 12px; background: var(--orange); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; }
 
 .empty { padding: 60px; text-align: center; color: var(--muted); font-size: 15px; }
+
+/* Item que a própria loja entrega (não cabe no baú do entregador) */
+.storeDeliveryTag {
+  display: flex; width: fit-content; align-items: center; gap: 4px;
+  margin: 0 0 10px; padding: 2px 8px; border-radius: 20px;
+  background: #FFF0EB; color: #C2410C; font-size: 10.5px; font-weight: 800;
+}

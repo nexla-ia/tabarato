@@ -40,8 +40,10 @@ interface Props {
 
 export function OrderCard({ order, onPress }: Props) {
   const statusColor = STATUS_COLOR[order.status] ?? colors.textMuted
-  const statusLabel = STATUS_LABEL[order.status] ?? order.status
-  const statusIcon = STATUS_ICON[order.status] ?? '📋'
+  // Entrega feita pela própria loja: "pronto" é para a loja sair, não para retirada.
+  const lojaEntrega = order.fulfillmentType === 'STORE_DELIVERY'
+  const statusLabel = lojaEntrega && order.status === 'READY' ? 'Pronto para entrega' : (STATUS_LABEL[order.status] ?? order.status)
+  const statusIcon = lojaEntrega && order.status === 'PICKED_UP' ? '🚚' : (STATUS_ICON[order.status] ?? '📋')
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.88}>

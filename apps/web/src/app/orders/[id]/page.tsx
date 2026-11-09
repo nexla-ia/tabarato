@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { MessageCircle, ArrowRight } from 'lucide-react'
+import { MessageCircle, ArrowRight, Truck } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { OrderReview } from '@/components/OrderReview'
 import { CourierReview } from '@/components/CourierReview'
@@ -103,6 +103,7 @@ export default function OrderDetailPage() {
         productId: p.id, variationId: it.variation?.id, name: p.name,
         price, quantity: it.quantity, imageUrl: p.imageUrl ?? undefined, variationName: it.variation?.name,
         promoBuyQty: p.promoBuyQty, promoPayQty: p.promoPayQty,
+        storeDelivery: !!p.storeDelivery,
       }, user?.id)
       added++
     }
@@ -123,6 +124,13 @@ export default function OrderDetailPage() {
       ? STEPS.indexOf('READY')
       : STEPS.indexOf(order.status)
   const color = STATUS_COLOR[order.status] ?? '#888'
+  // Entrega feita pela própria loja (itens que não cabem no baú): sem entregador do app.
+  const isStoreDelivery = order.fulfillmentType === 'STORE_DELIVERY'
+  const statusLabel = isStoreDelivery && order.status === 'READY'
+    ? 'Pronto — a loja vai sair para entregar'
+    : (STATUS_LABEL[order.status] ?? order.status)
+  const showStoreDeliveryCode = isStoreDelivery && !!order.deliveryCode
+    && ['CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP'].includes(order.status)
 
   return (
     <>
@@ -133,7 +141,7 @@ export default function OrderDetailPage() {
 
         {/* Status badge */}
         <div className={styles.statusBadge} style={{ background: color + '18', color }}>
-          {STATUS_LABEL[order.status] ?? order.status}
+          {statusLabel}
         </div>
 
         {/* Progress tracker */}
@@ -182,7 +190,8 @@ export default function OrderDetailPage() {
           ))}
           <div className={styles.divider} />
           <div className={styles.totalRow}>
-            <span>Entrega</span><span>{fmtBRL(order.deliveryFee)}</span>
+            <span>{isStoreDelivery ? 'Entrega pela loja' : 'Entrega'}</span>
+            <span>{isStoreDelivery && Number(order.deliveryFee) === 0 ? 'Grátis' : fmtBRL(order.deliveryFee)}</span>
           </div>
           {order.discount > 0 && <div className={styles.totalRow}><span style={{ color: 'var(--green)' }}>Desconto</span><span style={{ color: 'var(--green)' }}>-{fmtBRL(order.discount)}</span></div>}
           <div className={styles.grandTotal}>
@@ -219,8 +228,30 @@ export default function OrderDetailPage() {
           </button>
         )}
 
+        {/* Entrega feita pela própria loja */}
+        {isStoreDelivery && order.status !== 'CANCELLED' && (
+          <div className={styles.card} style={{ marginTop: 14 }}>
+            <h3 className={styles.sectionLabel}>Entrega</h3>
+            <p className={styles.courierName} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Truck size={18} /> A própria loja vai entregar este pedido
+            </p>
+            <p className={styles.deliveryStatus}>
+              {order.status === 'PICKED_UP' ? 'Saiu para entrega'
+                : order.status === 'DELIVERED' ? 'Entregue'
+                : 'Itens grandes que não cabem no baú do entregador.'}
+            </p>
+            {showStoreDeliveryCode && (
+              <div className={styles.deliveryCode}>
+                <span className={styles.deliveryCodeLabel}>🔒 Código de entrega</span>
+                <span className={styles.deliveryCodeDigits}>{order.deliveryCode}</span>
+                <span className={styles.deliveryCodeHint}>Informe este código à loja quando receber o pedido.</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Delivery */}
-        {order.delivery && (
+        {order.delivery && !isStoreDelivery && (
           <div className={styles.card} style={{ marginTop: 14 }}>
             <h3 className={styles.sectionLabel}>Entregador</h3>
             {order.delivery.courier

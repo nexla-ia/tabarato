@@ -191,3 +191,12 @@
 .modalActions { display: flex; gap: 10px; }
 .modalCancel { flex: 1; padding: 12px; border-radius: 12px; background: var(--bg); border: 1.5px solid var(--border); font-weight: 700; font-size: 14px; color: var(--muted); }
 .modalConfirm { flex: 1; padding: 12px; border-radius: 12px; background: var(--orange); color: #fff; font-weight: 700; font-size: 14px; }
+
+/* Item que a própria loja entrega (não cabe no baú do entregador) */
+.storeDeliveryNote {
+  display: flex; align-items: center; gap: 8px;
+  margin: 4px 0 16px; padding: 9px 12px; border-radius: 12px;
+  background: #FFF0EB; color: #9A3412; font-size: 13px; line-height: 1.35;
+}
+.storeDeliveryNote svg { flex-shrink: 0; color: var(--orange, #FF6600); }
+.storeDeliveryNote strong { font-weight: 800; }

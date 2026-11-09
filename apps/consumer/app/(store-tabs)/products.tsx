@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, TextInput,
   Modal, KeyboardAvoidingView, Platform, ActivityIndicator, RefreshControl, Image,
@@ -43,6 +43,7 @@ interface Product {
   imageUrl?: string | null
   promoBuyQty?: number | null
   promoPayQty?: number | null
+  storeDelivery?: boolean
 }
 
 interface ProductFormState {
@@ -55,7 +56,17 @@ interface ProductFormState {
   maxDeliveryKm: string
   promoBuyQty: string
   promoPayQty: string
+  storeDelivery: boolean
 }
+
+interface CourierBox {
+  widthCm: number
+  heightCm: number
+  depthCm: number
+  maxKg: number
+}
+
+const DEFAULT_COURIER_BOX: CourierBox = { widthCm: 45, heightCm: 45, depthCm: 45, maxKg: 20 }
 
 interface VariationFormState {
   id?: string
@@ -66,7 +77,7 @@ interface VariationFormState {
   stock: string
 }
 
-const EMPTY_FORM: ProductFormState = { name: '', categoryId: '', basePrice: '', comparePrice: '', stock: '', imageUrl: '', maxDeliveryKm: '', promoBuyQty: '', promoPayQty: '' }
+const EMPTY_FORM: ProductFormState = { name: '', categoryId: '', basePrice: '', comparePrice: '', stock: '', imageUrl: '', maxDeliveryKm: '', promoBuyQty: '', promoPayQty: '', storeDelivery: false }
 const EMPTY_VAR_FORM: VariationFormState = { name: '', size: '', color: '', price: '', stock: '' }
 
 function ProductCard({
@@ -100,6 +111,11 @@ function ProductCard({
                   ? `Variações (${(product as any).variationCount})`
                   : 'Variações'}
               </Text>
+            </View>
+          )}
+          {product.storeDelivery && (
+            <View style={card.lojaEntregaBadge}>
+              <Text style={card.lojaEntregaText}>Entrega própria</Text>
             </View>
           )}
         </View>
@@ -182,7 +198,7 @@ function stripAccents(s: string) {
 }
 
 function ProductModal({
-  visible, onClose, onSave, categories, categoriesLoading, initial, saving,
+  visible, onClose, onSave, categories, categoriesLoading, initial, saving, courierBox, ownDeliveryFee,
 }: {
   visible: boolean
   onClose: () => void
@@ -191,6 +207,8 @@ function ProductModal({
   categoriesLoading: boolean
   initial?: ProductFormState
   saving: boolean
+  courierBox: CourierBox
+  ownDeliveryFee: number | null
 }) {
   const { show: toast } = useToast()
   const [form, setForm] = useState<ProductFormState>(initial ?? EMPTY_FORM)
@@ -384,7 +402,11 @@ function ProductModal({
                           <TouchableOpacity
                             key={cat.id}
                             style={[modal.catBtn, active && modal.catBtnActive]}
-                            onPress={() => setForm((f) => ({ ...f, categoryId: cat.id }))}
+                            onPress={() => setForm((f) => {
+                              // Gás não vai no baú da moto: já sugere a entrega pela loja.
+                              const gas = f.categoryId !== cat.id && stripAccents(cat.name).includes('gas de cozinha')
+                              return { ...f, categoryId: cat.id, storeDelivery: gas ? true : f.storeDelivery }
+                            })}
                             activeOpacity={0.8}
                           >
                             <Text style={[modal.catBtnText, active && modal.catBtnTextActive]}>{cat.name}</Text>
@@ -500,6 +522,44 @@ function ProductModal({
                     Cliente leva {form.promoBuyQty} e paga {form.promoPayQty} — {Number(form.promoBuyQty) - Number(form.promoPayQty)} grátis a cada {form.promoBuyQty}.
                   </Text>
                 </View>
+              )}
+            </View>
+
+            <View style={modal.fieldWrap}>
+              <Text style={modal.fieldLabel}>ENTREGA</Text>
+              <View style={modal.bauCard}>
+                <View style={modal.bauIcon}>
+                  <Ionicons name="cube-outline" size={18} color={colors.primary} />
+                </View>
+                <Text style={modal.bauText}>
+                  <Text style={modal.bauTextStrong}>
+                    Baú do entregador: {courierBox.widthCm} × {courierBox.heightCm} × {courierBox.depthCm} cm · até {courierBox.maxKg} kg.
+                  </Text>
+                  {' '}Maior ou mais pesado que isso? Marque Entrega feita pela loja.
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[modal.lojaEntregaRow, form.storeDelivery && modal.lojaEntregaRowOn]}
+                onPress={() => setForm((f) => ({ ...f, storeDelivery: !f.storeDelivery }))}
+                activeOpacity={0.85}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={modal.lojaEntregaTitle}>Entrega feita pela loja</Text>
+                  <Text style={modal.lojaEntregaSub}>
+                    Para itens que não cabem no baú do entregador (gás, móveis, eletrodomésticos). Você mesmo entrega, cobrando a sua taxa.
+                  </Text>
+                </View>
+                <Switch
+                  value={form.storeDelivery}
+                  onValueChange={(v) => setForm((f) => ({ ...f, storeDelivery: v }))}
+                  trackColor={{ false: '#E0D8D0', true: colors.primary }}
+                  thumbColor="#fff"
+                />
+              </TouchableOpacity>
+              {form.storeDelivery && ownDeliveryFee === 0 && (
+                <Text style={[modal.fieldHint, { color: '#B45309' }]}>
+                  Sua taxa de entrega própria está como grátis. Para cobrar, ajuste em Loja → Taxa da sua entrega própria.
+                </Text>
               )}
             </View>
 
@@ -889,6 +949,8 @@ export default function StoreProductsScreen() {
   const [bulkStock, setBulkStock] = useState('')
   const [bulkActive, setBulkActive] = useState<'yes' | 'no' | 'unchanged'>('unchanged')
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [courierBox, setCourierBox] = useState<CourierBox>(DEFAULT_COURIER_BOX)
+  const [ownDeliveryFee, setOwnDeliveryFee] = useState<number | null>(null)
 
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -898,6 +960,7 @@ export default function StoreProductsScreen() {
         api.get('/products/my'),
       ])
       setStoreId(storeRes.data.id)
+      setOwnDeliveryFee(storeRes.data.ownDeliveryFee != null ? Number(storeRes.data.ownDeliveryFee) : null)
       setProducts(productsRes.data)
     } catch (err: any) {
       if (!silent) toast('Não foi possível carregar os produtos.', 'error')
@@ -918,6 +981,18 @@ export default function StoreProductsScreen() {
 
   useEffect(() => { fetchData() }, [fetchData])
   useEffect(() => { fetchCategories() }, [fetchCategories])
+  useEffect(() => {
+    api.get('/config/pricing')
+      .then((r) => { if (r.data?.courierBox) setCourierBox({ ...DEFAULT_COURIER_BOX, ...r.data.courierBox }) })
+      .catch(() => {})
+  }, [])
+  // A taxa pode ter mudado na aba Loja: relê ao abrir o cadastro (só para o aviso).
+  useEffect(() => {
+    if (!modalVisible) return
+    api.get('/stores/my')
+      .then((r) => setOwnDeliveryFee(r.data?.ownDeliveryFee != null ? Number(r.data.ownDeliveryFee) : null))
+      .catch(() => {})
+  }, [modalVisible])
 
   async function handleToggle(id: string) {
     try {
@@ -1052,6 +1127,7 @@ export default function StoreProductsScreen() {
     payload.stock = form.stock.trim() === '' ? null : parseInt(form.stock, 10)
     payload.maxDeliveryKm = form.maxDeliveryKm.trim() === '' ? null : parseFloat(form.maxDeliveryKm.replace(',', '.'))
     if (form.imageUrl) payload.imageUrl = form.imageUrl
+    payload.storeDelivery = form.storeDelivery
 
     // Promoção "Leve X Pague Y": envia os dois ou limpa (null). Valida X > Y.
     const hasPromo = form.promoBuyQty.trim() !== '' || form.promoPayQty.trim() !== ''
@@ -1094,7 +1170,9 @@ export default function StoreProductsScreen() {
 
   const activeCount = products.filter((p) => p.isActive).length
 
-  const editInitial: ProductFormState | undefined = editingProduct ? {
+  // Memoizado: o modal reinicia o formulário quando `initial` muda, e um objeto
+  // novo a cada render apagaria o que o lojista já digitou.
+  const editInitial = useMemo<ProductFormState | undefined>(() => editingProduct ? {
     name: editingProduct.name,
     categoryId: editingProduct.category?.id ?? '',
     basePrice: editingProduct.basePrice != null ? String(editingProduct.basePrice) : '',
@@ -1104,7 +1182,8 @@ export default function StoreProductsScreen() {
     maxDeliveryKm: (editingProduct as any).maxDeliveryKm != null ? String((editingProduct as any).maxDeliveryKm) : '',
     promoBuyQty: editingProduct.promoBuyQty != null ? String(editingProduct.promoBuyQty) : '',
     promoPayQty: editingProduct.promoPayQty != null ? String(editingProduct.promoPayQty) : '',
-  } : undefined
+    storeDelivery: !!editingProduct.storeDelivery,
+  } : undefined, [editingProduct])
 
   return (
     <View style={styles.container}>
@@ -1241,6 +1320,8 @@ export default function StoreProductsScreen() {
         categoriesLoading={categoriesLoading}
         initial={editInitial}
         saving={saving}
+        courierBox={courierBox}
+        ownDeliveryFee={ownDeliveryFee}
       />
 
       <VariationsModal
@@ -1413,6 +1494,22 @@ const modal = StyleSheet.create({
     backgroundColor: '#DCFCE7', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9,
   },
   promoPreviewText: { flex: 1, fontSize: 12, color: '#15803D', fontWeight: '700', lineHeight: 16 },
+  bauCard: {
+    ...relevo.card,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderRadius: 12, padding: 12, marginBottom: 10,
+  },
+  bauIcon: { ...relevo.icone, width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  bauText: { flex: 1, fontSize: 12, color: '#6B5A50', lineHeight: 17 },
+  bauTextStrong: { fontWeight: '800', color: '#1A0A00' },
+  lojaEntregaRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: '#EDE5DF',
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  lojaEntregaRowOn: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  lojaEntregaTitle: { fontSize: 14, fontWeight: '800', color: '#1A0A00' },
+  lojaEntregaSub: { fontSize: 12, color: '#6B5A50', lineHeight: 16, marginTop: 3 },
   saveBtn: {
     ...relevo.botao,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -1515,11 +1612,13 @@ const card = StyleSheet.create({
   image: { width: '100%', height: 90 },
   imagePlaceholder: { height: 90, backgroundColor: '#FFF0EB', alignItems: 'center', justifyContent: 'center' },
   body: { padding: 12 },
-  topRow: { flexDirection: 'row', gap: 6, marginBottom: 6 },
+  topRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
   categoryBadge: { backgroundColor: '#F0EBE5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   categoryText: { fontSize: 10, fontWeight: '700', color: '#7A6A60' },
   variationsBadge: { backgroundColor: '#EDE9FE', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   variationsText: { fontSize: 10, fontWeight: '700', color: '#7C3AED' },
+  lojaEntregaBadge: { backgroundColor: colors.primaryLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  lojaEntregaText: { fontSize: 10, fontWeight: '700', color: colors.primaryDark },
   name: { fontSize: 14, fontWeight: '800', color: '#1A0A00', lineHeight: 18, marginBottom: 8 },
   nameInactive: { color: '#9A8880' },
   blockedBox: {

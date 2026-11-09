@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, ChevronRight, Clock, MapPin, Minus, Plus, ShoppingCart, Package, Star } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronRight, Clock, MapPin, Minus, Plus, ShoppingCart, Package, Star, Truck } from 'lucide-react'
 import { useCartStore } from '@/stores/cart'
 import { promoLabel } from '@/lib/promo'
 import { useAuth } from '@/hooks/useAuth'
@@ -19,6 +19,7 @@ interface Product {
   basePrice?: number | string | null
   stock?: number | null; hasVariations?: boolean
   promoBuyQty?: number | null; promoPayQty?: number | null
+  storeDelivery?: boolean
   avgRating?: number | null; reviewCount?: number; soldCount?: number
   variations?: Variation[]; category?: Category | null
 }
@@ -143,6 +144,7 @@ export function ProductClient({
       productId: product.id, variationId: selectedVar?.id, name: product.name,
       price, quantity: qty, imageUrl: product.imageUrl ?? undefined, variationName: selectedVar?.name,
       promoBuyQty: product.promoBuyQty, promoPayQty: product.promoPayQty,
+      storeDelivery: !!product.storeDelivery,
     }, user?.id)
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
@@ -199,6 +201,13 @@ export function ProductClient({
               )}
 
               <div className={styles.price}>{fmtBRL(price)}</div>
+
+              {product.storeDelivery && (
+                <div className={styles.storeDeliveryNote}>
+                  <Truck size={15} />
+                  <span><strong>Entrega pela loja</strong> · item grande, a própria {store.name} leva até você.</span>
+                </div>
+              )}
 
               {promoLabel(product.promoBuyQty, product.promoPayQty) && (
                 <div style={{

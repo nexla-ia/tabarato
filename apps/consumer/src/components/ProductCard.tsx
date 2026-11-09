@@ -52,6 +52,11 @@ export function ProductCard({ product, onAdd, onPress }: Props) {
         {product.description ? (
           <Text style={styles.description} numberOfLines={2}>{product.description}</Text>
         ) : null}
+        {product.storeDelivery && (
+          <View style={styles.lojaEntregaTag}>
+            <Text style={styles.lojaEntregaTagText}>Entrega pela loja</Text>
+          </View>
+        )}
         <View style={styles.footer}>
           <Text style={[styles.price, outOfStock && styles.textMuted]}>{price}</Text>
           {outOfStock ? (
@@ -116,6 +121,11 @@ const styles = StyleSheet.create({
   info: { flex: 1, padding: 10, justifyContent: 'space-between' },
   name: { fontSize: 14, fontWeight: '600', color: colors.text },
   description: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  lojaEntregaTag: {
+    alignSelf: 'flex-start', marginTop: 4,
+    backgroundColor: colors.primaryLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+  },
+  lojaEntregaTagText: { fontSize: 10, fontWeight: '700', color: colors.primaryDark },
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
   price: { fontSize: 14, fontWeight: '700', color: colors.primary },
   addBtn: {

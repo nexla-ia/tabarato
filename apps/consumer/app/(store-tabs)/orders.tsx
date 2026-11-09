@@ -9,7 +9,7 @@ import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 import { Relevo } from '../../src/components/Relevo'
 import { useToast } from '../../src/components/Toast'
 
-type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED'
+type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'PICKED_UP' | 'DELIVERED' | 'CANCELLED'
 
 interface OrderItem {
   name: string
@@ -32,6 +32,8 @@ interface Order {
   status: OrderStatus
   deliveryCourier?: string
   isPickup: boolean
+  // Item que não cabe no baú: a própria loja entrega (sem entregador do app).
+  isStoreDelivery: boolean
   // A busca por entregador estourou o tempo: a loja precisa reanunciar.
   matchingExpired: boolean
 }
@@ -41,6 +43,7 @@ const STATUS_MAP: Record<OrderStatus, { label: string; color: string; bg: string
   CONFIRMED: { label: 'Confirmado', color: '#2563EB', bg: '#DBEAFE', icon: 'checkmark-circle-outline' },
   PREPARING: { label: 'Preparando', color: '#7C3AED', bg: '#EDE9FE', icon: 'flame-outline' },
   READY:     { label: 'Pronto',     color: '#059669', bg: '#D1FAE5', icon: 'bag-check-outline' },
+  PICKED_UP: { label: 'Saiu para entrega', color: '#0284C7', bg: '#E0F2FE', icon: 'bicycle-outline' },
   DELIVERED: { label: 'Entregue',   color: '#16A34A', bg: '#DCFCE7', icon: 'checkmark-done-outline' },
   CANCELLED: { label: 'Cancelado',  color: '#DC2626', bg: '#FEE2E2', icon: 'close-circle-outline' },
 }
@@ -51,6 +54,7 @@ const FILTERS: { key: OrderStatus | 'ALL'; label: string }[] = [
   { key: 'CONFIRMED', label: 'Confirmados' },
   { key: 'PREPARING', label: 'Preparando' },
   { key: 'READY',     label: 'Prontos' },
+  { key: 'PICKED_UP', label: 'Em entrega' },
   { key: 'DELIVERED', label: 'Entregues' },
 ]
 
@@ -59,6 +63,7 @@ const ACTION_STATUS: Record<string, OrderStatus> = {
   reject:        'CANCELLED',
   prepare:       'PREPARING',
   ready:         'READY',
+  'out-for-delivery': 'PICKED_UP',
   'cancel-store':'CANCELLED',
 }
 
@@ -102,6 +107,7 @@ function transformOrder(raw: any): Order {
     status: raw.status,
     deliveryCourier: raw.delivery?.courier?.user?.name ?? undefined,
     isPickup: raw.fulfillmentType === 'PICKUP',
+    isStoreDelivery: raw.fulfillmentType === 'STORE_DELIVERY',
     matchingExpired: Boolean(raw.delivery?.matchingExpired),
   }
 }
@@ -167,6 +173,12 @@ function OrderCard({ order, onAction, onPrint, flash, reannouncing }: {
                 <Text style={[card.badgeText, { color: '#FF5500' }]}>Retirada</Text>
               </View>
             )}
+            {order.isStoreDelivery && (
+              <View style={[card.badge, { backgroundColor: '#FFF0EB' }]}>
+                <Ionicons name="cube" size={11} color="#FF5500" />
+                <Text style={[card.badgeText, { color: '#FF5500' }]}>Entrega própria</Text>
+              </View>
+            )}
           </View>
           <View style={card.headerRight}>
             <Text style={card.total}>R$ {Number(order.total).toFixed(2)}</Text>
@@ -194,7 +206,7 @@ function OrderCard({ order, onAction, onPrint, flash, reannouncing }: {
               ))}
               <View style={card.itemRow}>
                 <Text style={card.itemQty} />
-                <Text style={[card.itemName, { color: '#9A8880' }]}>{order.isPickup ? 'Retirada na loja' : 'Taxa de entrega'}</Text>
+                <Text style={[card.itemName, { color: '#9A8880' }]}>{order.isPickup ? 'Retirada na loja' : order.isStoreDelivery ? 'Sua taxa de entrega' : 'Taxa de entrega'}</Text>
                 <Text style={[card.itemPrice, { color: '#9A8880' }]}>{order.isPickup ? 'sem taxa' : `R$ ${Number(order.deliveryFee).toFixed(2)}`}</Text>
               </View>
             </View>
@@ -219,7 +231,7 @@ function OrderCard({ order, onAction, onPrint, flash, reannouncing }: {
             ) : null}
 
             {/* Conversar com o cliente (chat em tempo real) — só em pedido ativo */}
-            {['PENDING', 'CONFIRMED', 'PREPARING', 'READY'].includes(order.status) && (
+            {(['PENDING', 'CONFIRMED', 'PREPARING', 'READY'].includes(order.status) || (order.isStoreDelivery && order.status === 'PICKED_UP')) && (
               <TouchableOpacity
                 style={card.chatBtn}
                 onPress={() => router.push(`/chat?orderId=${order.id}&peer=${encodeURIComponent('o cliente')}` as any)}
@@ -300,6 +312,27 @@ function OrderCard({ order, onAction, onPrint, flash, reannouncing }: {
                   <Text style={[card.actionBtnText, { color: '#fff' }]}>Confirmar retirada</Text>
                 </Relevo>
               </>
+            ) : order.isStoreDelivery ? (
+              <>
+                <View style={[card.courierBadge, { backgroundColor: '#FFF0EB', borderColor: '#FFD9BF' }]}>
+                  <Ionicons name="cube" size={14} color="#FF5500" />
+                  <Text style={[card.courierBadgeText, { color: '#FF5500' }]}>Você entrega este pedido</Text>
+                </View>
+                <Relevo
+                  style={[card.actionBtn, card.actionBtnFull, card.actionBtnBlue, { marginTop: 0 }]}
+                  onPress={() => onAction(order.id, 'out-for-delivery')}
+                >
+                  <Ionicons name="bicycle-outline" size={16} color="#fff" />
+                  <Text style={[card.actionBtnText, { color: '#fff' }]}>Saiu para entrega</Text>
+                </Relevo>
+                <Relevo
+                  style={[card.actionBtn, card.actionBtnFull, card.actionBtnGreen, { marginTop: 0 }]}
+                  onPress={() => onAction(order.id, 'confirm-pickup')}
+                >
+                  <Ionicons name="checkmark-done-outline" size={16} color="#fff" />
+                  <Text style={[card.actionBtnText, { color: '#fff' }]}>Confirmar entrega</Text>
+                </Relevo>
+              </>
             ) : order.deliveryCourier ? (
               <View style={card.courierBadge}>
                 <Ionicons name="bicycle" size={14} color="#0284C7" />
@@ -343,6 +376,21 @@ function OrderCard({ order, onAction, onPrint, flash, reannouncing }: {
             >
               <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
               <Text style={[card.actionBtnText, { color: '#DC2626' }]}>Cancelar pedido</Text>
+            </Relevo>
+          </View>
+        )}
+        {order.status === 'PICKED_UP' && order.isStoreDelivery && (
+          <View style={{ gap: 8, marginTop: 14 }}>
+            <View style={[card.courierBadge, { marginTop: 0 }]}>
+              <Ionicons name="bicycle" size={14} color="#0284C7" />
+              <Text style={card.courierBadgeText}>A caminho do cliente</Text>
+            </View>
+            <Relevo
+              style={[card.actionBtn, card.actionBtnFull, card.actionBtnGreen, { marginTop: 0 }]}
+              onPress={() => onAction(order.id, 'confirm-pickup')}
+            >
+              <Ionicons name="checkmark-done-outline" size={16} color="#fff" />
+              <Text style={[card.actionBtnText, { color: '#fff' }]}>Confirmar entrega</Text>
             </Relevo>
           </View>
         )}
@@ -512,8 +560,8 @@ export default function StoreOrdersScreen() {
 
     try {
       await api.patch(`/orders/${id}/status`, { status: newStatus })
-      // Show undo toast for 10 seconds
-      if (previousStatus) {
+      // Show undo toast for 10 seconds (saída para entrega não volta atrás)
+      if (previousStatus && newStatus !== 'PICKED_UP') {
         if (undoTimer.current) clearTimeout(undoTimer.current)
         setUndoState({ orderId: id, previousStatus, label: STATUS_MAP[newStatus]?.label ?? newStatus })
         undoTimer.current = setTimeout(() => setUndoState(null), 10_000)
@@ -564,7 +612,7 @@ export default function StoreOrdersScreen() {
     // eles o mais ANTIGO no topo (FIFO — quem está esperando há mais tempo é atendido
     // primeiro). Finalizados (entregue/cancelado) vão depois, do mais recente pro mais
     // antigo. Antes a lista vinha só "mais recente no topo" e o lojista se perdia.
-    const ACTIVE: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY']
+    const ACTIVE: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP']
     const isActive = (s: OrderStatus) => ACTIVE.includes(s)
     list = list.slice().sort((a, b) => {
       const aa = isActive(a.status), ba = isActive(b.status)
@@ -596,6 +644,9 @@ export default function StoreOrdersScreen() {
     }
   }
 
+  // O mesmo modal de código serve à retirada e à entrega feita pela loja.
+  const pickupIsDelivery = !!orders.find((o) => o.id === pickupOrderId)?.isStoreDelivery
+
   async function handleConfirmPickup() {
     if (!pickupOrderId || pickupCode.length < 4) return
     setPickupBusy(true)
@@ -603,7 +654,7 @@ export default function StoreOrdersScreen() {
       await api.post(`/orders/${pickupOrderId}/confirm-pickup`, { code: pickupCode })
       setPickupOrderId(null)
       setPickupCode('')
-      toast('Retirada confirmada!', 'success')
+      toast(pickupIsDelivery ? 'Entrega confirmada!' : 'Retirada confirmada!', 'success')
       fetchOrders(true)
     } catch (err: any) {
       toast(err.response?.data?.message ?? 'Código inválido. Confira com o cliente.', 'error')
@@ -791,10 +842,14 @@ export default function StoreOrdersScreen() {
               <View style={rf.handleBar} />
             </View>
             <View style={[rf.iconWrap, { backgroundColor: '#FFF0EB' }]}>
-              <Ionicons name="storefront" size={34} color="#FF5500" />
+              <Ionicons name={pickupIsDelivery ? 'cube' : 'storefront'} size={34} color="#FF5500" />
             </View>
-            <Text style={rf.title}>Confirmar retirada</Text>
-            <Text style={rf.sub}>Peça ao cliente o código de retirada (aparece no app dele) e digite abaixo.</Text>
+            <Text style={rf.title}>{pickupIsDelivery ? 'Confirmar entrega' : 'Confirmar retirada'}</Text>
+            <Text style={rf.sub}>
+              {pickupIsDelivery
+                ? 'Peça ao cliente o código de 6 dígitos (aparece no app dele) e digite abaixo.'
+                : 'Peça ao cliente o código de retirada (aparece no app dele) e digite abaixo.'}
+            </Text>
 
             <TextInput
               style={rf.codeInput}
@@ -821,7 +876,7 @@ export default function StoreOrdersScreen() {
               >
                 {pickupBusy
                   ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={rf.confirmBtnText}>Confirmar retirada</Text>
+                  : <Text style={rf.confirmBtnText}>{pickupIsDelivery ? 'Confirmar entrega' : 'Confirmar retirada'}</Text>
                 }
               </Relevo>
             </View>

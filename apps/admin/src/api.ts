@@ -236,6 +236,11 @@ export interface Pricing {
   adMinDays: number
   adSlots: number
   adPayDeadlineDays: number
+  // Baú dos entregadores (mostrado ao lojista no cadastro de produto).
+  courierBoxWidthCm: number
+  courierBoxHeightCm: number
+  courierBoxDepthCm: number
+  courierBoxMaxKg: number
 }
 
 export type AdStatus = 'PENDING_REVIEW' | 'REJECTED' | 'AWAITING_PAYMENT' | 'EXPIRED_UNPAID' | 'PAID' | 'CANCELLED'

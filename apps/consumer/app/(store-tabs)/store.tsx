@@ -93,6 +93,7 @@ export default function StoreSettingsScreen() {
   const [address, setAddress] = useState('')
   const [deliveryRadius, setDeliveryRadius] = useState('5')
   const [prepTime, setPrepTime] = useState('30')
+  const [ownDeliveryFee, setOwnDeliveryFee] = useState('0')
   const [maxConcurrent, setMaxConcurrent] = useState('')
   const [exceptions, setExceptions] = useState<{ date: string; closed: boolean }[]>([])
   const [addingException, setAddingException] = useState(false)
@@ -206,6 +207,7 @@ export default function StoreSettingsScreen() {
       setAddress(data.address ?? '')
       setDeliveryRadius(String(data.deliveryRadiusKm ?? 5))
       setPrepTime(String(data.prepTimeMin ?? 30))
+      setOwnDeliveryFee(Number(data.ownDeliveryFee ?? 0).toFixed(2).replace('.', ','))
       setMaxConcurrent(data.maxConcurrentOrders != null ? String(data.maxConcurrentOrders) : '')
       if (Array.isArray(data.categories)) setSelectedCategoryIds(data.categories.map((c: Category) => c.id))
       if (Array.isArray(data.scheduleExceptions)) setExceptions(data.scheduleExceptions)
@@ -412,6 +414,11 @@ export default function StoreSettingsScreen() {
         return
       }
     }
+    const ownFee = ownDeliveryFee.trim() === '' ? 0 : Number(ownDeliveryFee.replace(',', '.'))
+    if (!Number.isFinite(ownFee) || ownFee < 0 || ownFee > 1000) {
+      toast('Taxa da sua entrega própria: use um valor de R$ 0 a R$ 1.000.', 'error')
+      return
+    }
     setSaving(true)
     try {
       // Só envia fotos que são URLs válidas — uma entrada inválida (uri local /
@@ -424,6 +431,7 @@ export default function StoreSettingsScreen() {
         address: address.trim() || undefined,
         deliveryRadiusKm: Number(deliveryRadius) || 5,
         prepTimeMin: Number(prepTime) || 30,
+        ownDeliveryFee: Math.round(ownFee * 100) / 100,
         openingHours: schedule,
         scheduleExceptions: exceptions,
         photos: safePhotos,
@@ -640,6 +648,16 @@ export default function StoreSettingsScreen() {
             <Field label="Tempo de preparo (min)" value={prepTime} onChangeText={setPrepTime} keyboardType="numeric" />
           </View>
         </View>
+        <Field
+          label="Taxa da sua entrega própria (R$)"
+          value={ownDeliveryFee}
+          onChangeText={setOwnDeliveryFee}
+          placeholder="0,00 = grátis"
+          keyboardType="numeric"
+        />
+        <Text style={styles.ownFeeHint}>
+          Cobrada do cliente nos pedidos com produtos de Entrega feita pela loja. O valor é todo seu.
+        </Text>
       </View>
 
 
@@ -1125,6 +1143,7 @@ const styles = StyleSheet.create({
   version: { textAlign: 'center', color: '#C8B8B0', fontSize: 12, marginTop: 16 },
 
   photosHint: { fontSize: 12, color: '#9A8880', marginBottom: 12, lineHeight: 17 },
+  ownFeeHint: { fontSize: 11, color: '#9A8880', marginTop: -10, lineHeight: 16 },
 
   catWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   catChip: {

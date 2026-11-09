@@ -119,11 +119,12 @@ const rStyles = StyleSheet.create({
 })
 
 function ProductDetailModal({
-  product, storeId, storeName, visible, onClose, aoAdicionar,
+  product, storeId, storeName, ownDeliveryFee, visible, onClose, aoAdicionar,
 }: {
   product: Product | null
   storeId: string
   storeName: string
+  ownDeliveryFee?: number
   visible: boolean
   onClose: () => void
   /** Intercala o aviso de loja fechada antes de adicionar de fato. */
@@ -227,6 +228,18 @@ function ProductDetailModal({
                 <Ionicons name="pricetag" size={15} color="#15803D" />
                 <Text style={det.promoBannerText}>
                   {promoLabel(product.promoBuyQty, product.promoPayQty)} — leve {product.promoBuyQty} unidades e pague só {product.promoPayQty}!
+                </Text>
+              </View>
+            )}
+
+            {product.storeDelivery && (
+              <View style={det.lojaEntregaBanner}>
+                <Ionicons name="cube-outline" size={15} color={PRIMARY} />
+                <Text style={det.lojaEntregaText}>
+                  Entrega pela loja: item grande, a própria loja entrega
+                  {ownDeliveryFee != null
+                    ? ownDeliveryFee > 0 ? ` (taxa de R$ ${ownDeliveryFee.toFixed(2).replace('.', ',')})` : ' (grátis)'
+                    : ''}.
                 </Text>
               </View>
             )}
@@ -373,6 +386,12 @@ const det = StyleSheet.create({
     marginBottom: 20,
   },
   promoBannerText: { flex: 1, fontSize: 13, fontWeight: '800', color: '#15803D', lineHeight: 17 },
+  lojaEntregaBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.primaryLight, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: 20,
+  },
+  lojaEntregaText: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.primaryDark, lineHeight: 17 },
   section: { marginBottom: 24 },
   sectionLabel: { fontSize: 11, fontWeight: '700', color: MUTED, letterSpacing: 0.6, marginBottom: 12 },
   description: { fontSize: 14, color: TEXT, lineHeight: 22 },
@@ -636,6 +655,7 @@ export default function StoreScreen() {
         product={selectedProduct}
         storeId={id}
         storeName={store.name}
+        ownDeliveryFee={store.ownDeliveryFee != null ? Number(store.ownDeliveryFee) : undefined}
         onClose={() => setSelectedProduct(null)}
         aoAdicionar={comAvisoSeFechada}
       />

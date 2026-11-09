@@ -35,6 +35,10 @@ const PAYMENT_LABEL: Record<string, string> = {
   PIX: 'PIX', CREDIT_CARD: 'Crédito', DEBIT_CARD: 'Débito', WALLET: 'Carteira',
 }
 
+const FULFILLMENT_LABEL: Record<string, string> = {
+  DELIVERY: 'Entregador do app', PICKUP: 'Retirada na loja', STORE_DELIVERY: 'Entrega própria da loja',
+}
+
 const FILTERS: { key: OrderStatus; label: string }[] = [
   { key: 'ALL',       label: 'Todos'      },
   { key: 'PENDING',   label: 'Aguardando' },
@@ -52,6 +56,7 @@ interface Order {
   subtotal: number
   deliveryFee: number
   discount: number
+  fulfillmentType?: 'DELIVERY' | 'PICKUP' | 'STORE_DELIVERY'
   notes?: string
   createdAt: string
   user: { name: string; email: string; phone?: string }
@@ -236,6 +241,9 @@ export function Orders() {
               <Row label="Cliente" value={selected.user.name} />
               {selected.user.phone && <Row label="Telefone" value={selected.user.phone} />}
               <Row label="Loja" value={selected.store.name} />
+              {selected.fulfillmentType && (
+                <Row label="Entrega" value={FULFILLMENT_LABEL[selected.fulfillmentType] ?? selected.fulfillmentType} />
+              )}
               {selected.payment && (
                 <>
                   <Row label="Pagamento" value={PAYMENT_LABEL[selected.payment.method] ?? selected.payment.method} />

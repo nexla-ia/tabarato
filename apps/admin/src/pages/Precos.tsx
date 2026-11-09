@@ -12,8 +12,8 @@ const SANS = "'DM Sans', sans-serif"
 
 const money = (v: number) => `R$ ${(Math.round(v * 100) / 100).toFixed(2).replace('.', ',')}`
 
-function Field({ label, hint, value, onChange, suffix }: {
-  label: string; hint?: string; value: number; onChange: (v: number) => void; suffix?: string
+function Field({ label, hint, value, onChange, suffix, step = '0.01' }: {
+  label: string; hint?: string; value: number; onChange: (v: number) => void; suffix?: string; step?: string
 }) {
   return (
     <div style={{ marginBottom: 14 }}>
@@ -21,7 +21,7 @@ function Field({ label, hint, value, onChange, suffix }: {
       {hint && <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 6 }}>{hint}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <input
-          type="number" step="0.01" min="0" value={Number.isFinite(value) ? value : 0}
+          type="number" step={step} min="0" value={Number.isFinite(value) ? value : 0}
           onChange={(e) => onChange(parseFloat(e.target.value))}
           style={{ width: 140, border: `1.5px solid ${BORDER}`, borderRadius: 9, padding: '9px 12px', fontSize: 14, color: TEXT, fontFamily: SANS }}
         />
@@ -53,6 +53,8 @@ export function Precos() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (k: keyof Pricing) => (v: number) => setP((cur) => (cur ? { ...cur, [k]: v } : cur))
+  // Medidas do baú: a API só aceita inteiros.
+  const setInt = (k: keyof Pricing) => (v: number) => set(k)(Math.round(v))
 
   async function save() {
     if (!p) return
@@ -118,6 +120,21 @@ export function Precos() {
               onChange={set('maxDeliveryValue')}
               suffix="R$"
             />
+          </Section>
+
+          <Section title="Baú do entregador">
+            <div style={{ fontSize: 11.5, color: MUTED, marginTop: -6, marginBottom: 12, lineHeight: 1.5 }}>
+              O lojista vê essas medidas ao cadastrar produto. O que não cabe no baú ele marca como
+              "Entrega feita pela loja".
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const }}>
+              <Field label="Largura" value={p.courierBoxWidthCm} onChange={setInt('courierBoxWidthCm')} suffix="cm" step="1" />
+              <Field label="Altura" value={p.courierBoxHeightCm} onChange={setInt('courierBoxHeightCm')} suffix="cm" step="1" />
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const }}>
+              <Field label="Profundidade" value={p.courierBoxDepthCm} onChange={setInt('courierBoxDepthCm')} suffix="cm" step="1" />
+              <Field label="Peso máximo" value={p.courierBoxMaxKg} onChange={setInt('courierBoxMaxKg')} suffix="kg" step="1" />
+            </div>
           </Section>
 
           <Section title="Anúncios na vitrine">

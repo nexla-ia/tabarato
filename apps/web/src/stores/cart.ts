@@ -12,6 +12,8 @@ export interface CartItem {
   variationName?: string
   promoBuyQty?: number | null
   promoPayQty?: number | null
+  /** Item que a própria loja entrega (não cabe no baú) — muda a cotação do frete da loja. */
+  storeDelivery?: boolean
 }
 
 export interface AppliedCoupon {
@@ -70,7 +72,9 @@ export const useCartStore = create<CartState>()(
         )
         const newItems = existingIdx === -1
           ? [...store.items, item]
-          : store.items.map((i, ix) => (ix === existingIdx ? { ...i, quantity: i.quantity + item.quantity } : i))
+          : store.items.map((i, ix) => (ix === existingIdx
+            ? { ...i, quantity: i.quantity + item.quantity, storeDelivery: item.storeDelivery ?? i.storeDelivery }
+            : i))
 
         set({
           userId: uid,
