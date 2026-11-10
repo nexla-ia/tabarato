@@ -144,6 +144,27 @@ describe('AsaasService', () => {
       expect(a.isWebhookAuthorized('tamanho-diferente')).toBe(false)
       expect(a.isWebhookAuthorized(undefined)).toBe(false)
     })
+    it('token próprio por webhook: cada endpoint só aceita o dele', () => {
+      const a = makeAsaas({ ASAAS_WEBHOOK_TOKEN_PAYMENTS: 'tok-cobranca', ASAAS_WEBHOOK_TOKEN_TRANSFERS: 'tok-transfer' })
+      expect(a.isWebhookAuthorized('tok-cobranca', 'payments')).toBe(true)
+      expect(a.isWebhookAuthorized('tok-transfer', 'payments')).toBe(false)
+      expect(a.isWebhookAuthorized('tok-transfer', 'transfers')).toBe(true)
+      expect(a.isWebhookAuthorized('tok-cobranca', 'transfers')).toBe(false)
+      // validação de saque sem token próprio usa o das transferências
+      expect(a.isWebhookAuthorized('tok-transfer', 'authorize')).toBe(true)
+      expect(a.isWebhookAuthorized('tok-cobranca', 'authorize')).toBe(false)
+    })
+    it('validação de saque com token próprio', () => {
+      const a = makeAsaas({ ASAAS_WEBHOOK_TOKEN_TRANSFERS: 'tok-transfer', ASAAS_WEBHOOK_TOKEN_AUTHORIZE: 'tok-saque' })
+      expect(a.isWebhookAuthorized('tok-saque', 'authorize')).toBe(true)
+      expect(a.isWebhookAuthorized('tok-transfer', 'authorize')).toBe(false)
+    })
+    it('token único antigo continua valendo para todos', () => {
+      const a = makeAsaas({ ASAAS_WEBHOOK_TOKEN: 'unico' })
+      expect(a.isWebhookAuthorized('unico', 'payments')).toBe(true)
+      expect(a.isWebhookAuthorized('unico', 'transfers')).toBe(true)
+      expect(a.isWebhookAuthorized('unico', 'authorize')).toBe(true)
+    })
     it('FAIL-CLOSED em produção: sem token configurado → rejeita', () => {
       expect(makeAsaas({ NODE_ENV: 'production' }).isWebhookAuthorized('qualquer')).toBe(false)
     })

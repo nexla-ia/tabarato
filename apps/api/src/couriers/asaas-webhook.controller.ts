@@ -6,7 +6,7 @@ import { AsaasService } from '../payments/asaas.service'
  * Webhook PÚBLICO do Asaas (sem JWT) — recebe o status das transferências PIX de
  * repasse ao entregador. Configure a URL no painel do Asaas apontando para
  *   POST https://<api>/api/couriers/asaas/webhook
- * e o token de autenticação em ASAAS_WEBHOOK_TOKEN.
+ * e o token de autenticação em ASAAS_WEBHOOK_TOKEN_TRANSFERS (ou ASAAS_WEBHOOK_TOKEN).
  */
 @Controller('couriers/asaas')
 export class AsaasWebhookController {
@@ -18,7 +18,7 @@ export class AsaasWebhookController {
   @Post('webhook')
   @HttpCode(200)
   async webhook(@Headers('asaas-access-token') token: string, @Body() body: any) {
-    if (!this.asaas.isWebhookAuthorized(token)) {
+    if (!this.asaas.isWebhookAuthorized(token, 'transfers')) {
       throw new UnauthorizedException('Webhook token inválido.')
     }
     const event: string | undefined = body?.event
@@ -42,7 +42,7 @@ export class AsaasWebhookController {
   @Post('authorize')
   @HttpCode(200)
   async authorize(@Headers('asaas-access-token') token: string, @Body() body: any) {
-    if (!this.asaas.isWebhookAuthorized(token)) {
+    if (!this.asaas.isWebhookAuthorized(token, 'authorize')) {
       throw new UnauthorizedException('Token inválido.')
     }
     return this.couriers.authorizeAsaasTransfer(body)

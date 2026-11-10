@@ -352,12 +352,22 @@ export class AsaasService {
    * produção: sem token configurado, rejeita (não deixa o webhook anônimo). Comparação
    * timing-safe pra não vazar o token por análise de tempo.
    */
-  isWebhookAuthorized(token: string | undefined): boolean {
-    const expected = this.config.get<string>('ASAAS_WEBHOOK_TOKEN')
+  isWebhookAuthorized(token: string | undefined, kind: 'payments' | 'transfers' | 'authorize' = 'payments'): boolean {
+    // O painel do Asaas gera um token PRÓPRIO para cada webhook. Cada endpoint aceita o
+    // token dele; ASAAS_WEBHOOK_TOKEN segue valendo como token único (configuração antiga).
+    const specific = {
+      payments: ['ASAAS_WEBHOOK_TOKEN_PAYMENTS'],
+      transfers: ['ASAAS_WEBHOOK_TOKEN_TRANSFERS'],
+      // A validação de saque pode ter token próprio; sem ele, usa o das transferências.
+      authorize: ['ASAAS_WEBHOOK_TOKEN_AUTHORIZE', 'ASAAS_WEBHOOK_TOKEN_TRANSFERS'],
+    }[kind]
+    const expected = [...specific, 'ASAAS_WEBHOOK_TOKEN']
+      .map((k) => this.config.get<string>(k))
+      .find((v) => !!v)
     if (!expected) {
       // Em produção, sem segredo configurado = fecha (igual ao webhook do Mercado Pago).
       if (this.config.get<string>('NODE_ENV') === 'production') {
-        this.logger.error('ASAAS_WEBHOOK_TOKEN ausente em produção — webhook rejeitado')
+        this.logger.error(`Token do webhook Asaas (${kind}) ausente em produção — webhook rejeitado`)
         return false
       }
       return true // dev/sandbox: sem token, não bloqueia

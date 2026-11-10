@@ -593,7 +593,7 @@ export class PaymentsService {
    * idempotente). O header asaas-access-token é validado aqui.
    */
   async handleAsaasWebhook(token: string | undefined, body: any) {
-    if (!this.asaas.isWebhookAuthorized(token)) {
+    if (!this.asaas.isWebhookAuthorized(token, 'payments')) {
       this.logger.warn('Asaas webhook (cobrança): token inválido — ignorando')
       return
     }
