@@ -11,6 +11,24 @@ describe('AsaasService', () => {
     expect(makeAsaas({}).enabled).toBe(false)
   })
 
+  describe('ambiente (produção x sandbox) sai da chave', () => {
+    const PROD = 'https://api.asaas.com/v3'
+    const SANDBOX = 'https://api-sandbox.asaas.com/v3'
+    it('chave de produção sem ASAAS_BASE_URL → produção (o erro de 13/11)', () => {
+      expect(makeAsaas({ ASAAS_API_KEY: '$aact_prod_abc' }).baseUrl).toBe(PROD)
+    })
+    it('chave de sandbox → sandbox', () => {
+      expect(makeAsaas({ ASAAS_API_KEY: '$aact_hmlg_abc' }).baseUrl).toBe(SANDBOX)
+    })
+    it('URL configurada do ambiente errado: segue a chave', () => {
+      expect(makeAsaas({ ASAAS_API_KEY: '$aact_prod_abc', ASAAS_BASE_URL: SANDBOX }).baseUrl).toBe(PROD)
+    })
+    it('chave sem prefixo conhecido: usa a URL configurada, senão sandbox', () => {
+      expect(makeAsaas({ ASAAS_API_KEY: 'x', ASAAS_BASE_URL: PROD }).baseUrl).toBe(PROD)
+      expect(makeAsaas({ ASAAS_API_KEY: 'x' }).baseUrl).toBe(SANDBOX)
+    })
+  })
+
   describe('flags de entrada (money-in)', () => {
     it('pixInEnabled: exige key E flag ligada', () => {
       expect(makeAsaas({ ASAAS_API_KEY: 'x', ASAAS_PIX_ENABLED: 'true' }).pixInEnabled).toBe(true)

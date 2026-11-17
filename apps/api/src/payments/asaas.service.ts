@@ -44,8 +44,27 @@ export class AsaasService {
     return this.pixInEnabled || this.cardInEnabled
   }
 
-  private get baseUrl(): string {
-    return this.config.get<string>('ASAAS_BASE_URL') || 'https://api-sandbox.asaas.com/v3'
+  private avisouAmbiente = false
+
+  /**
+   * Endereço da API. O ambiente sai da PRÓPRIA chave ($aact_prod_ = produção,
+   * $aact_hmlg_ = sandbox): chave de um ambiente no endereço do outro dá
+   * "A chave de API informada não pertence a este ambiente" — aconteceu em
+   * 13/11/2026 com a chave de produção e o ASAAS_BASE_URL sem configurar.
+   * ASAAS_BASE_URL só vale quando a chave não diz o ambiente.
+   */
+  get baseUrl(): string {
+    const PROD = 'https://api.asaas.com/v3'
+    const SANDBOX = 'https://api-sandbox.asaas.com/v3'
+    const key = this.config.get<string>('ASAAS_API_KEY') ?? ''
+    const configurada = this.config.get<string>('ASAAS_BASE_URL')?.replace(/\/$/, '')
+    const daChave = key.startsWith('$aact_prod_') ? PROD : key.startsWith('$aact_hmlg_') ? SANDBOX : null
+    if (!daChave) return configurada || SANDBOX
+    if (configurada && configurada !== daChave && !this.avisouAmbiente) {
+      this.avisouAmbiente = true
+      this.logger.warn(`ASAAS_BASE_URL (${configurada}) não é do ambiente da chave; usando ${daChave}.`)
+    }
+    return daChave
   }
 
   /** Chamada genérica à API do Asaas. Lança Error com a descrição do provedor quando !ok. */
