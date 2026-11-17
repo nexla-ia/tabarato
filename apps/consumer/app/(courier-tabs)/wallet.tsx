@@ -10,6 +10,7 @@ import { api } from '../../src/api/client'
 import { useToast } from '../../src/components/Toast'
 import { Relevo } from '../../src/components/Relevo'
 import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
+import { MarcaT } from '../../src/components/MarcaT'
 
 const PRIMARY = '#FF5500'
 const PRIMARY_LIGHT = '#FFF3EB'
@@ -184,7 +185,7 @@ export default function CourierWalletScreen() {
         >
           {/* Balance card */}
           <View style={styles.balanceCard}>
-            <View style={styles.balanceDecor} />
+            <MarcaT size={190} color="rgba(255,255,255,0.06)" style={{ top: -28, right: -18 }} />
             <Text style={styles.balanceLabel}>Saldo disponível</Text>
             <Text style={styles.balanceValue}>{fmtBRL(data?.balance ?? 0)}</Text>
             <Text style={styles.balanceSub}>Ganhos de entregas realizadas</Text>

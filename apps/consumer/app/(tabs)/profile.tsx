@@ -10,6 +10,7 @@ import { useToast } from '../../src/components/Toast'
 import { Relevo } from '../../src/components/Relevo'
 import { relevo } from '../../src/theme/relevo'
 import { VENDE_ANUNCIO_NO_APP } from '../../src/utils/ads'
+import { MarcaT } from '../../src/components/MarcaT'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -27,8 +28,7 @@ function GuestScreen() {
   return (
     <View style={guestStyles.container}>
       <View style={guestStyles.header}>
-        <View style={guestStyles.headerDecor1} />
-        <View style={guestStyles.headerDecor2} />
+        <MarcaT size={190} style={{ top: -30, right: -22 }} />
         <View style={guestStyles.iconWrap}>
           <Ionicons name="person-outline" size={44} color="#fff" />
         </View>
@@ -202,8 +202,7 @@ export default function ProfileScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerDecor1} />
-        <View style={styles.headerDecor2} />
+        <MarcaT size={190} style={{ top: -30, right: -22 }} />
 
         <TouchableOpacity style={styles.avatarWrap} activeOpacity={0.8} onPress={() => router.push('/edit-profile' as any)}>
           {user?.avatarUrl ? (

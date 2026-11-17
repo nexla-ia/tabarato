@@ -3,7 +3,8 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Image,
 } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
+import { StatusBar } from 'expo-status-bar'
+import { MarcaT } from '../../src/components/MarcaT'
 import { Ionicons } from '@expo/vector-icons'
 import { Link, router, useNavigation } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -139,19 +140,17 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
         {/* Header */}
-        <LinearGradient
-          colors={['#FF3D00', '#FF5500', '#FF7722']}
-          start={{ x: 0.2, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.header, { paddingTop: insets.top + 20 }]}
-        >
+        {/* Header claro: o logo laranja contrasta com o fundo, sem a caixa branca. */}
+        <StatusBar style="dark" />
+        <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+          <MarcaT size={260} color="rgba(255,85,0,0.05)" style={{ top: insets.top - 30, right: -60 }} />
           {canGoBack && (
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
-              <Ionicons name="arrow-back" size={20} color="#fff" />
+            <TouchableOpacity style={[styles.backBtn, { top: insets.top + 12 }]} onPress={() => router.back()} activeOpacity={0.8}>
+              <Ionicons name="arrow-back" size={20} color="#1A0A00" />
             </TouchableOpacity>
           )}
           <Image
-            source={require('../../assets/logo.png')}
+            source={require('../../assets/logo-transparente.png')}
             style={styles.logoImg}
             resizeMode="contain"
           />
@@ -160,9 +159,7 @@ export default function LoginScreen() {
               {isStore ? 'Painel do Lojista' : 'Área do Entregador'}
             </Text>
           )}
-        </LinearGradient>
-
-        <View style={styles.wave} />
+        </View>
 
         {/* Form */}
         <View style={styles.form}>
@@ -324,13 +321,15 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FF7722' },
+  container: { flex: 1, backgroundColor: '#FAF6F2' },
   scroll: { flexGrow: 1 },
 
   header: {
     alignItems: 'center',
     paddingTop: 72,
-    paddingBottom: 48,
+    paddingBottom: 8,
+    backgroundColor: '#FAF6F2',
+    overflow: 'hidden',
   },
   backBtn: {
     position: 'absolute',
@@ -339,16 +338,17 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: '#EDE5DF',
+    zIndex: 2,
   },
+  // logo-transparente.png é 1518×852 (≈ 1,78:1).
   logoImg: {
-    width: 200,
-    height: 200,
-    marginBottom: -40,
+    width: 248,
+    height: 139,
   },
   brand: {
     fontSize: 36,
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 0,
   },
-  slogan: { fontSize: 14, color: 'rgba(255,255,255,0.75)', marginTop: 4, fontStyle: 'italic' },
+  slogan: { fontSize: 14, fontWeight: '800', color: colors.primary, marginTop: 6, letterSpacing: 0.2 },
 
   wave: {
     height: 30,

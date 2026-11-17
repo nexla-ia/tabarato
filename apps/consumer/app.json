@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tá Barato",
     "slug": "tabarato-consumer",
-    "version": "1.0.2",
+    "version": "1.2.32",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -68,7 +68,7 @@
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "resize",
       "package": "com.tabarato.consumer",
-      "versionCode": 3,
+      "versionCode": 53,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",

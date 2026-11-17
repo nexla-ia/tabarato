@@ -12,6 +12,7 @@ import { Relevo } from '../../src/components/Relevo'
 import { useToast } from '../../src/components/Toast'
 import { STORE_TERMS_URL, STORE_TERMS_VERSION } from '../../src/links'
 import { AdPromoCard } from '../../src/components/AdPromoCard'
+import { MarcaT } from '../../src/components/MarcaT'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'PICKED_UP' | 'DELIVERED' | 'CANCELLED'
@@ -342,8 +343,7 @@ export default function StoreDashboard() {
     >
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <View style={styles.headerDecor1} />
-        <View style={styles.headerDecor2} />
+        <MarcaT size={200} style={{ top: -34, right: -26 }} />
 
         <View style={styles.topRow}>
           <View>
@@ -405,6 +405,19 @@ export default function StoreDashboard() {
             }
           </View>
         </View>
+
+        {/* A vitrine do app, do jeito que o cliente vê — sem precisar de conta de cliente. */}
+        {storeId && (
+          <TouchableOpacity
+            style={styles.verLojaBtn}
+            onPress={() => router.push(`/store/${storeId}`)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="eye-outline" size={17} color={colors.primary} />
+            <Text style={styles.verLojaTexto}>Ver minha loja no app</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Trava de pagamento: sem Mercado Pago conectado a loja não abre/recebe */}
@@ -797,6 +810,12 @@ const styles = StyleSheet.create({
   orderTime: { fontSize: 11, color: '#9A8880' },
 
   quickActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  verLojaBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#fff', borderRadius: 14, paddingVertical: 12, marginTop: 12,
+    borderBottomWidth: 3, borderBottomColor: 'rgba(0,0,0,0.12)',
+  },
+  verLojaTexto: { fontSize: 14, fontWeight: '800', color: colors.primary },
   quickBtn: {
     ...relevo.neutro,
     flex: 1, borderRadius: 14, paddingVertical: 16,

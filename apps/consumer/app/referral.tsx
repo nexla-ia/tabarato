@@ -9,6 +9,7 @@ import { colors } from '../src/theme/colors'
 import { useToast } from '../src/components/Toast'
 import { Relevo } from '../src/components/Relevo'
 import { relevo, LABIO_LARANJA } from '../src/theme/relevo'
+import { MarcaT } from '../src/components/MarcaT'
 
 const PRIMARY = colors.primary
 const TEXT = '#1A0A00'
@@ -63,7 +64,7 @@ export default function ReferralScreen() {
         <View style={styles.content}>
           {/* Hero */}
           <View style={styles.hero}>
-            <View style={styles.heroDecor} />
+            <MarcaT size={230} style={{ top: -22, alignSelf: 'center' }} />
             <Ionicons name="gift" size={48} color="#fff" style={{ marginBottom: 12 }} />
             <Text style={styles.heroTitle}>Ganhe 50 pontos{'\n'}por cada amigo!</Text>
             <Text style={styles.heroSub}>Seu amigo também ganha 50 pontos de boas-vindas</Text>

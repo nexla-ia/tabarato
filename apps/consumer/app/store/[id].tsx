@@ -17,6 +17,8 @@ import { useCartStore } from '../../src/stores/cart.store'
 import { Store, Product, ProductVariation } from '../../src/types'
 import { AppAlert } from '../../src/components/AppAlert'
 import { Relevo } from '../../src/components/Relevo'
+import { GaleriaFotos, VisualizadorFotos, fotosDoProduto } from '../../src/components/FotosProduto'
+import { useAuthStore } from '../../src/stores/auth.store'
 
 const PRIMARY = '#FF5500'
 const PRIMARY_LIGHT = '#FFF0EB'
@@ -119,8 +121,10 @@ const rStyles = StyleSheet.create({
 })
 
 function ProductDetailModal({
-  product, storeId, storeName, ownDeliveryFee, visible, onClose, aoAdicionar,
+  product, storeId, storeName, ownDeliveryFee, visible, onClose, aoAdicionar, soVer,
 }: {
+  /** Lojista olhando a vitrine: mostra tudo, mas sem adicionar ao carrinho. */
+  soVer?: boolean
   product: Product | null
   storeId: string
   storeName: string
@@ -134,6 +138,7 @@ function ProductDetailModal({
   const [selectedVariation, setSelectedVariation] = useState<ProductVariation | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [notes, setNotes] = useState('')
+  const [verFoto, setVerFoto] = useState<number | null>(null)
 
   const addItem = useCartStore((s) => s.addItem)
 
@@ -200,8 +205,8 @@ function ProductDetailModal({
 
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 140 }}>
           {/* Image */}
-          {product.imageUrl ? (
-            <Image source={{ uri: product.imageUrl }} style={det.image} resizeMode="cover" />
+          {fotosDoProduto(product).length > 0 ? (
+            <GaleriaFotos fotos={fotosDoProduto(product)} altura={280} onPress={setVerFoto} />
           ) : (
             <View style={det.imagePlaceholder}>
               <Ionicons name="cube-outline" size={64} color={PRIMARY} />
@@ -331,6 +336,12 @@ function ProductDetailModal({
 
         {/* Fixed bottom CTA */}
         <View style={[det.footer, { paddingBottom: insets.bottom + 16 }]}>
+          {soVer ? (
+            <View style={det.soVerAviso}>
+              <Ionicons name="eye-outline" size={18} color={PRIMARY} />
+              <Text style={det.soVerTexto}>Visualização do lojista: é assim que o cliente vê este produto.</Text>
+            </View>
+          ) : (
           <Relevo
             style={[det.addBtn, !canAdd && { opacity: 0.55 }]}
             onPress={handleAdd}
@@ -349,8 +360,17 @@ function ProductDetailModal({
               </Text>
             </View>
           </Relevo>
+          )}
         </View>
       </KeyboardAvoidingView>
+
+      <VisualizadorFotos
+        fotos={fotosDoProduto(product)}
+        inicial={verFoto ?? 0}
+        visivel={verFoto != null}
+        onFechar={() => setVerFoto(null)}
+        titulo={product.name}
+      />
     </Modal>
   )
 }
@@ -430,6 +450,13 @@ const det = StyleSheet.create({
   },
   addBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 
+  soVerAviso: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: PRIMARY_LIGHT, borderRadius: 14, borderWidth: 1, borderColor: '#FFD4BA',
+    paddingHorizontal: 14, paddingVertical: 14,
+  },
+  soVerTexto: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.primaryDark, lineHeight: 18 },
+
   notesWrap: { paddingHorizontal: 20, paddingBottom: 12 },
   notesLabel: { fontSize: 12, fontWeight: '700', color: '#9A8880', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   notesInput: {
@@ -442,7 +469,7 @@ const det = StyleSheet.create({
 export default function StoreScreen() {
   const insets = useSafeAreaInsets()
   const { id } = useLocalSearchParams<{ id: string }>()
-  const { data: store, isLoading } = useQuery({
+  const { data: store, isLoading, isError, refetch } = useQuery({
     queryKey: ['store', id],
     queryFn: () => fetchStore(id),
   })
@@ -454,6 +481,8 @@ export default function StoreScreen() {
 
   const addItem = useCartStore((s) => s.addItem)
   const itemCount = useCartStore((s) => s.itemCount())
+  // Lojista vê a vitrine como o cliente, mas não compra com a conta de loja.
+  const soVer = useAuthStore((s) => s.user?.role === 'STORE_OWNER')
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -477,6 +506,31 @@ export default function StoreScreen() {
   function handleAddProduct(product: Product) {
     // Multi-loja: pode juntar itens de várias lojas no mesmo carrinho.
     comAvisoSeFechada(() => addItem(id, store!.name, product))
+  }
+
+  // Loja fora do ar (pendente, suspensa) ou sem internet: antes ficava girando para sempre.
+  if (isError && !store) {
+    return (
+      <View style={[styles.center, { paddingHorizontal: 32, gap: 12 }]}>
+        <Ionicons name="storefront-outline" size={48} color={colors.primary} />
+        <Text style={styles.erroTitulo}>
+          {soVer ? 'Sua loja ainda não aparece no app' : 'Não deu para abrir esta loja'}
+        </Text>
+        <Text style={styles.erroTexto}>
+          {soVer
+            ? 'Ela aparece para os clientes depois de aprovada pelo Tá Barato. Se já foi aprovada, confira sua internet e tente de novo.'
+            : 'Ela pode estar fora do ar agora. Confira sua internet e tente de novo.'}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+          <TouchableOpacity style={styles.erroBtn} onPress={() => router.back()} activeOpacity={0.85}>
+            <Text style={styles.erroBtnTexto}>Voltar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.erroBtn, styles.erroBtnPrimario]} onPress={() => refetch()} activeOpacity={0.85}>
+            <Text style={[styles.erroBtnTexto, { color: '#fff' }]}>Tentar de novo</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    )
   }
 
   if (isLoading || !store) {
@@ -528,6 +582,13 @@ export default function StoreScreen() {
                 <Ionicons name="arrow-back" size={20} color="#1A0A00" />
               </TouchableOpacity>
             </View>
+
+            {soVer && (
+              <View style={styles.soVerFaixa}>
+                <Ionicons name="eye-outline" size={16} color="#fff" />
+                <Text style={styles.soVerFaixaTexto}>Modo visualização: é assim que o cliente vê a loja</Text>
+              </View>
+            )}
 
             {/* Store info */}
             <View style={styles.storeInfo}>
@@ -638,7 +699,7 @@ export default function StoreScreen() {
         }
       />
 
-      {itemCount > 0 && (
+      {itemCount > 0 && !soVer && (
         <View style={[styles.cartBar, { paddingBottom: insets.bottom + 16 }]}>
           <Relevo style={styles.cartBtn} onPress={() => router.push('/cart')}>
             <View style={styles.cartCount}>
@@ -655,6 +716,7 @@ export default function StoreScreen() {
         product={selectedProduct}
         storeId={id}
         storeName={store.name}
+        soVer={soVer}
         ownDeliveryFee={store.ownDeliveryFee != null ? Number(store.ownDeliveryFee) : undefined}
         onClose={() => setSelectedProduct(null)}
         aoAdicionar={comAvisoSeFechada}
@@ -687,6 +749,20 @@ export default function StoreScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  erroTitulo: { fontSize: 18, fontWeight: '800', color: '#1A0A00', textAlign: 'center' },
+  erroTexto: { fontSize: 14, color: '#6B5A50', textAlign: 'center', lineHeight: 20 },
+  erroBtn: {
+    paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12,
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#EDE5DF',
+  },
+  erroBtnPrimario: { backgroundColor: colors.primary, borderColor: colors.primary },
+  erroBtnTexto: { fontSize: 14, fontWeight: '800', color: '#1A0A00' },
+
+  soVerFaixa: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#1A0A00', paddingHorizontal: 16, paddingVertical: 10,
+  },
+  soVerFaixaTexto: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
 
   bannerWrap: { position: 'relative' },
   banner: { width: '100%', height: 180 },

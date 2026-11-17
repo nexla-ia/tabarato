@@ -6,21 +6,10 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
 const prisma = new PrismaClient({ adapter })
 
 const categories = [
-  // Alimentação
-  { name: 'Restaurantes', icon: 'restaurant', sortOrder: 1 },
-  { name: 'Lanches', icon: 'fast-food', sortOrder: 2 },
-  { name: 'Pizzaria', icon: 'pizza', sortOrder: 3 },
-  { name: 'Padaria', icon: 'cafe', sortOrder: 4 },
-  { name: 'Açaí', icon: 'leaf', sortOrder: 5 },
-  { name: 'Sorvetes', icon: 'ice-cream', sortOrder: 6 },
-  { name: 'Sushi', icon: 'fish', sortOrder: 7 },
-  { name: 'Marmita', icon: 'restaurant-outline', sortOrder: 8 },
-  { name: 'Churrasco', icon: 'flame', sortOrder: 9 },
-  { name: 'Bebidas', icon: 'wine', sortOrder: 10 },
+  // Alimentação saiu em 11/11/2026 (pedido do cliente): fica só Mercado.
   // Mercado & Farmácia
   { name: 'Mercado', icon: 'cart', sortOrder: 11 },
   { name: 'Farmácia', icon: 'medical', sortOrder: 12 },
-  { name: 'Hortifruti', icon: 'nutrition', sortOrder: 13 },
   // Moda & Beleza
   { name: 'Moda, calçados e acessórios', icon: 'shirt', sortOrder: 14 },
   { name: 'Perfumaria, cosméticos e cuidados pessoais', icon: 'rose', sortOrder: 16 },

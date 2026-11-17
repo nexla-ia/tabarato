@@ -14,6 +14,7 @@ import { colors } from '../../src/theme/colors'
 import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 import { Relevo } from '../../src/components/Relevo'
 import { useToast } from '../../src/components/Toast'
+import { MarcaT } from '../../src/components/MarcaT'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -487,7 +488,7 @@ export default function StoreSettingsScreen() {
 
       {/* Profile card */}
       <View style={styles.profileCard}>
-        <View style={styles.profileDecor} />
+        <MarcaT size={190} style={{ top: -30, right: -22 }} />
         <TouchableOpacity style={styles.avatarWrap} onPress={pickLogo} activeOpacity={0.85}>
           {logoUrl ? (
             <Image source={{ uri: logoUrl }} style={styles.avatarImg} />

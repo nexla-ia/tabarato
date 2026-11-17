@@ -7,6 +7,7 @@ import { api } from '../src/api/client'
 import { colors } from '../src/theme/colors'
 import { LoadError } from '../src/components/LoadError'
 import { relevo, LABIO_LARANJA } from '../src/theme/relevo'
+import { MarcaT } from '../src/components/MarcaT'
 
 const PRIMARY = colors.primary
 const TEXT = '#1A0A00'
@@ -66,7 +67,7 @@ export default function LoyaltyScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
           {/* Balance card */}
           <View style={styles.balanceCard}>
-            <View style={styles.balanceDecor} />
+            <MarcaT size={220} style={{ top: -26, alignSelf: 'center' }} />
             <Ionicons name="star" size={28} color={GOLD} style={{ marginBottom: 8 }} />
             <Text style={styles.balancePoints}>{account?.points ?? 0}</Text>
             <Text style={styles.balanceLabel}>pontos disponíveis</Text>
