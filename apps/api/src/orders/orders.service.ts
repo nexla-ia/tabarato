@@ -15,6 +15,7 @@ import { PlatformSettingsService } from '../settings/platform-settings.service'
 import { WalletService } from '../wallet/wallet.service'
 import { LoyaltyService } from '../loyalty/loyalty.service'
 import { CreateOrderDto } from './dto/create-order.dto'
+import { coordsDaQuery } from '../common/geo'
 
 function isStoreOpenNow(openingHours: any, scheduleExceptions?: any, atMs: number = Date.now()): boolean | null {
   const localMs = atMs - 4 * 60 * 60 * 1000
@@ -139,6 +140,52 @@ const STATUS_PUSH: Partial<Record<OrderStatus, { title: string; body: string }>>
   PICKED_UP:  { title: '🛵 Saiu para entrega!',     body: 'Seu pedido está a caminho. Fique de olho!' },
   DELIVERED:  { title: '🎉 Pedido entregue!',       body: 'Aproveite! Não esqueça de avaliar.' },
   CANCELLED:  { title: '❌ Pedido cancelado',        body: 'Seu pedido foi cancelado.' },
+}
+
+/**
+ * Folga sobre o raio de entrega da loja: GPS de celular erra algumas centenas
+ * de metros (às vezes mais em área coberta), e o cliente na beira do raio não
+ * pode ser barrado por isso. Outra cidade fica muito além.
+ */
+export const FOLGA_AREA_KM = 5
+
+/** Com `EXIGIR_LOCAL_NA_COMPRA=true`, pedido sem a localização do celular é recusado.
+ *  Desligado enquanto houver APK antigo (que não manda a localização). */
+function exigeLocalNaCompra(): boolean {
+  return process.env.EXIGIR_LOCAL_NA_COMPRA === 'true'
+}
+
+/**
+ * Confere se dá para entregar e se o cliente está mesmo na região da loja.
+ * 1) Entrega: o endereço precisa estar no raio da loja (antes não era conferido).
+ * 2) Sempre (entrega ou retirada): o celular precisa estar na região da loja —
+ *    quem está em Porto Velho não compra numa loja de Vilhena trocando o endereço.
+ */
+export function conferirAreaDaCompra(
+  store: { name: string; lat: number; lng: number; deliveryRadiusKm: number },
+  address: { lat: number; lng: number },
+  isPickup: boolean,
+  device?: { lat: number; lng: number },
+) {
+  const limite = (store.deliveryRadiusKm ?? 0) + FOLGA_AREA_KM
+  if (!isPickup) {
+    const km = haversineKm(store.lat, store.lng, address.lat, address.lng)
+    if (km > limite) {
+      throw new BadRequestException(
+        `A loja "${store.name}" não entrega nesse endereço (fica a ${km.toFixed(0)} km dela). Escolha um endereço na região da loja.`,
+      )
+    }
+  }
+  if (device) {
+    const km = haversineKm(store.lat, store.lng, device.lat, device.lng)
+    if (km > limite) {
+      throw new BadRequestException(
+        `Você está a ${km.toFixed(0)} km da loja "${store.name}". Só dá para comprar estando na região onde a loja entrega.`,
+      )
+    }
+  } else if (exigeLocalNaCompra()) {
+    throw new BadRequestException('Ative a localização do celular para finalizar a compra.')
+  }
 }
 
 @Injectable()
@@ -284,6 +331,7 @@ export class OrdersService {
       where: { id: dto.addressId, userId },
     })
     if (!address) throw new NotFoundException('Address not found')
+    conferirAreaDaCompra(store as any, address, dto.fulfillmentType === 'PICKUP', coordsDaQuery(dto.deviceLat, dto.deviceLng))
 
     // Calculate distance once — reused for per-product limit validation and delivery fee
     const distToAddress = haversineKm(store.lat, store.lng, address.lat, address.lng)
@@ -731,6 +779,7 @@ export class OrdersService {
     scheduledDate: Date | undefined,
     marketplaceOn: boolean,
     isPickup = false,
+    device?: { lat: number; lng: number },
   ) {
     const store = await this.prisma.store.findUnique({
       where: { id: group.storeId },
@@ -759,6 +808,8 @@ export class OrdersService {
       })
       if (activeCount >= maxConcurrent) throw new BadRequestException(`A loja "${store.name}" está com capacidade máxima no momento.`)
     }
+
+    conferirAreaDaCompra(store as any, address, isPickup, device)
 
     const distToAddress = haversineKm(store.lat, store.lng, address.lat, address.lng)
     let subtotal = 0
@@ -859,7 +910,8 @@ export class OrdersService {
 
     // Prepara todos os grupos (validação + preço) ANTES de qualquer escrita.
     const prepared: Awaited<ReturnType<typeof this.prepareStoreGroup>>[] = []
-    for (const g of rawGroups) prepared.push(await this.prepareStoreGroup(userId, g, address, scheduledDate, marketplaceOn, isPickup))
+    const device = coordsDaQuery(dto.deviceLat, dto.deviceLng)
+    for (const g of rawGroups) prepared.push(await this.prepareStoreGroup(userId, g, address, scheduledDate, marketplaceOn, isPickup, device))
 
     // Retirada na loja: sem taxa de entrega em nenhum grupo. Entrega: aplica o teto de
     // segurança (acima de maxDeliveryValue, só retirada) por loja.

@@ -2,13 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, RefreshControl, ActivityIndicator, ScrollView,
-  Dimensions, Image, Modal,
+  Dimensions, Image, Modal, AppState, Linking, Platform,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import * as Location from 'expo-location'
 import { api } from '../../src/api/client'
 import { colors } from '../../src/theme/colors'
 import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
@@ -16,11 +15,16 @@ import { useTheme } from '../../src/theme/theme'
 import { Store, Category } from '../../src/types'
 import { useAuthStore } from '../../src/stores/auth.store'
 import { useFavoritesStore } from '../../src/stores/favorites.store'
+import { useLocationStore } from '../../src/stores/location.store'
 import { ProductRail } from '../../src/components/ProductRail'
 import { AdCarousel } from '../../src/components/AdCarousel'
 import { Relevo } from '../../src/components/Relevo'
 
 const SLOGAN = 'Entrega na sua casa'
+
+// O pedido de permissão/GPS aparece uma vez por abertura do app (não a cada
+// volta para a home). Depois disso, só quando o cliente toca em "Ativar".
+let pediuLocalNestaAbertura = false
 
 async function fetchUnreadCount(): Promise<number> {
   try {
@@ -50,8 +54,10 @@ interface FeedProduct {
 
 interface FeedFilters { sort?: string; minPrice?: string; maxPrice?: string; minRating?: string }
 
-async function fetchProducts(categoryId?: string, search?: string, filters?: FeedFilters) {
+async function fetchProducts(categoryId?: string, search?: string, filters?: FeedFilters, coords?: { lat: number; lng: number }) {
   const params: Record<string, string> = { limit: '60' }
+  // Com a localização, a API só devolve produto de loja que entrega onde o cliente está.
+  if (coords) { params.userLat = String(coords.lat); params.userLng = String(coords.lng) }
   if (categoryId) params.categoryId = categoryId
   if (search) params.search = search
   if (filters?.sort) params.sort = filters.sort
@@ -101,20 +107,43 @@ export default function HomeScreen() {
   const [minRating, setMinRating] = useState<number | undefined>()
   const [showFilters, setShowFilters] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | undefined>()
+  const local = useLocationStore()
+  const userCoords = local.situacao === 'ok' ? local.coords : undefined
   const user = useAuthStore((s) => s.user)
   const loadFavorites = useFavoritesStore(s => s.load)
   const insets = useSafeAreaInsets()
 
-  // Localização (silenciosa) pra ordenar lojas por proximidade
+  // Localização atual: mostra as lojas que entregam onde o cliente ESTÁ (não a
+  // cidade do cadastro). Pede ao abrir o app e relê ao voltar para ele, porque
+  // a pessoa pode ter viajado ou ligado o GPS nas configurações.
   useEffect(() => {
-    Location.getForegroundPermissionsAsync().then(({ status }) => {
-      if (status !== 'granted') return
-      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-        .then(({ coords }) => setUserCoords({ lat: coords.latitude, lng: coords.longitude }))
-        .catch(() => {})
+    const pedir = !pediuLocalNestaAbertura
+    pediuLocalNestaAbertura = true
+    useLocationStore.getState().atualizar({ pedir })
+    const sub = AppState.addEventListener('change', (estado) => {
+      if (estado === 'active') useLocationStore.getState().atualizar({ forcar: true })
     })
+    return () => sub.remove()
   }, [])
+
+  function ativarLocalizacao() {
+    // Recusou de vez ("não perguntar de novo"): o sistema só libera nas configurações.
+    if (local.situacao === 'negada' && !local.podePedir) {
+      Linking.openSettings()
+      return
+    }
+    // iOS não tem o aviso de ligar o GPS dentro do app.
+    if (local.situacao === 'gps-desligado' && Platform.OS === 'ios') {
+      Linking.openSettings()
+      return
+    }
+    local.atualizar({ pedir: true, forcar: true })
+  }
+
+  const semLocal = local.situacao === 'negada' || local.situacao === 'gps-desligado'
+  const cidadeAgora = local.situacao === 'ok' && local.cidade
+    ? `${local.cidade}${local.uf ? `, ${local.uf}` : ''}`
+    : `${user?.city ?? 'Vilhena'}, ${user?.state ?? 'RO'}`
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -125,14 +154,22 @@ export default function HomeScreen() {
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories })
 
   const { data: products = [], isLoading, isFetching, refetch, isRefetching } = useQuery({
-    queryKey: ['products-feed', selectedCategory, debouncedSearch, sort, minPrice, maxPrice, minRating],
+    queryKey: ['products-feed', selectedCategory, debouncedSearch, sort, minPrice, maxPrice, minRating, userCoords?.lat, userCoords?.lng],
     queryFn: () => fetchProducts(selectedCategory, debouncedSearch || undefined, {
       sort,
       minPrice: minPrice || undefined,
       maxPrice: maxPrice || undefined,
       minRating: minRating != null ? String(minRating) : undefined,
-    }),
+    }, userCoords),
   })
+
+  // Alguma loja entrega onde o cliente está? (sem filtro de categoria/busca)
+  const { data: lojasDaArea } = useQuery({
+    queryKey: ['stores-area', userCoords?.lat, userCoords?.lng],
+    queryFn: () => fetchStores(undefined, userCoords?.lat, userCoords?.lng),
+    enabled: !!userCoords,
+  })
+  const foraDaArea = !!userCoords && !!lojasDaArea && lojasDaArea.length === 0
 
   // Quantos filtros avançados estão ativos (badge no botão)
   const filtersActive = (sort ? 1 : 0) + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0) + (minRating != null ? 1 : 0)
@@ -201,6 +238,7 @@ export default function HomeScreen() {
       {!isSearching && !selectedCategory && (
         <>
           <ProductRail
+            coords={userCoords}
             rota="/products/offers"
             chave="offers"
             titulo="Ofertas Imperdíveis"
@@ -208,6 +246,7 @@ export default function HomeScreen() {
             icone="pricetag"
           />
           <ProductRail
+            coords={userCoords}
             rota="/products/highlights"
             chave="highlights"
             titulo="Destaques da Semana"
@@ -269,12 +308,25 @@ export default function HomeScreen() {
         </View>
 
         {/* Saudação + local */}
-        <View style={styles.locationRow}>
-          <Ionicons name="location-sharp" size={12} color="rgba(255,255,255,0.8)" />
-          <Text style={styles.locationText}>
-            {firstName ? `Olá, ${firstName} · ` : ''}{user?.city ?? 'Vilhena'}, {user?.state ?? 'RO'}
+        <TouchableOpacity style={styles.locationRow} onPress={ativarLocalizacao} activeOpacity={0.7} hitSlop={6}>
+          <Ionicons name={semLocal ? 'location-outline' : 'location-sharp'} size={12} color="rgba(255,255,255,0.8)" />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {firstName ? `Olá, ${firstName} · ` : ''}{cidadeAgora}
           </Text>
-        </View>
+          {local.situacao === 'buscando' && <ActivityIndicator size="small" color="rgba(255,255,255,0.8)" style={{ transform: [{ scale: 0.6 }] }} />}
+        </TouchableOpacity>
+
+        {semLocal && (
+          <TouchableOpacity style={styles.localAviso} onPress={ativarLocalizacao} activeOpacity={0.85}>
+            <Ionicons name="navigate-circle" size={20} color={colors.primary} />
+            <Text style={styles.localAvisoTexto}>
+              {local.situacao === 'gps-desligado'
+                ? 'A localização do celular está desligada. Ligue para ver as lojas que entregam onde você está.'
+                : 'Ative a localização para ver as lojas que entregam onde você está.'}
+            </Text>
+            <Text style={styles.localAvisoBtn}>Ativar</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.searchBar}>
           <Ionicons name="search-outline" size={17} color={colors.textMuted} />
@@ -339,7 +391,27 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {isLoading ? (
+      {foraDaArea ? (
+        // Nenhuma loja entrega onde o cliente está: não mostra produto de outra cidade.
+        <ScrollView
+          contentContainerStyle={styles.foraArea}
+          refreshControl={<RefreshControl refreshing={false} onRefresh={() => local.atualizar({ forcar: true })} tintColor={colors.primary} />}
+        >
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="map-outline" size={38} color={colors.primary} />
+          </View>
+          <Text style={styles.foraAreaTitulo}>
+            {local.cidade ? `Ainda não temos lojas cadastradas em ${local.cidade}` : 'Ainda não temos lojas cadastradas onde você está'}
+          </Text>
+          <Text style={styles.foraAreaTexto}>
+            O Tá Barato mostra só as lojas que entregam na sua região. Quando chegarmos aí, elas aparecem nesta tela.
+          </Text>
+          <TouchableOpacity style={styles.foraAreaBtn} onPress={() => local.atualizar({ pedir: true, forcar: true })} activeOpacity={0.85}>
+            <Ionicons name="locate" size={16} color={colors.primary} />
+            <Text style={styles.foraAreaBtnTexto}>Atualizar minha localização</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      ) : isLoading ? (
         <ActivityIndicator style={{ marginTop: 60 }} color={colors.primary} size="large" />
       ) : (
         <FlatList
@@ -523,7 +595,23 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 16, fontWeight: '800', color: '#fff' },
 
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, marginBottom: 12 },
-  locationText: { fontSize: 12, color: 'rgba(255,255,255,0.82)', fontWeight: '600' },
+  locationText: { fontSize: 12, color: 'rgba(255,255,255,0.82)', fontWeight: '600', flexShrink: 1 },
+  localAviso: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10,
+    marginTop: -4, marginBottom: 12,
+  },
+  localAvisoTexto: { flex: 1, fontSize: 12.5, fontWeight: '700', color: '#1A0A00', lineHeight: 17 },
+  localAvisoBtn: { fontSize: 13, fontWeight: '900', color: colors.primary },
+  foraArea: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 48, gap: 10 },
+  foraAreaTitulo: { fontSize: 18, fontWeight: '800', color: '#1A0A00', textAlign: 'center', marginTop: 6 },
+  foraAreaTexto: { fontSize: 14, color: '#6B5A50', textAlign: 'center', lineHeight: 20 },
+  foraAreaBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10,
+    paddingHorizontal: 18, paddingVertical: 12, borderRadius: 14,
+    backgroundColor: '#FFF0EB', borderWidth: 1, borderColor: '#FFD4BA',
+  },
+  foraAreaBtnTexto: { fontSize: 14, fontWeight: '800', color: colors.primary },
 
   searchBar: {
     flexDirection: 'row', alignItems: 'center',

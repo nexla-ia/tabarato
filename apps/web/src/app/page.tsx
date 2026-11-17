@@ -63,7 +63,7 @@ export default async function HomePage({
             <div className={styles.heroBlob2} />
             <div className={`container ${styles.heroInner}`}>
               <div className={styles.heroArt}>
-                <Image src="/logo.png" alt="Tá Barato" width={150} height={150} priority className={styles.heroLogo} style={{ objectFit: 'contain' }} />
+                <Image src="/logo-slogan.png" alt="Tá Barato — Entrega na sua casa" width={240} height={162} priority className={styles.heroLogo} style={{ objectFit: 'contain' }} />
               </div>
             </div>
             <div className={styles.heroWave} />

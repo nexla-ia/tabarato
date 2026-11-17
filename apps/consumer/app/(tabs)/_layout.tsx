@@ -82,7 +82,7 @@ function LoginPrompt() {
           <View style={prompt.handle} />
 
           <Image
-            source={require('../../assets/logo-transparente.png')}
+            source={require('../../assets/logo-slogan.png')}
             style={prompt.logo}
             resizeMode="contain"
           />
@@ -157,7 +157,7 @@ const prompt = StyleSheet.create({
     width: 40, height: 4, borderRadius: 2,
     backgroundColor: '#E0D8D0', marginBottom: 24,
   },
-  logo: { width: 160, height: 90, marginBottom: 16 },
+  logo: { width: 178, height: 120, marginBottom: 16 },
   title: {
     fontSize: 22, fontWeight: '900', color: '#1A0A00',
     letterSpacing: -0.4, textAlign: 'center', marginBottom: 8,

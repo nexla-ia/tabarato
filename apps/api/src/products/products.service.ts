@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
+import { haversineKm } from '../common/geo'
 import { FundoBrancoLoteService } from '../uploads/fundo-branco-lote.service'
 import { CreateProductDto } from './dto/create-product.dto'
 import { CreateVariationDto } from './dto/create-variation.dto'
@@ -11,6 +13,38 @@ export class ProductsService {
     // Fundo branco obrigatório: foto que chegar sem tratar é processada no servidor.
     @Optional() private fundoBranco?: FundoBrancoLoteService,
   ) {}
+
+  /**
+   * Área de entrega do cliente: lojas aprovadas cujo raio de entrega alcança
+   * onde ele está, com a distância de cada uma. Sem coordenadas → undefined
+   * (lista tudo, como antes). Lista vazia = nenhuma loja entrega ali.
+   */
+  private async lojasNaArea(coords?: { lat: number; lng: number }) {
+    if (!coords) return undefined
+    const lojas = await this.prisma.store.findMany({
+      where: { status: 'APPROVED' },
+      select: { id: true, lat: true, lng: true, deliveryRadiusKm: true },
+    })
+    return lojas
+      .map((l) => ({ id: l.id, km: haversineKm(coords.lat, coords.lng, l.lat, l.lng), raio: l.deliveryRadiusKm }))
+      .filter((l) => l.km <= l.raio)
+  }
+
+  /**
+   * Filtro de produtos para as lojas da área. Respeita também o limite de
+   * distância do próprio produto (maxDeliveryKm; 0 ou vazio = sem limite),
+   * igual à conferência feita ao fechar o pedido.
+   */
+  private filtroArea(lojas?: { id: string; km: number }[]): Prisma.ProductWhereInput {
+    if (!lojas) return {}
+    if (!lojas.length) return { id: { in: [] } }
+    return {
+      OR: lojas.map((l) => ({
+        storeId: l.id,
+        OR: [{ maxDeliveryKm: null }, { maxDeliveryKm: { lte: 0 } }, { maxDeliveryKm: { gte: l.km } }],
+      })),
+    }
+  }
 
   /** Chamado depois de salvar foto: trata em segundo plano o que veio sem fundo branco. */
   private conferirFotos(dto: { imageUrl?: string | null; images?: string[] }) {
@@ -77,7 +111,9 @@ export class ProductsService {
    *  30 dias se o volume de pedidos nao sustentar 7. */
   static readonly DESTAQUES_DIAS = 7
 
-  async findPopular(limit = 12, dias?: number) {
+  async findPopular(limit = 12, dias?: number, coords?: { lat: number; lng: number }) {
+    const area = await this.lojasNaArea(coords)
+    if (area && !area.length) return []
     // Aggregate order items to find most-ordered products
     const topItems = await this.prisma.orderItem.groupBy({
       by: ['productId'],
@@ -106,6 +142,7 @@ export class ProductsService {
         isActive: true,
         blockedByAdmin: false,
         store: { status: 'APPROVED' },
+        ...this.filtroArea(area),
       },
       include: {
         category: { select: { id: true, name: true } },
@@ -132,7 +169,14 @@ export class ProductsService {
    * O maior desconto vem primeiro. A comparação fica no banco (campo x campo),
    * porque filtrar em memória exigiria carregar o catálogo inteiro.
    */
-  async findOffers(limit = 12) {
+  async findOffers(limit = 12, coords?: { lat: number; lng: number }) {
+    const area = await this.lojasNaArea(coords)
+    if (area && !area.length) return []
+    // Com área, o ranking já sai só das lojas que entregam ali (o limite por
+    // produto é conferido no findMany abaixo, por isso pede alguns a mais).
+    const naArea = area
+      ? Prisma.sql`AND s.id IN (${Prisma.join(area.map((l) => l.id))})`
+      : Prisma.empty
     const ids = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT p.id
       FROM products p
@@ -143,13 +187,14 @@ export class ProductsService {
         AND p.is_active = true
         AND p.blocked_by_admin = false
         AND s.status = 'APPROVED'
+        ${naArea}
       ORDER BY (p.compare_price - p.base_price) / p.compare_price DESC
-      LIMIT ${limit}
+      LIMIT ${area ? limit * 2 : limit}
     `
     if (ids.length === 0) return []
 
     const produtos = await this.prisma.product.findMany({
-      where: { id: { in: ids.map(r => r.id) } },
+      where: { id: { in: ids.map(r => r.id) }, ...this.filtroArea(area) },
       include: {
         category: { select: { id: true, name: true } },
         store: { select: { id: true, name: true, logoUrl: true, isOpen: true, prepTimeMin: true } },
@@ -160,6 +205,7 @@ export class ProductsService {
     const pos = new Map(ids.map((r, i) => [r.id, i]))
     return produtos
       .sort((a, b) => (pos.get(a.id) ?? 999) - (pos.get(b.id) ?? 999))
+      .slice(0, limit)
       .map(p => {
         const de = Number(p.comparePrice)
         const por = Number(p.basePrice)
@@ -175,8 +221,12 @@ export class ProductsService {
   async findAll(opts: {
     categoryId?: string; productCategoryId?: string; excludeId?: string; search?: string; limit?: number
     minPrice?: number; maxPrice?: number; minRating?: number; sort?: 'rating' | 'price_asc' | 'price_desc'
+    /** Onde o cliente está: só lista produto de loja que entrega ali. */
+    coords?: { lat: number; lng: number }
   }) {
     const { categoryId, productCategoryId, excludeId, search, minPrice, maxPrice, minRating, sort } = opts
+    const area = await this.lojasNaArea(opts.coords)
+    if (area && !area.length) return []
     const limit = Math.min(Math.max(opts.limit ?? 40, 1), 100)
 
     // Preço: casa se o preço-base OU alguma variação ativa estiver na faixa.
@@ -207,7 +257,8 @@ export class ProductsService {
           ...(minRating != null ? { rating: { gte: minRating } } : {}),
         },
         ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
-        ...priceFilter,
+        // AND: o filtro de preço e o de área usam OR cada um; espalhados, um apagaria o outro.
+        AND: [priceFilter, this.filtroArea(area)],
       },
       include: {
         store: { select: { id: true, name: true, logoUrl: true, isOpen: true, prepTimeMin: true, rating: true, reviewCount: true } },

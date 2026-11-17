@@ -150,7 +150,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
           )}
           <Image
-            source={require('../../assets/logo-transparente.png')}
+            source={require('../../assets/logo-slogan.png')}
             style={styles.logoImg}
             resizeMode="contain"
           />
@@ -345,10 +345,10 @@ const styles = StyleSheet.create({
     borderColor: '#EDE5DF',
     zIndex: 2,
   },
-  // logo-transparente.png é 1518×852 (≈ 1,78:1).
+  // logo-slogan.png (com "Entrega na sua casa") é 1200×809 (≈ 1,48:1).
   logoImg: {
-    width: 248,
-    height: 139,
+    width: 264,
+    height: 178,
   },
   brand: {
     fontSize: 36,

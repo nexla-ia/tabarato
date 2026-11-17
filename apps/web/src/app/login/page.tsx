@@ -68,7 +68,7 @@ export default function LoginPage() {
         <Link href="/" className={styles.backLink}><ArrowLeft size={16} /> Voltar ao início</Link>
         <div className={styles.logoWrap}>
           <Link href="/" className={styles.logoLink}>
-            <Image src="/logo.png" alt="Tá Barato" width={120} height={120} style={{ objectFit: 'contain' }} priority />
+            <Image src="/logo-slogan.png" alt="Tá Barato — Entrega na sua casa" width={180} height={121} style={{ objectFit: 'contain' }} priority />
           </Link>
         </div>
         <h1 className={styles.title}>Entrar na conta</h1>

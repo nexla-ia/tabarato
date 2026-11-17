@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
+import { coordsDaQuery } from '../common/geo'
 import { ProductsService } from './products.service'
 import { CreateProductDto } from './dto/create-product.dto'
 import { CreateVariationDto } from './dto/create-variation.dto'
@@ -19,24 +20,24 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get('popular')
-  getPopular(@Query('limit') limit?: string) {
+  getPopular(@Query('limit') limit?: string, @Query('userLat') lat?: string, @Query('userLng') lng?: string) {
     // Clamp: limit vira `take` no Prisma; sem teto/validação seria DoS (e NaN → 500).
     const n = parseInt(limit ?? '', 10)
     const safeLimit = Math.min(Math.max(1, Number.isFinite(n) ? n : 12), 50)
-    return this.productsService.findPopular(safeLimit)
+    return this.productsService.findPopular(safeLimit, undefined, coordsDaQuery(lat, lng))
   }
 
   /** Ofertas Imperdiveis da home: quem tem preco "de" maior que o atual. */
   @Get('offers')
-  getOffers(@Query('limit') limit?: string) {
-    return this.productsService.findOffers(clampLimit(limit))
+  getOffers(@Query('limit') limit?: string, @Query('userLat') lat?: string, @Query('userLng') lng?: string) {
+    return this.productsService.findOffers(clampLimit(limit), coordsDaQuery(lat, lng))
   }
 
   /** Destaques da Semana: mais vendidos na janela de ProductsService.DESTAQUES_DIAS.
    *  Devolve lista vazia quando nao houve venda — a home esconde a secao. */
   @Get('highlights')
-  getHighlights(@Query('limit') limit?: string) {
-    return this.productsService.findPopular(clampLimit(limit), ProductsService.DESTAQUES_DIAS)
+  getHighlights(@Query('limit') limit?: string, @Query('userLat') lat?: string, @Query('userLng') lng?: string) {
+    return this.productsService.findPopular(clampLimit(limit), ProductsService.DESTAQUES_DIAS, coordsDaQuery(lat, lng))
   }
 
   // Listagem geral de produtos (home focada em itens). Filtra por categoria da loja e busca.
@@ -54,6 +55,9 @@ export class ProductsController {
     @Query('maxPrice') maxPrice?: string,
     @Query('minRating') minRating?: string,
     @Query('sort') sort?: string,
+    // Onde o cliente está (GPS): só produtos de lojas que entregam ali.
+    @Query('userLat') userLat?: string,
+    @Query('userLng') userLng?: string,
   ) {
     const n = parseInt(limit ?? '', 10)
     const min = parseFloat(minPrice ?? '')
@@ -70,6 +74,7 @@ export class ProductsController {
       maxPrice: Number.isFinite(max) ? max : undefined,
       minRating: Number.isFinite(rating) ? rating : undefined,
       sort: validSort,
+      coords: coordsDaQuery(userLat, userLng),
     })
   }
 

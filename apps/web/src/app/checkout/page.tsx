@@ -272,6 +272,22 @@ export default function CheckoutPage() {
     } finally { setSavingAddr(false) }
   }
 
+  /**
+   * Onde o navegador está agora. A loja só vende para quem está na região dela
+   * (barra quem está em outra cidade e põe um endereço daqui); o servidor confere.
+   * Recusou ou demorou: segue sem, e o servidor decide (EXIGIR_LOCAL_NA_COMPRA).
+   */
+  function localDoAparelho(): Promise<{ lat: number; lng: number } | null> {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return Promise.resolve(null)
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: false, timeout: 10_000, maximumAge: 5 * 60_000 },
+      )
+    })
+  }
+
   async function handleSubmit() {
     if (!selectedAddr) { setError('Selecione um endereço de entrega'); return }
     if (stores.length === 0) { setError('Carrinho vazio'); return }
@@ -291,6 +307,7 @@ export default function CheckoutPage() {
 
     setLoading(true); setError('')
     try {
+      const aparelho = await localDoAparelho()
       let cardToken: string | undefined
       if (isCard && !cardCheckout) {
         const [month, year] = cardExpiry.split('/')
@@ -316,6 +333,8 @@ export default function CheckoutPage() {
         // por antifraude (cc_rejected_high_risk). Só existe depois do script carregar.
         deviceId: typeof window !== 'undefined' ? window.MP_DEVICE_SESSION_ID : undefined,
         pointsToRedeem: pointsToRedeem > 0 ? pointsToRedeem : undefined,
+        deviceLat: aparelho?.lat,
+        deviceLng: aparelho?.lng,
       })
 
       const orders: { id: string }[] = data.orders

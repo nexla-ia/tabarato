@@ -13,6 +13,7 @@ import { api } from '../src/api/client'
 import { useCartStore } from '../src/stores/cart.store'
 import { useConsumerStore } from '../src/stores/consumer.store'
 import { useAuthStore } from '../src/stores/auth.store'
+import { useLocationStore } from '../src/stores/location.store'
 import { Address } from '../src/types'
 import { validateCardForm, validateCpf } from '../src/utils/cardValidation'
 import { loadCardMeta, saveCardMeta, cardLabel, SavedCardMeta } from '../src/utils/savedCard'
@@ -379,6 +380,15 @@ export default function CheckoutScreen() {
         scheduledForIso = when.toISOString()
       }
 
+      // Onde o celular está agora: a loja só vende para quem está na região dela
+      // (barra quem está em outra cidade e põe um endereço daqui). O servidor confere.
+      await useLocationStore.getState().atualizar({ pedir: true })
+      const local = useLocationStore.getState()
+      if (local.situacao === 'negada' || local.situacao === 'gps-desligado') {
+        throw new Error('Ative a localização do celular para finalizar a compra. As lojas só vendem para quem está na região onde entregam.')
+      }
+      const aparelho = local.situacao === 'ok' ? local.coords : undefined
+
       let cardToken: string | undefined
       // No modo Checkout (Asaas) o cartão é preenchido na página do Asaas — não tokeniza aqui.
       if (isCard && !cardCheckout) {
@@ -415,6 +425,8 @@ export default function CheckoutScreen() {
         payerCpf: isCard ? cardCpf : (asaasPix ? pixCpf : undefined),
         deviceId: isCard ? deviceId : undefined,
         scheduledFor: scheduledForIso,
+        deviceLat: aparelho?.lat,
+        deviceLng: aparelho?.lng,
       }, {
         // Criar o pedido gera o PIX / cobra o cartão no Mercado Pago (round-trips
         // externos) — passa fácil dos 10s padrão do axios e viraria "Network Error".

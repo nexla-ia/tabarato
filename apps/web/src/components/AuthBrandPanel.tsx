@@ -42,7 +42,7 @@ export function AuthBrandPanel({
 
       <div className={styles.content}>
         <div className={styles.logoWrap}>
-          <Image src="/logo.png" alt="Tá Barato" width={216} height={216} className={styles.logo} style={{ objectFit: 'contain' }} priority />
+          <Image src="/logo-slogan.png" alt="Tá Barato — Entrega na sua casa" width={260} height={175} className={styles.logo} style={{ objectFit: 'contain' }} priority />
         </div>
         {badge && <span className={styles.badge}>{badge}</span>}
         {title && <h1 className={styles.title}>{title}</h1>}

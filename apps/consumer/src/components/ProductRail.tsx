@@ -35,7 +35,10 @@ export function ProductRail({
   titulo,
   subtitulo,
   icone,
+  coords,
 }: {
+  /** Onde o cliente está: só mostra produto de loja que entrega ali. */
+  coords?: { lat: number; lng: number }
   rota: string
   /** Parte da queryKey — precisa ser única por trilho. */
   chave: string
@@ -44,8 +47,10 @@ export function ProductRail({
   icone: IoniconName
 }) {
   const { data: produtos = [] } = useQuery<RailProduct[]>({
-    queryKey: ['rail', chave],
-    queryFn: async () => (await api.get(`${rota}?limit=12`)).data,
+    queryKey: ['rail', chave, coords?.lat, coords?.lng],
+    queryFn: async () => (await api.get(rota, {
+      params: { limit: 12, ...(coords ? { userLat: coords.lat, userLng: coords.lng } : {}) },
+    })).data,
     staleTime: 2 * 60_000,
     // Falhar aqui não pode estragar a home: sem dado, a seção simplesmente
     // não aparece.

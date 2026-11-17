@@ -114,6 +114,20 @@ export class CreateOrderDto {
   @IsOptional()
   scheduledFor?: string // ISO date string
 
+  // Onde o celular do cliente está (GPS) na hora da compra. Barra quem está em
+  // outra cidade e põe um endereço daqui — a loja não tem como entregar.
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  @IsOptional()
+  deviceLat?: number
+
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  @IsOptional()
+  deviceLng?: number
+
   @IsNumber()
   @Min(0)
   @Max(1_000_000)
