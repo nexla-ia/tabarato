@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, TextInput,
   Modal, KeyboardAvoidingView, Platform, ActivityIndicator, RefreshControl, Image,
@@ -11,6 +11,7 @@ import { colors } from '../../src/theme/colors'
 import { relevo, LABIO_NEUTRO } from '../../src/theme/relevo'
 import { Relevo } from '../../src/components/Relevo'
 import { useToast } from '../../src/components/Toast'
+import { fotosDoProduto, VisualizadorFotos, MAX_FOTOS_PRODUTO } from '../../src/components/FotosProduto'
 
 interface Category {
   id: string
@@ -41,6 +42,8 @@ interface Product {
   blockReason?: string | null
   hasVariations: boolean
   imageUrl?: string | null
+  images?: string[]
+  maxDeliveryKm?: number | null
   promoBuyQty?: number | null
   promoPayQty?: number | null
   storeDelivery?: boolean
@@ -52,7 +55,8 @@ interface ProductFormState {
   basePrice: string
   comparePrice: string
   stock: string
-  imageUrl: string
+  /** Até 3 fotos; a primeira é a capa (imageUrl), as outras vão em `images`. */
+  photos: string[]
   maxDeliveryKm: string
   promoBuyQty: string
   promoPayQty: string
@@ -77,23 +81,39 @@ interface VariationFormState {
   stock: string
 }
 
-const EMPTY_FORM: ProductFormState = { name: '', categoryId: '', basePrice: '', comparePrice: '', stock: '', imageUrl: '', maxDeliveryKm: '', promoBuyQty: '', promoPayQty: '', storeDelivery: false }
+const EMPTY_FORM: ProductFormState = { name: '', categoryId: '', basePrice: '', comparePrice: '', stock: '', photos: [], maxDeliveryKm: '', promoBuyQty: '', promoPayQty: '', storeDelivery: false }
 const EMPTY_VAR_FORM: VariationFormState = { name: '', size: '', color: '', price: '', stock: '' }
 
 function ProductCard({
-  product, onToggle, onEdit, onDelete, onVariations, onDuplicate,
+  product, onToggle, onEdit, onDelete, onVariations, onDuplicate, onView,
 }: {
   product: Product
+  onView: (product: Product) => void
   onToggle: (id: string) => void
   onEdit: (product: Product) => void
   onDelete: (id: string) => void
   onVariations: (product: Product) => void
   onDuplicate: (id: string) => void
 }) {
+  const fotos = fotosDoProduto(product)
   return (
     <View style={[card.container, (!product.isActive || product.blockedByAdmin) && card.inactive]}>
-      {product.imageUrl ? (
-        <Image source={{ uri: product.imageUrl }} style={card.image} resizeMode="cover" />
+      {fotos.length > 0 ? (
+        // Tocar na foto abre em tela cheia (antes não fazia nada).
+        <TouchableOpacity activeOpacity={0.9} onPress={() => onView(product)}>
+          <Image source={{ uri: fotos[0] }} style={card.image} resizeMode="contain" />
+          <View style={card.fotoBadges} pointerEvents="none">
+            {fotos.length > 1 && (
+              <View style={card.fotoBadge}>
+                <Ionicons name="images-outline" size={11} color="#fff" />
+                <Text style={card.fotoBadgeText}>{fotos.length}</Text>
+              </View>
+            )}
+            <View style={card.fotoBadge}>
+              <Ionicons name="expand-outline" size={12} color="#fff" />
+            </View>
+          </View>
+        </TouchableOpacity>
       ) : (
         <View style={card.imagePlaceholder}>
           <Ionicons name="cube-outline" size={28} color={product.isActive ? colors.primary : '#C0B0A8'} />
@@ -212,16 +232,17 @@ function ProductModal({
 }) {
   const { show: toast } = useToast()
   const [form, setForm] = useState<ProductFormState>(initial ?? EMPTY_FORM)
-  const [uploading, setUploading] = useState(false)
   const [catSearch, setCatSearch] = useState('')
-  // Fundo branco automatico (Bria). `fotoOriginal` guarda a foto de antes para o
-  // lojista poder desfazer — a IA acerta quase sempre, mas nao sempre.
+  // Fundo branco (Bria): aplicado SOZINHO em toda foto enviada, sem perguntar.
+  // Sem a chave da Bria no servidor o recurso fica desligado e a foto vai como está.
   const [fundoBrancoAtivo, setFundoBrancoAtivo] = useState(false)
-  const [processandoFundo, setProcessandoFundo] = useState(false)
-  const [fotoOriginal, setFotoOriginal] = useState<string | null>(null)
+  // Fotos ainda subindo / tirando o fundo (aparecem esmaecidas na grade).
+  const [pendentes, setPendentes] = useState<{ key: string; uri: string; etapa: 'enviando' | 'fundo' }[]>([])
+  const [verFoto, setVerFoto] = useState<number | null>(null)
+  // Cada abertura do modal é uma "sessão": resultado de upload que chegar depois
+  // de fechar não pode cair no formulário do próximo produto.
+  const sessao = useRef(0)
 
-  // Pergunta ao servidor se o recurso esta ligado (sem a chave da Bria, o botao
-  // nao aparece). Falha aqui so esconde o botao — nunca atrapalha o cadastro.
   useEffect(() => {
     if (!visible) return
     api.get('/uploads/white-background/status')
@@ -235,13 +256,18 @@ function ProductModal({
     : categories
 
   useEffect(() => {
+    sessao.current += 1
     setForm(initial ?? EMPTY_FORM)
-    setFotoOriginal(null)
+    setPendentes([])
+    setVerFoto(null)
   }, [initial, visible])
 
   const isEdit = !!initial?.name
+  const totalFotos = form.photos.length + pendentes.length
+  const vagas = Math.max(0, MAX_FOTOS_PRODUTO - totalFotos)
 
-  async function pickImage() {
+  async function pickImages() {
+    if (vagas <= 0) return
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (!perm.granted) {
       toast('Permita acesso à galeria nas configurações.', 'error')
@@ -251,42 +277,62 @@ function ProductModal({
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.9,
+      allowsMultipleSelection: vagas > 1,
+      selectionLimit: vagas,
     })
     if (result.canceled) return
 
-    const asset = result.assets?.[0]
-    if (!asset?.uri) { toast('Não consegui ler a imagem selecionada. Tente escolher outra.', 'error'); return }
-    setUploading(true)
-    try {
-      const url = await uploadImageAsset(asset.uri, { name: 'product.jpg' })
-      setForm((f) => ({ ...f, imageUrl: url }))
-      setFotoOriginal(null)
-    } catch (e: any) {
-      toast(e?.message ?? 'Não foi possível fazer upload da imagem.', 'error')
-    } finally {
-      setUploading(false)
+    const assets = (result.assets ?? []).filter((a) => !!a?.uri).slice(0, vagas)
+    if (!assets.length) { toast('Não consegui ler a imagem selecionada. Tente escolher outra.', 'error'); return }
+
+    const minhaSessao = sessao.current
+    const novos = assets.map((a, i) => ({ key: `${Date.now()}-${i}`, uri: a.uri, etapa: 'enviando' as const }))
+    setPendentes((p) => [...p, ...novos])
+    let fundoFalhou = false
+
+    await Promise.all(novos.map(async (n) => {
+      try {
+        let url = await uploadImageAsset(n.uri, { name: 'product.jpg' })
+        if (fundoBrancoAtivo) {
+          if (sessao.current === minhaSessao) {
+            setPendentes((p) => p.map((x) => (x.key === n.key ? { ...x, etapa: 'fundo' } : x)))
+          }
+          try {
+            const { data } = await api.post('/uploads/image/white-background', { imageUrl: url })
+            if (data?.url) url = data.url
+          } catch {
+            fundoFalhou = true // fica a foto original: nada se perde
+          }
+        }
+        if (sessao.current !== minhaSessao) return
+        setForm((f) => ({ ...f, photos: [...f.photos, url].slice(0, MAX_FOTOS_PRODUTO) }))
+      } catch (e: any) {
+        if (sessao.current === minhaSessao) toast(e?.message ?? 'Não foi possível enviar a foto.', 'error')
+      } finally {
+        if (sessao.current === minhaSessao) setPendentes((p) => p.filter((x) => x.key !== n.key))
+      }
+    }))
+
+    if (fundoFalhou && sessao.current === minhaSessao) {
+      toast('Não deu para tirar o fundo agora. A foto ficou como foi enviada.', 'info')
     }
   }
 
-  async function aplicarFundoBranco() {
-    if (!form.imageUrl || processandoFundo) return
-    setProcessandoFundo(true)
-    try {
-      const { data } = await api.post('/uploads/image/white-background', { imageUrl: form.imageUrl })
-      setFotoOriginal(form.imageUrl)
-      setForm((f) => ({ ...f, imageUrl: data.url }))
-    } catch (e: any) {
-      // A foto original continua no formulario: falhar aqui nao perde nada.
-      toast(e?.response?.data?.message ?? 'Nao foi possivel deixar o fundo branco agora.', 'error')
-    } finally {
-      setProcessandoFundo(false)
-    }
+  function removerFoto(i: number) {
+    setForm((f) => ({ ...f, photos: f.photos.filter((_, j) => j !== i) }))
   }
 
-  function desfazerFundoBranco() {
-    if (!fotoOriginal) return
-    setForm((f) => ({ ...f, imageUrl: fotoOriginal }))
-    setFotoOriginal(null)
+  function tornarCapa(i: number) {
+    setForm((f) => {
+      const fotos = [...f.photos]
+      const [escolhida] = fotos.splice(i, 1)
+      return { ...f, photos: [escolhida, ...fotos] }
+    })
+  }
+
+  function salvar() {
+    if (pendentes.length) { toast('Espere as fotos terminarem de carregar.', 'info'); return }
+    onSave(form)
   }
 
   return (
@@ -302,55 +348,52 @@ function ProductModal({
 
           <ScrollView contentContainerStyle={modal.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-            <TouchableOpacity style={modal.imagePicker} onPress={pickImage} activeOpacity={0.8} disabled={uploading}>
-              {uploading ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : form.imageUrl ? (
-                <>
-                  <Image source={{ uri: form.imageUrl }} style={modal.imagePreview} />
-                  <View style={modal.imageEditBadge}>
-                    <Ionicons name="camera" size={14} color="#fff" />
-                  </View>
-                </>
-              ) : (
-                <View style={modal.imagePlaceholder}>
-                  <Ionicons name="camera-outline" size={28} color={colors.primary} />
-                  <Text style={modal.imagePlaceholderText}>Adicionar foto</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            {fundoBrancoAtivo && !!form.imageUrl && !uploading && (
-              fotoOriginal ? (
-                <View style={modal.fundoLinha}>
-                  <Ionicons name="checkmark-circle" size={16} color="#15803D" />
-                  <Text style={modal.fundoOk}>Fundo branco aplicado</Text>
-                  <TouchableOpacity onPress={desfazerFundoBranco} hitSlop={8} activeOpacity={0.7}>
-                    <Text style={modal.fundoDesfazer}>Desfazer</Text>
+            <View style={modal.fieldWrap}>
+              <View style={modal.fotosTopo}>
+                <Text style={[modal.fieldLabel, { marginBottom: 0 }]}>FOTOS DO PRODUTO</Text>
+                <Text style={modal.fotosConta}>{totalFotos}/{MAX_FOTOS_PRODUTO}</Text>
+              </View>
+              <View style={modal.fotosLinha}>
+                {form.photos.map((uri, i) => (
+                  <TouchableOpacity key={uri} style={modal.fotoSlot} onPress={() => setVerFoto(i)} activeOpacity={0.85}>
+                    <Image source={{ uri }} style={modal.fotoImg} resizeMode="contain" />
+                    {i === 0 && (
+                      <View style={modal.capaTag}>
+                        <Text style={modal.capaTagTexto}>CAPA</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity style={modal.fotoRemover} onPress={() => removerFoto(i)} hitSlop={8} activeOpacity={0.8}>
+                      <Ionicons name="close" size={13} color="#fff" />
+                    </TouchableOpacity>
                   </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={[modal.fundoBtn, processandoFundo && { opacity: 0.6 }]}
-                  onPress={aplicarFundoBranco}
-                  disabled={processandoFundo}
-                  activeOpacity={0.85}
-                >
-                  {processandoFundo
-                    ? <ActivityIndicator size="small" color={colors.primary} />
-                    : <Ionicons name="sparkles" size={15} color={colors.primary} />}
-                  <Text style={modal.fundoBtnTexto}>
-                    {processandoFundo ? 'Deixando o fundo branco...' : 'Deixar fundo branco'}
-                  </Text>
-                </TouchableOpacity>
-              )
-            )}
-            {/* O teste real mostrou o erro mais provavel: foto com varios produtos
-                ou cortada na borda. A IA recorta tudo que parece produto, e o que
-                estava cortado continua cortado. */}
-            {fundoBrancoAtivo && !!form.imageUrl && !uploading && !fotoOriginal && !processandoFundo && (
-              <Text style={modal.fundoDica}>Funciona melhor com um produto por foto, inteiro no enquadramento.</Text>
-            )}
+                ))}
+                {pendentes.map((p) => (
+                  <View key={p.key} style={modal.fotoSlot}>
+                    <Image source={{ uri: p.uri }} style={[modal.fotoImg, { opacity: 0.3 }]} resizeMode="cover" />
+                    <View style={modal.fotoProcessando}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={modal.fotoProcessandoTexto}>
+                        {p.etapa === 'fundo' ? 'Tirando o fundo…' : 'Enviando…'}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+                {vagas > 0 && (
+                  <TouchableOpacity style={[modal.fotoSlot, modal.fotoAdd]} onPress={pickImages} activeOpacity={0.8}>
+                    <Ionicons name="camera-outline" size={24} color={colors.primary} />
+                    <Text style={modal.fotoAddTexto}>{totalFotos === 0 ? 'Adicionar foto' : 'Mais uma'}</Text>
+                  </TouchableOpacity>
+                )}
+                {/* mantém as 3 colunas alinhadas */}
+                {Array.from({ length: Math.max(0, vagas - 1) }).map((_, i) => (
+                  <View key={`vazio-${i}`} style={[modal.fotoSlot, modal.fotoVazio]} />
+                ))}
+              </View>
+              <Text style={modal.fotosDica}>
+                A primeira é a capa. Toque numa foto para ver grande ou trocar a capa.
+                {fundoBrancoAtivo ? ' O fundo fica branco sozinho. Funciona melhor com um produto por foto, inteiro no enquadramento.' : ''}
+              </Text>
+            </View>
 
             <View style={modal.fieldWrap}>
               <Text style={modal.fieldLabel}>NOME DO PRODUTO *</Text>
@@ -571,8 +614,8 @@ function ProductModal({
             </View>
 
             <Relevo
-              style={[modal.saveBtn, saving && { opacity: 0.7 }]}
-              onPress={() => onSave(form)}
+              style={[modal.saveBtn, (saving || pendentes.length > 0) && { opacity: 0.7 }]}
+              onPress={salvar}
               disabled={saving}
             >
               {saving
@@ -586,6 +629,28 @@ function ProductModal({
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
+
+      <VisualizadorFotos
+        fotos={form.photos}
+        inicial={verFoto ?? 0}
+        visivel={verFoto != null}
+        onFechar={() => setVerFoto(null)}
+        titulo={form.name || 'Foto do produto'}
+        rodape={(i) => (
+          <>
+            {i > 0 && (
+              <TouchableOpacity style={modal.verBtn} onPress={() => { tornarCapa(i); setVerFoto(null) }} activeOpacity={0.85}>
+                <Ionicons name="star-outline" size={16} color="#fff" />
+                <Text style={modal.verBtnTexto}>Usar como capa</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={[modal.verBtn, modal.verBtnPerigo]} onPress={() => { removerFoto(i); setVerFoto(null) }} activeOpacity={0.85}>
+              <Ionicons name="trash-outline" size={16} color="#fff" />
+              <Text style={modal.verBtnTexto}>Remover</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      />
     </Modal>
   )
 }
@@ -941,6 +1006,8 @@ export default function StoreProductsScreen() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [saving, setSaving] = useState(false)
   const [variationsProduct, setVariationsProduct] = useState<Product | null>(null)
+  // Fotos do produto em tela cheia (tocar na foto do card).
+  const [fotosDe, setFotosDe] = useState<Product | null>(null)
   // Bulk select
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -1126,7 +1193,9 @@ export default function StoreProductsScreen() {
     // Antes usava `if (form.stock)` — string vazia é falsy, então nunca voltava pra ilimitado.
     payload.stock = form.stock.trim() === '' ? null : parseInt(form.stock, 10)
     payload.maxDeliveryKm = form.maxDeliveryKm.trim() === '' ? null : parseFloat(form.maxDeliveryKm.replace(',', '.'))
-    if (form.imageUrl) payload.imageUrl = form.imageUrl
+    // Capa + galeria. null limpa a capa quando o lojista tirou todas as fotos.
+    payload.imageUrl = form.photos[0] ?? null
+    payload.images = form.photos.slice(1)
     payload.storeDelivery = form.storeDelivery
 
     // Promoção "Leve X Pague Y": envia os dois ou limpa (null). Valida X > Y.
@@ -1178,8 +1247,8 @@ export default function StoreProductsScreen() {
     basePrice: editingProduct.basePrice != null ? String(editingProduct.basePrice) : '',
     comparePrice: editingProduct.comparePrice != null ? String(editingProduct.comparePrice) : '',
     stock: editingProduct.stock != null ? String(editingProduct.stock) : '',
-    imageUrl: editingProduct.imageUrl ?? '',
-    maxDeliveryKm: (editingProduct as any).maxDeliveryKm != null ? String((editingProduct as any).maxDeliveryKm) : '',
+    photos: fotosDoProduto(editingProduct),
+    maxDeliveryKm: editingProduct.maxDeliveryKm != null ? String(editingProduct.maxDeliveryKm) : '',
     promoBuyQty: editingProduct.promoBuyQty != null ? String(editingProduct.promoBuyQty) : '',
     promoPayQty: editingProduct.promoPayQty != null ? String(editingProduct.promoPayQty) : '',
     storeDelivery: !!editingProduct.storeDelivery,
@@ -1285,8 +1354,9 @@ export default function StoreProductsScreen() {
               {filtered.map((product) => (
                 <TouchableOpacity
                   key={product.id}
-                  activeOpacity={selectMode ? 0.7 : 1}
-                  onPress={selectMode ? () => toggleSelect(product.id) : undefined}
+                  activeOpacity={0.85}
+                  // Tocar no card abre o produto (antes só o botão Editar abria).
+                  onPress={selectMode ? () => toggleSelect(product.id) : () => handleEdit(product)}
                   onLongPress={() => { setSelectMode(true); toggleSelect(product.id) }}
                   style={{ position: 'relative' }}
                 >
@@ -1299,6 +1369,7 @@ export default function StoreProductsScreen() {
                   )}
                   <ProductCard
                     product={product}
+                    onView={selectMode ? () => toggleSelect(product.id) : setFotosDe}
                     onToggle={selectMode ? () => {} : handleToggle}
                     onEdit={selectMode ? () => {} : handleEdit}
                     onDelete={selectMode ? () => {} : handleDelete}
@@ -1322,6 +1393,28 @@ export default function StoreProductsScreen() {
         saving={saving}
         courierBox={courierBox}
         ownDeliveryFee={ownDeliveryFee}
+      />
+
+      <VisualizadorFotos
+        fotos={fotosDe ? fotosDoProduto(fotosDe) : []}
+        visivel={!!fotosDe}
+        onFechar={() => setFotosDe(null)}
+        titulo={fotosDe?.name}
+        rodape={() => (
+          <TouchableOpacity
+            style={modal.verBtn}
+            activeOpacity={0.85}
+            onPress={() => {
+              const p = fotosDe
+              setFotosDe(null)
+              // deixa o visualizador fechar antes de abrir o formulário
+              if (p) setTimeout(() => handleEdit(p), 250)
+            }}
+          >
+            <Ionicons name="pencil-outline" size={16} color="#fff" />
+            <Text style={modal.verBtnTexto}>Editar produto</Text>
+          </TouchableOpacity>
+        )}
       />
 
       <VariationsModal
@@ -1433,38 +1526,43 @@ const modal = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: '#EDE5DF',
     paddingHorizontal: 14, paddingVertical: 14, fontSize: 15, color: '#1A0A00',
   },
-  imagePicker: {
-    width: 100, height: 100, borderRadius: 16,
-    backgroundColor: '#F5F0EC',
-    borderWidth: 1.5, borderColor: '#EDE5DF', borderStyle: 'dashed',
-    alignSelf: 'center', marginBottom: 20,
-    alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden',
+  fotosTopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  fotosConta: { fontSize: 12, fontWeight: '800', color: colors.primary },
+  fotosLinha: { flexDirection: 'row', gap: 10 },
+  fotoSlot: {
+    flex: 1, aspectRatio: 1, borderRadius: 14, overflow: 'hidden',
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#EDE5DF',
   },
-  imagePreview: { width: 100, height: 100 },
-  // Fundo branco automatico, logo abaixo da foto.
-  fundoBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-    alignSelf: 'center', marginTop: -6, marginBottom: 14,
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
-    backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: '#FFD9C2',
+  fotoImg: { width: '100%', height: '100%' },
+  fotoAdd: {
+    borderStyle: 'dashed', borderColor: '#FFC9A8', backgroundColor: colors.primaryLight,
+    alignItems: 'center', justifyContent: 'center', gap: 4,
   },
-  fundoBtnTexto: { fontSize: 13, fontWeight: '800', color: colors.primary },
-  fundoDica: { fontSize: 11.5, color: '#9A8880', textAlign: 'center', marginTop: -8, marginBottom: 14, paddingHorizontal: 24 },
-  fundoLinha: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    marginTop: -6, marginBottom: 14,
+  fotoAddTexto: { fontSize: 11, fontWeight: '800', color: colors.primary },
+  fotoVazio: { backgroundColor: 'transparent', borderStyle: 'dashed', borderColor: '#EDE5DF' },
+  capaTag: {
+    position: 'absolute', left: 6, bottom: 6,
+    backgroundColor: colors.primary, borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 2,
   },
-  fundoOk: { fontSize: 13, fontWeight: '700', color: '#15803D' },
-  fundoDesfazer: { fontSize: 13, fontWeight: '800', color: colors.primary, textDecorationLine: 'underline' },
-  imageEditBadge: {
-    position: 'absolute', bottom: 6, right: 6,
-    backgroundColor: colors.primary,
-    borderRadius: 12, width: 24, height: 24,
+  capaTagTexto: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
+  fotoRemover: {
+    position: 'absolute', top: 6, right: 6,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(26,10,0,0.6)',
     alignItems: 'center', justifyContent: 'center',
   },
-  imagePlaceholder: { alignItems: 'center', gap: 4 },
-  imagePlaceholderText: { fontSize: 11, fontWeight: '700', color: colors.primary },
+  fotoProcessando: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 6, padding: 4 },
+  fotoProcessandoTexto: { fontSize: 10.5, fontWeight: '800', color: colors.primaryDark, textAlign: 'center' },
+  fotosDica: { fontSize: 11.5, color: '#9A8880', marginTop: 8, lineHeight: 16 },
+  // Botões do visualizador de fotos (fundo escuro).
+  verBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 15,
+    borderBottomWidth: 4, borderBottomColor: '#C2410C',
+  },
+  verBtnPerigo: { backgroundColor: 'rgba(255,255,255,0.12)', borderBottomColor: 'rgba(255,255,255,0.06)' },
+  verBtnTexto: { color: '#fff', fontSize: 15, fontWeight: '800' },
   catLoading: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   catScroll: { flexGrow: 0 },
   catSearchRow: {
@@ -1609,7 +1707,14 @@ const card = StyleSheet.create({
     shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
   inactive: { opacity: 0.6 },
-  image: { width: '100%', height: 90 },
+  image: { width: '100%', height: 150, backgroundColor: '#fff' },
+  fotoBadges: { position: 'absolute', top: 8, right: 8, flexDirection: 'row', gap: 6 },
+  fotoBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(26,10,0,0.55)', borderRadius: 999,
+    paddingHorizontal: 7, paddingVertical: 4,
+  },
+  fotoBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   imagePlaceholder: { height: 90, backgroundColor: '#FFF0EB', alignItems: 'center', justifyContent: 'center' },
   body: { padding: 12 },
   topRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },

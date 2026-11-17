@@ -119,3 +119,32 @@ describe('ProductsService.findPopular — janela dos destaques', () => {
     expect(prisma.product.findMany).not.toHaveBeenCalled()
   })
 })
+
+describe('ProductsService: fundo branco obrigatório', () => {
+  function comFundo() {
+    const { prisma } = makeService()
+    const fundo = { agendar: jest.fn() }
+    return { svc: new ProductsService(prisma as any, fundo as any), prisma, fundo }
+  }
+
+  it('salvar produto com foto manda o servidor tratar o que veio sem fundo branco', async () => {
+    const { svc, prisma, fundo } = comFundo()
+    prisma.store.findUnique.mockResolvedValue(loja)
+    prisma.product.create.mockResolvedValue({ id: 'p1' })
+    await svc.create('u1', 's1', { name: 'X', imageUrl: 'https://x/1.jpg' } as any)
+    expect(fundo.agendar).toHaveBeenCalledTimes(1)
+
+    prisma.product.findUnique.mockResolvedValue({ id: 'p1', basePrice: null, store: loja })
+    prisma.product.update.mockResolvedValue({ id: 'p1' })
+    await svc.update('u1', 'p1', { images: ['https://x/2.jpg'] } as any)
+    expect(fundo.agendar).toHaveBeenCalledTimes(2)
+  })
+
+  it('salvar sem mexer em foto não dispara nada', async () => {
+    const { svc, prisma, fundo } = comFundo()
+    prisma.product.findUnique.mockResolvedValue({ id: 'p1', basePrice: null, store: loja })
+    prisma.product.update.mockResolvedValue({ id: 'p1' })
+    await svc.update('u1', 'p1', { name: 'Novo nome' } as any)
+    expect(fundo.agendar).not.toHaveBeenCalled()
+  })
+})

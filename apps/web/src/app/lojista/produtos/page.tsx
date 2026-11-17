@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus, TriangleAlert, Layers, Ban, Sparkles, Truck } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Package, Camera, Loader2, Minus, TriangleAlert, Layers, Ban, Truck } from 'lucide-react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 import { Product, ProductVariation, Store, Category, CourierBox, money } from '@/lib/types'
@@ -11,7 +11,8 @@ import { Spinner } from '@/components/Spinner'
 import styles from './page.module.css'
 import { useDialogs } from '@/components/Dialogs'
 
-const MAX_GALLERY_IMAGES = 8
+// Até 3 fotos por produto: a capa + 2 na galeria (igual ao app).
+const MAX_GALLERY_IMAGES = 2
 
 interface FormState {
   id?: string
@@ -47,12 +48,10 @@ export default function ProdutosPage() {
   const [variationsProduct, setVariationsProduct] = useState<Product | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imageError, setImageError] = useState('')
-  // Fundo branco automatico (Bria). `fotoOriginal` permite desfazer.
+  // Fundo branco (Bria): aplicado sozinho em toda foto enviada, sem perguntar.
   const [fundoBrancoAtivo, setFundoBrancoAtivo] = useState(false)
-  const [processandoFundo, setProcessandoFundo] = useState(false)
-  const [fotoOriginal, setFotoOriginal] = useState<string | null>(null)
 
-  // Sem a chave da Bria no servidor, o botao simplesmente nao aparece.
+  // Sem a chave da Bria no servidor, a foto vai como foi enviada.
   useEffect(() => {
     api.get('/uploads/white-background/status')
       .then((r) => setFundoBrancoAtivo(!!r.data?.enabled))
@@ -111,56 +110,53 @@ export default function ProdutosPage() {
     onError: (e: any) => toast(e?.response?.data?.message ?? e?.message ?? 'Não foi possível salvar o produto.', 'error'),
   })
 
+  /** Envia a foto e já devolve com o fundo branco (se o recurso estiver ligado). */
+  async function enviarFoto(file: File, aoTirarFundo: () => void): Promise<string> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await api.post<{ url: string }>('/uploads/image', formData)
+    if (!fundoBrancoAtivo) return data.url
+    aoTirarFundo()
+    try {
+      const r = await api.post<{ url: string }>('/uploads/image/white-background', { imageUrl: data.url })
+      return r.data?.url || data.url
+    } catch {
+      // Fica a foto original: nada se perde.
+      toast('Não deu para tirar o fundo agora. A foto ficou como foi enviada.', 'info')
+      return data.url
+    }
+  }
+
+  const [etapaCapa, setEtapaCapa] = useState<'enviando' | 'fundo' | null>(null)
+  const [etapaGaleria, setEtapaGaleria] = useState<'enviando' | 'fundo' | null>(null)
+
   async function handleImageFile(file: File) {
     setImageError('')
     setUploadingImage(true)
+    setEtapaCapa('enviando')
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const { data } = await api.post<{ url: string }>('/uploads/image', formData)
-      setForm((f) => f && { ...f, imageUrl: data.url })
-      setFotoOriginal(null)
+      const url = await enviarFoto(file, () => setEtapaCapa('fundo'))
+      setForm((f) => f && { ...f, imageUrl: url })
     } catch {
       setImageError('Não foi possível enviar a imagem. Use JPEG, PNG ou WEBP de até 10MB.')
     } finally {
       setUploadingImage(false)
+      setEtapaCapa(null)
     }
-  }
-
-  async function aplicarFundoBranco() {
-    if (!form?.imageUrl || processandoFundo) return
-    setImageError('')
-    setProcessandoFundo(true)
-    try {
-      const { data } = await api.post<{ url: string }>('/uploads/image/white-background', { imageUrl: form.imageUrl })
-      setFotoOriginal(form.imageUrl)
-      setForm((f) => f && { ...f, imageUrl: data.url })
-    } catch (e: any) {
-      // A foto original fica no formulario — falhar aqui nao perde nada.
-      setImageError(e?.response?.data?.message ?? 'Nao foi possivel deixar o fundo branco agora.')
-    } finally {
-      setProcessandoFundo(false)
-    }
-  }
-
-  function desfazerFundoBranco() {
-    if (!fotoOriginal) return
-    setForm((f) => f && { ...f, imageUrl: fotoOriginal })
-    setFotoOriginal(null)
   }
 
   async function handleGalleryFile(file: File) {
     setGalleryError('')
     setUploadingGallery(true)
+    setEtapaGaleria('enviando')
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const { data } = await api.post<{ url: string }>('/uploads/image', formData)
-      setForm((f) => f && { ...f, images: [...f.images, data.url] })
+      const url = await enviarFoto(file, () => setEtapaGaleria('fundo'))
+      setForm((f) => f && { ...f, images: [...f.images, url].slice(0, MAX_GALLERY_IMAGES) })
     } catch {
       setGalleryError('Não foi possível enviar a imagem. Use JPEG, PNG ou WEBP de até 10MB.')
     } finally {
       setUploadingGallery(false)
+      setEtapaGaleria(null)
     }
   }
   function removeGalleryImage(url: string) {
@@ -208,7 +204,7 @@ export default function ProdutosPage() {
       basePrice: String(Math.round(Number(p.basePrice) * 100)),
       comparePrice: p.comparePrice ? String(Math.round(Number(p.comparePrice) * 100)) : '',
       stock: p.stock == null ? '' : String(p.stock),
-      categoryId: p.categoryId ?? '', imageUrl: p.imageUrl ?? '', images: p.images ?? [], isActive: p.isActive,
+      categoryId: p.categoryId ?? '', imageUrl: p.imageUrl ?? '', images: (p.images ?? []).slice(0, MAX_GALLERY_IMAGES), isActive: p.isActive,
       promoBuyQty: p.promoBuyQty != null ? String(p.promoBuyQty) : '',
       promoPayQty: p.promoPayQty != null ? String(p.promoPayQty) : '',
       storeDelivery: !!p.storeDelivery,
@@ -464,38 +460,13 @@ export default function ProdutosPage() {
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageFile(f); e.target.value = '' }}
                 />
                 <button type="button" className={styles.imgBtn} onClick={() => imageInputRef.current?.click()} disabled={uploadingImage}>
-                  {uploadingImage ? <><Loader2 size={14} className={styles.spin} /> Enviando…</> : <><Camera size={14} /> {form.imageUrl ? 'Trocar foto' : 'Enviar foto'}</>}
+                  {uploadingImage
+                    ? <><Loader2 size={14} className={styles.spin} /> {etapaCapa === 'fundo' ? 'Tirando o fundo…' : 'Enviando…'}</>
+                    : <><Camera size={14} /> {form.imageUrl ? 'Trocar foto' : 'Enviar foto'}</>}
                 </button>
-                {fundoBrancoAtivo && !!form.imageUrl && !uploadingImage && (
-                  fotoOriginal ? (
-                    <p style={{ fontSize: 12.5, fontWeight: 700, color: '#15803D', margin: '8px 0 0' }}>
-                      Fundo branco aplicado ·{' '}
-                      <button
-                        type="button"
-                        onClick={desfazerFundoBranco}
-                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                          color: 'var(--orange)', fontWeight: 800, textDecoration: 'underline', fontSize: 12.5 }}
-                      >
-                        Desfazer
-                      </button>
-                    </p>
-                  ) : (
-                    <button
-                      type="button"
-                      className={styles.imgBtn}
-                      onClick={aplicarFundoBranco}
-                      disabled={processandoFundo}
-                      style={{ marginTop: 8 }}
-                    >
-                      {processandoFundo
-                        ? <><Loader2 size={14} className={styles.spin} /> Deixando o fundo branco…</>
-                        : <><Sparkles size={14} /> Deixar fundo branco</>}
-                    </button>
-                  )
-                )}
-                {fundoBrancoAtivo && !!form.imageUrl && !uploadingImage && !fotoOriginal && !processandoFundo && (
+                {fundoBrancoAtivo && (
                   <p style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0 0', maxWidth: 260 }}>
-                    Funciona melhor com um produto por foto, inteiro no enquadramento.
+                    O fundo fica branco sozinho. Funciona melhor com um produto por foto, inteiro no enquadramento.
                   </p>
                 )}
                 {imageError && <p className={styles.imgErr}>{imageError}</p>}
@@ -526,12 +497,13 @@ export default function ProdutosPage() {
                     title="Adicionar foto"
                   >
                     {uploadingGallery ? <Loader2 size={16} className={styles.spin} /> : <Camera size={16} />}
+                    {etapaGaleria === 'fundo' && <span style={{ fontSize: 10, fontWeight: 700 }}>fundo…</span>}
                   </button>
                 </>
               )}
             </div>
             {galleryError && <p className={styles.imgErr}>{galleryError}</p>}
-            <p className={styles.hint}>A primeira foto (acima) é a capa exibida nas listagens. Estas aparecem na galeria da página do produto.</p>
+            <p className={styles.hint}>Até 3 fotos no total. A primeira (acima) é a capa exibida nas listagens; estas aparecem na galeria da página do produto.</p>
 
             <label className={styles.checkRow}>
               <input type="checkbox" checked={form.isActive} onChange={e => setForm({ ...form, isActive: e.target.checked })} />

@@ -1,11 +1,21 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { FundoBrancoLoteService } from '../uploads/fundo-branco-lote.service'
 import { CreateProductDto } from './dto/create-product.dto'
 import { CreateVariationDto } from './dto/create-variation.dto'
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    // Fundo branco obrigatório: foto que chegar sem tratar é processada no servidor.
+    @Optional() private fundoBranco?: FundoBrancoLoteService,
+  ) {}
+
+  /** Chamado depois de salvar foto: trata em segundo plano o que veio sem fundo branco. */
+  private conferirFotos(dto: { imageUrl?: string | null; images?: string[] }) {
+    if (dto.imageUrl || dto.images?.length) this.fundoBranco?.agendar()
+  }
 
   // "Leve X Pague Y": só é válido com X > Y (e X ≥ 2). Se o cliente mexeu na promo
   // mas mandou algo inválido/incompleto, limpa (null) pra não gravar promoção quebrada.
@@ -55,10 +65,12 @@ export class ProductsService {
 
     this.normalizePromo(dto)
     this.validarOferta(dto, dto.basePrice ?? null)
-    return this.prisma.product.create({
+    const criado = await this.prisma.product.create({
       data: { ...dto, storeId, hasVariations: false },
       include: { category: true },
     })
+    this.conferirFotos(dto)
+    return criado
   }
 
   /** Janela dos "Destaques da Semana". Um numero so, facil de abrir para 15 ou
@@ -292,11 +304,13 @@ export class ProductsService {
 
     this.normalizePromo(dto)
     this.validarOferta(dto, dto.basePrice ?? (product.basePrice ? Number(product.basePrice) : null))
-    return this.prisma.product.update({
+    const atualizado = await this.prisma.product.update({
       where: { id: productId },
       data: dto,
       include: { category: true },
     })
+    this.conferirFotos(dto)
+    return atualizado
   }
 
   async toggleActive(userId: string, productId: string) {

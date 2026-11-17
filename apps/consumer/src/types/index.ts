@@ -58,6 +58,8 @@ export interface Product {
   name: string
   description?: string
   imageUrl?: string
+  /** Outras fotos (até 2); a capa continua em imageUrl. */
+  images?: string[]
   basePrice?: number
   stock?: number | null
   hasVariations: boolean

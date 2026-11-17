@@ -12,6 +12,32 @@ const BRIA_TIMEOUT_MS = 45_000
 const MAX_RESULTADO_BYTES = 30 * 1024 * 1024
 
 /**
+ * Toda foto que sai daqui é salva com este prefixo no nome. É assim que o lote
+ * do admin sabe que ela já foi tratada e não paga a Bria de novo.
+ */
+export const PREFIXO_FUNDO_BRANCO = 'fb-'
+
+/**
+ * A foto já é uma das nossas com fundo branco, gravada antes de existir o prefixo?
+ * O formato é inconfundível: JPEG 1200×1200 com os quatro cantos brancos.
+ */
+export async function pareceFundoBrancoNosso(img: Buffer): Promise<boolean> {
+  try {
+    const meta = await sharp(img).metadata()
+    if (meta.format !== 'jpeg' || meta.width !== LADO_FINAL || meta.height !== LADO_FINAL) return false
+    const { data, info } = await sharp(img).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+    const d = 4
+    const cantos = [[d, d], [info.width - 1 - d, d], [d, info.height - 1 - d], [info.width - 1 - d, info.height - 1 - d]]
+    return cantos.every(([x, y]) => {
+      const i = (y * info.width + x) * info.channels
+      return data[i] > 245 && data[i + 1] > 245 && data[i + 2] > 245
+    })
+  } catch {
+    return false
+  }
+}
+
+/**
  * Recorta a imagem na área ocupada pelo produto, lendo o canal de transparência.
  *
  * Não usa o `trim()` do sharp de propósito: ele decide o que é "fundo" pelo
@@ -125,7 +151,37 @@ export class FundoBrancoService {
 
     const recorte = await this.recortarNaBria(urlOriginal)
     const final = await comporSobreBranco(recorte)
-    return this.uploads.uploadImageBuffer(final, 'image/jpeg')
+    return this.uploads.uploadImageBuffer(final, 'image/jpeg', PREFIXO_FUNDO_BRANCO)
+  }
+
+  /** Nome do arquivo começa com o prefixo = já passou por aqui. */
+  ehFotoTratada(url: string): boolean {
+    const nome = (url.split('?')[0].split('/').pop() ?? '')
+    return nome.startsWith(PREFIXO_FUNDO_BRANCO)
+  }
+
+  /**
+   * Foto antiga, para o lote do admin. Antes de pagar a Bria, confere se ela já
+   * é uma foto nossa com fundo branco (de antes do prefixo): nesse caso só regrava
+   * com o prefixo, sem custo. A foto original continua no bucket.
+   */
+  async tratarFotoAntiga(url: string): Promise<{ url: string; cobrada: boolean }> {
+    if (!this.urlEhNossa(url)) {
+      throw new BadRequestException('Foto fora do nosso armazenamento.')
+    }
+    const controle = new AbortController()
+    const prazo = setTimeout(() => controle.abort(), BRIA_TIMEOUT_MS)
+    let original: Buffer
+    try {
+      original = await this.baixar(url, controle.signal)
+    } finally {
+      clearTimeout(prazo)
+    }
+    if (await pareceFundoBrancoNosso(original)) {
+      const nova = await this.uploads.uploadImageBuffer(original, 'image/jpeg', PREFIXO_FUNDO_BRANCO)
+      return { url: nova, cobrada: false }
+    }
+    return { url: await this.deixarFundoBranco(url), cobrada: true }
   }
 
   private async recortarNaBria(urlImagem: string): Promise<Buffer> {

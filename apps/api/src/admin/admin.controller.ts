@@ -9,12 +9,16 @@ import { UpdateCourierDocStatusDto } from './dto/update-courier-doc-status.dto'
 import { UpdateStoreStatusDto } from './dto/update-store-status.dto'
 import { UpdateUserStatusDto } from './dto/update-user-status.dto'
 import { UpdatePricingDto } from './dto/update-pricing.dto'
+import { FundoBrancoLoteService } from '../uploads/fundo-branco-lote.service'
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly fundoBrancoLote: FundoBrancoLoteService,
+  ) {}
 
   @Get('stats')
   getStats() {
@@ -71,6 +75,12 @@ export class AdminController {
   @Patch('products/:id/block')
   setProductBlock(@Param('id') id: string, @Body() body: { blocked: boolean; reason?: string }) {
     return this.adminService.setProductBlock(id, !!body?.blocked, body?.reason)
+  }
+
+  // Fundo branco: o servidor trata toda foto sozinho; aqui o admin só acompanha.
+  @Get('products/white-background')
+  getFundoBrancoResumo() {
+    return this.fundoBrancoLote.resumo()
   }
 
   // Bíblia de cortesia — quem pediu e para onde enviar.

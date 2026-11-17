@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, type AdminProduct } from '../api'
+import { api, type AdminProduct, type WhiteBgSummary } from '../api'
 import { useToast } from '../context/ToastContext'
 
 const O = '#FF6600'
@@ -16,6 +16,52 @@ type Filter = 'all' | 'blocked'
 function fmtBRL(v: number | string | null) {
   if (v == null) return '—'
   return `R$ ${Number(v).toFixed(2).replace('.', ',')}`
+}
+
+/**
+ * Fundo branco: o servidor trata toda foto de produto sozinho (não é opção de
+ * ninguém). Este quadro só mostra o andamento — atualiza enquanto há fila.
+ */
+function FundoBrancoStatus() {
+  const [resumo, setResumo] = useState<WhiteBgSummary | null>(null)
+  const [erro, setErro] = useState(false)
+
+  const carregar = useCallback(async () => {
+    try { setResumo(await api.whiteBackgroundSummary()); setErro(false) } catch { setErro(true) }
+  }, [])
+  useEffect(() => { carregar() }, [carregar])
+  // Com fila andando, confere de novo a cada 10 s.
+  useEffect(() => {
+    if (!resumo || (!resumo.rodando && resumo.fotos === 0)) return
+    const t = setInterval(carregar, 10_000)
+    return () => clearInterval(t)
+  }, [resumo, carregar])
+
+  if (erro || !resumo) return null
+
+  const [cor, texto] = !resumo.ativo
+    ? ['#B45309', 'Desligado: falta a BRIA_API_TOKEN nas variáveis da API no Railway.']
+    : resumo.fotos > 0
+      ? [MUTED, `Processando sozinho: faltam ${resumo.fotos} foto${resumo.fotos === 1 ? '' : 's'} em ${resumo.produtos} produto${resumo.produtos === 1 ? '' : 's'}.`]
+      : [GREEN, 'Todas as fotos de produto estão com fundo branco.']
+
+  return (
+    <div style={{
+      background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14,
+      padding: '12px 16px', marginBottom: 18, display: 'flex', gap: 12, alignItems: 'center',
+    }}>
+      <div style={{ width: 34, height: 34, borderRadius: 10, background: '#FFF0E6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>✨</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 800, fontSize: 13.5, color: TEXT }}>Fundo branco automático</div>
+        <div style={{ fontSize: 12.5, color: cor, marginTop: 2, fontWeight: 600 }}>
+          {texto}
+          {resumo.falharam > 0 && (
+            <span style={{ color: RED }}> {resumo.falharam} foto{resumo.falharam === 1 ? '' : 's'} não deu para tratar (tenta de novo quando a API reiniciar).</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function Produtos() {
@@ -82,6 +128,8 @@ export function Produtos() {
       <p style={{ fontSize: 13.5, color: MUTED, marginTop: 0, marginBottom: 18 }}>
         Moderação do catálogo. Bloqueie itens impróprios ou proibidos — eles somem do app e não podem ser pedidos.
       </p>
+
+      <FundoBrancoStatus />
 
       {/* Busca + filtro */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>

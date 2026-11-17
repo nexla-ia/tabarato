@@ -75,9 +75,9 @@ export class UploadsService {
    * Diferente de uploadImage, nao vem de um usuario: o buffer saiu do sharp,
    * entao nao precisa de sniff. Mesmo bucket publico das fotos de produto.
    */
-  async uploadImageBuffer(buffer: Buffer, mime: 'image/jpeg' | 'image/png'): Promise<string> {
+  async uploadImageBuffer(buffer: Buffer, mime: 'image/jpeg' | 'image/png', prefixo = ''): Promise<string> {
     const ext = mime === 'image/png' ? 'png' : 'jpg'
-    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const filename = `${prefixo}${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
     const { error } = await this.supabase.storage
       .from(IMAGE_BUCKET)

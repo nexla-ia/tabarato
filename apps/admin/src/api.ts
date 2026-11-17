@@ -97,6 +97,16 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+export interface WhiteBgSummary {
+  ativo: boolean
+  rodando: boolean
+  fotos: number
+  produtos: number
+  ignoradas: number
+  falharam: number
+  custoMaximoUsd: number
+}
+
 export const api = {
   login: (email: string, password: string) =>
     request<{ accessToken: string; refreshToken?: string; user: AuthUser }>('/auth/login', {
@@ -150,6 +160,9 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ blocked, ...(reason ? { reason } : {}) }),
     }),
+
+  // Andamento do fundo branco automático (o servidor processa sozinho).
+  whiteBackgroundSummary: () => request<WhiteBgSummary>('/admin/products/white-background'),
 
   withdrawals: (status?: string) =>
     request<AdminWithdrawal[]>(`/admin/withdrawals${status ? `?status=${status}` : ''}`),
